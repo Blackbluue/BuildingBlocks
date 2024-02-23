@@ -41,17 +41,17 @@ target_link_libraries(test_array_list array_list cunit)
 add_library(linked_list SHARED ${BuildingBlocks_SOURCE_DIR}/src/linked_list.c)
 add_executable(test_linked_list ${BuildingBlocks_SOURCE_DIR}/tests/linked_list_tests.c)
 target_link_libraries(test_linked_list linked_list cunit)
-# # INSTALL(TARGETS linked_list test_linked_list DESTINATION ${BuildingBlocks_SOURCE_DIR}/build)
+# INSTALL(TARGETS linked_list test_linked_list DESTINATION ${BuildingBlocks_SOURCE_DIR}/build)
+
+add_library(stack SHARED ${BuildingBlocks_SOURCE_DIR}/src/stack.c)
+add_executable(test_stack ${BuildingBlocks_SOURCE_DIR}/tests/stack_tests.c)
+target_link_libraries(test_stack stack cunit)
+# INSTALL(TARGETS test_stack stack DESTINATION ${BuildingBlocks_SOURCE_DIR}/build)
 
 # add_library(hash_table SHARED ${BuildingBlocks_SOURCE_DIR}/src/hash_table.c)
 # add_executable(test_table ${BuildingBlocks_SOURCE_DIR}/tests/hash_table_tests.c)
 # target_link_libraries(test_table hash_table linked_list cunit)
 # # INSTALL(TARGETS test_table hash_table DESTINATION ${BuildingBlocks_SOURCE_DIR}/build)
-
-# add_library(stack SHARED ${BuildingBlocks_SOURCE_DIR}/src/stack.c)
-# add_executable(test_stack ${BuildingBlocks_SOURCE_DIR}/tests/stack_tests.c)
-# target_link_libraries(test_stack stack cunit)
-# # INSTALL(TARGETS test_stack stack DESTINATION ${BuildingBlocks_SOURCE_DIR}/build)
 
 # add_library(queue SHARED ${BuildingBlocks_SOURCE_DIR}/src/queue.c)
 # add_executable(test_queue ${BuildingBlocks_SOURCE_DIR}/tests/queue_tests.c)
