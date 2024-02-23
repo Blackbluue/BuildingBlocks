@@ -13,23 +13,17 @@ project(
 
 include_directories(${BuildingBlocks_SOURCE_DIR}/include)
 
-find_program(CLANG_TIDY_PROG clang-tidy)
-if(CLANG_TIDY_PROG)
-    set(CMAKE_C_CLANG_TIDY
-    ${CLANG_TIDY_PROG};
-    "--checks=* -llvm-include-order, -cppcoreguidelines-*, -readability-magic-numbers, -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling, -hiccp-no-assembler")
-    set(CMAKE_C_FLAGS "-g")
-else()
-    set(CMAKE_C_COMPILER gcc)
-    set(CMAKE_C_FLAGS "-g -Wall -pedantic")
-endif()
+set(CMAKE_C_COMPILER gcc)
+set(CMAKE_C_FLAGS "-Wall -pedantic")
 
-if(DEBUG EQUAL "1")
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     message("DEBUGGING VERSION")
-    set(CMAKE_BUILD_TYPE Debug)
-    add_definitions(-DDEBUG)
-else()
+elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
     message("RELEASE VERSION")
+elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+    message("RELEASE WITH DEBUGGING INFO")
+elseif(CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
+    message("MINIMAL SIZE RELEASE")
 endif()
 
 # set(THREADS_PREFER_PTHREAD_FLAG ON)

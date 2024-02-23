@@ -10,12 +10,12 @@ bin_loc = "build/"
 tests = [
     "test_array_list",
     "test_linked_list",
-    # "test_queue",
-    # "test_queue_p",
-    # "test_stack",
-    # "test_table",
-    # "test_tree",
-    # "test_threadpool",
+    "test_queue",
+    "test_queue_p",
+    "test_stack",
+    "test_table",
+    "test_tree",
+    "test_threadpool",
 ]
 
 
