@@ -1,4 +1,4 @@
-/* #include "array_list.h"
+#include "array_list.h"
 #include <CUnit/Basic.h>
 #include <CUnit/CUnit.h>
 #include <stdbool.h>
@@ -305,12 +305,4 @@ int main(void) {
     CU_cleanup_registry();
     printf("\n");
     return num_failed;
-}
- */
-
-#include "array_list.h"
-
-int main(void) {
-    test();
-    return 0;
 }

@@ -6,7 +6,7 @@ set(CTEST_OUTPUT_ON_FAILURE ON)
 
 project(
     BuildingBlocks
-    VERSION 0.0.0
+    VERSION 0.1.0
     LANGUAGES "C"
     DESCRIPTION "A collection of data structures and algorithms"
 )
@@ -32,8 +32,8 @@ else()
     message("RELEASE VERSION")
 endif()
 
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package(Threads REQUIRED)
+# set(THREADS_PREFER_PTHREAD_FLAG ON)
+# find_package(Threads REQUIRED)
 
 
 ### DATA STRUCTURES ###
@@ -86,3 +86,13 @@ target_link_libraries(test_array_list array_list cunit)
 # add_library(weighted_graph SHARED ${BuildingBlocks_SOURCE_DIR}/src/weighted_graph.c)
 # target_link_libraries(weighted_graph queue_p queue linked_list hash_table)
 # # INSTALL(TARGETS test_weighted_graph weighted_graph DESTINATION ${BuildingBlocks_SOURCE_DIR}/build)
+
+
+### TESTS ###
+
+
+add_test(
+    NAME TestDataStructures
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMAND python3 ${CMAKE_SOURCE_DIR}/tests/DataStructuresTests.py
+)
