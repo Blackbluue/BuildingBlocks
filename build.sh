@@ -33,6 +33,7 @@ elif [[ $1 == "analyze" ]]; then
     POST_CMD="analyze-build --cdb build/compile_commands.json"
 elif [[ $1 == "test" ]]; then
     CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Debug"
+    CMAKE_ARGS+=" -DBUILD_TESTING=ON"
     MAKE_ARGS="CTEST_OUTPUT_ON_FAILURE=1 all test"
 elif [[ -z $1 ]]; then # default
     CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Debug"
