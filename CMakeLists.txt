@@ -44,10 +44,10 @@ add_executable(test_array_list ${BuildingBlocks_SOURCE_DIR}/tests/array_list_tes
 target_link_libraries(test_array_list array_list cunit)
 # INSTALL(TARGETS array_list DESTINATION ${BuildingBlocks_SOURCE_DIR}/build)
 
-# add_library(linked_list SHARED ${BuildingBlocks_SOURCE_DIR}/src/linked_list.c)
-# add_executable(test_list ${BuildingBlocks_SOURCE_DIR}/tests/linked_list_tests.c)
-# target_link_libraries(test_list linked_list cunit)
-# # INSTALL(TARGETS linked_list test_list DESTINATION ${BuildingBlocks_SOURCE_DIR}/build)
+add_library(linked_list SHARED ${BuildingBlocks_SOURCE_DIR}/src/linked_list.c)
+add_executable(test_linked_list ${BuildingBlocks_SOURCE_DIR}/tests/linked_list_tests.c)
+target_link_libraries(test_linked_list linked_list cunit)
+# # INSTALL(TARGETS linked_list test_linked_list DESTINATION ${BuildingBlocks_SOURCE_DIR}/build)
 
 # add_library(hash_table SHARED ${BuildingBlocks_SOURCE_DIR}/src/hash_table.c)
 # add_executable(test_table ${BuildingBlocks_SOURCE_DIR}/tests/hash_table_tests.c)

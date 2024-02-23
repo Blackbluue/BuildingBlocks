@@ -9,7 +9,7 @@ PASS = 0
 bin_loc = "build/"
 tests = [
     "test_array_list",
-    # "test_list",
+    "test_linked_list",
     # "test_queue",
     # "test_queue_p",
     # "test_stack",
