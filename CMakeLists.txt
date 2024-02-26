@@ -20,8 +20,8 @@ project(
 
 set(CMAKE_C_COMPILER gcc)
 set(CMAKE_C_FLAGS "-Wall -pedantic")
-# set(THREADS_PREFER_PTHREAD_FLAG ON)
-# find_package(Threads REQUIRED)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
 
 
 include_directories(${BuildingBlocks_SOURCE_DIR}/include)
@@ -62,9 +62,9 @@ set_property(TARGET queue_concurrent PROPERTY POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(queue_concurrent queue linked_list)
 target_link_libraries(${PROJECT_NAME} queue_concurrent)
 
-# add_library(threadpool OBJECT ${BuildingBlocks_SOURCE_DIR}/src/threadpool.c)
-# target_link_libraries(threadpool queue_concurrent linked_list Threads::Threads)
-# target_link_libraries(${PROJECT_NAME} threadpool)
+add_library(threadpool OBJECT ${BuildingBlocks_SOURCE_DIR}/src/threadpool.c)
+target_link_libraries(threadpool queue_concurrent Threads::Threads)
+target_link_libraries(${PROJECT_NAME} threadpool)
 
 add_library(weighted_graph OBJECT ${BuildingBlocks_SOURCE_DIR}/src/weighted_graph.c)
 target_link_libraries(weighted_graph queue_p queue linked_list hash_table)
@@ -106,7 +106,7 @@ if(BUILD_TESTING)
     target_link_libraries(test_tree avl_tree queue linked_list cunit)
     add_test(NAME TestTree COMMAND test_tree)
 
-    # add_executable(test_threadpool ${BuildingBlocks_SOURCE_DIR}/tests/threadpool_tests.c)
-    # target_link_libraries(test_threadpool threadpool cunit)
-    # add_test(NAME TestThreadPool COMMAND test_threadpool)
+    add_executable(test_threadpool ${BuildingBlocks_SOURCE_DIR}/tests/threadpool_tests.c)
+    target_link_libraries(test_threadpool threadpool queue_concurrent queue linked_list cunit)
+    add_test(NAME TestThreadPool COMMAND test_threadpool)
 endif()
