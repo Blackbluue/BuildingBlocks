@@ -37,7 +37,7 @@ elif [[ $1 == "test" ]]; then
     MAKE_ARGS="CTEST_OUTPUT_ON_FAILURE=1 all test"
 elif [[ -z $1 ]]; then # default
     CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Debug"
-elif [[ -n $1 ]]; then
+elif [[ -n $1 ]]; then # unknown
     echo "Unknown command: $1"
     exit 1
 fi
