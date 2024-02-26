@@ -66,9 +66,9 @@ target_link_libraries(${PROJECT_NAME} queue_concurrent)
 # target_link_libraries(threadpool queue_concurrent linked_list Threads::Threads)
 # target_link_libraries(${PROJECT_NAME} threadpool)
 
-# add_library(weighted_graph OBJECT ${BuildingBlocks_SOURCE_DIR}/src/weighted_graph.c)
-# target_link_libraries(weighted_graph queue_p queue linked_list hash_table)
-# target_link_libraries(${PROJECT_NAME} weighted_graph)
+add_library(weighted_graph OBJECT ${BuildingBlocks_SOURCE_DIR}/src/weighted_graph.c)
+target_link_libraries(weighted_graph queue_p queue linked_list hash_table)
+target_link_libraries(${PROJECT_NAME} weighted_graph)
 
 # INSTALL(TARGETS ${PROJECT_NAME} DESTINATION ${BuildingBlocks_SOURCE_DIR}/build)
 
