@@ -2,12 +2,16 @@ cmake_minimum_required(VERSION 3.16)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     message("DEBUGGING VERSION")
+    add_compile_options(-Wall -Wextra -Wpedantic)
 elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
     message("RELEASE VERSION")
+    add_compile_options(-Wall -Wextra)
 elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     message("RELEASE WITH DEBUGGING INFO")
+    add_compile_options(-Wall -Wextra -Wpedantic)
 elseif(CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
     message("MINIMAL SIZE RELEASE")
+    add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
 project(
@@ -17,15 +21,14 @@ project(
     DESCRIPTION "A collection of data structures and algorithms"
 )
 
-
-set(CMAKE_C_COMPILER gcc)
-set(CMAKE_C_FLAGS "-Wall -pedantic")
 # set(THREADS_PREFER_PTHREAD_FLAG ON)
 # find_package(Threads REQUIRED)
 
 
 include_directories(${BuildingBlocks_SOURCE_DIR}/include)
 add_library(${PROJECT_NAME} SHARED ${BuildingBlocks_SOURCE_DIR}/src/buildingblocks.c)
+install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION /usr/local/lib)
+install(DIRECTORY ${BuildingBlocks_SOURCE_DIR}/include/ DESTINATION /usr/local/include/${PROJECT_NAME})
 
 
 ### DATA STRUCTURES ###
@@ -70,7 +73,6 @@ add_library(weighted_graph OBJECT ${BuildingBlocks_SOURCE_DIR}/src/weighted_grap
 target_link_libraries(weighted_graph queue_p queue linked_list hash_table)
 target_link_libraries(${PROJECT_NAME} weighted_graph)
 
-# INSTALL(TARGETS ${PROJECT_NAME} DESTINATION ${BuildingBlocks_SOURCE_DIR}/build)
 
 ### TESTS ###
 
