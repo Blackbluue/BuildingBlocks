@@ -2,12 +2,16 @@ cmake_minimum_required(VERSION 3.16)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     message("DEBUGGING VERSION")
+    add_compile_options(-Wall -Wextra -Wpedantic)
 elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
     message("RELEASE VERSION")
+    add_compile_options(-Wall -Wextra)
 elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     message("RELEASE WITH DEBUGGING INFO")
+    add_compile_options(-Wall -Wextra -Wpedantic)
 elseif(CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
     message("MINIMAL SIZE RELEASE")
+    add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
 project(
@@ -17,9 +21,6 @@ project(
     DESCRIPTION "A collection of data structures and algorithms"
 )
 
-
-set(CMAKE_C_COMPILER gcc)
-set(CMAKE_C_FLAGS "-Wall -pedantic")
 # set(THREADS_PREFER_PTHREAD_FLAG ON)
 # find_package(Threads REQUIRED)
 
