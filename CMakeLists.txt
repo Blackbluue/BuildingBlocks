@@ -26,6 +26,7 @@ set(CMAKE_C_FLAGS "-Wall -pedantic")
 
 include_directories(${BuildingBlocks_SOURCE_DIR}/include)
 add_library(${PROJECT_NAME} SHARED ${BuildingBlocks_SOURCE_DIR}/src/buildingblocks.c)
+install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION /usr/local/lib)
 
 
 ### DATA STRUCTURES ###
@@ -70,7 +71,6 @@ add_library(weighted_graph OBJECT ${BuildingBlocks_SOURCE_DIR}/src/weighted_grap
 target_link_libraries(weighted_graph queue_p queue linked_list hash_table)
 target_link_libraries(${PROJECT_NAME} weighted_graph)
 
-# INSTALL(TARGETS ${PROJECT_NAME} DESTINATION ${BuildingBlocks_SOURCE_DIR}/build)
 
 ### TESTS ###
 
