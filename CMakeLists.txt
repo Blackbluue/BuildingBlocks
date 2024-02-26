@@ -57,9 +57,10 @@ add_library(avl_tree OBJECT ${BuildingBlocks_SOURCE_DIR}/src/avl_tree.c)
 target_link_libraries(avl_tree queue linked_list)
 target_link_libraries(${PROJECT_NAME} avl_tree)
 
-# add_library(queue_concurrent OBJECT ${BuildingBlocks_SOURCE_DIR}/src/queue_concurrent.c)
-# target_link_libraries(queue_concurrent queue linked_list)
-# target_link_libraries(${PROJECT_NAME} queue_concurrent)
+add_library(queue_concurrent OBJECT ${BuildingBlocks_SOURCE_DIR}/src/queue_concurrent.c)
+set_property(TARGET queue_concurrent PROPERTY POSITION_INDEPENDENT_CODE ON)
+target_link_libraries(queue_concurrent queue linked_list)
+target_link_libraries(${PROJECT_NAME} queue_concurrent)
 
 # add_library(threadpool OBJECT ${BuildingBlocks_SOURCE_DIR}/src/threadpool.c)
 # target_link_libraries(threadpool queue_concurrent linked_list Threads::Threads)
