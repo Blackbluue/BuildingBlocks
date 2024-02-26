@@ -28,6 +28,7 @@ project(
 include_directories(${BuildingBlocks_SOURCE_DIR}/include)
 add_library(${PROJECT_NAME} SHARED ${BuildingBlocks_SOURCE_DIR}/src/buildingblocks.c)
 install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION /usr/local/lib)
+install(DIRECTORY ${BuildingBlocks_SOURCE_DIR}/include/ DESTINATION /usr/local/include/${PROJECT_NAME})
 
 
 ### DATA STRUCTURES ###
