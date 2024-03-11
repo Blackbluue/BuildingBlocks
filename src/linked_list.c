@@ -71,9 +71,12 @@ static list_node_t *create_node(void *data, list_node_t *next,
  *
  * @param node The node to be incremented
  * @param data unused
- * @return int SUCCESS
+ * @return int 0 on success, EINVAL if node is NULL
  */
 static int inc_pos(list_node_t *node, void *data) {
+    if (node == NULL) {
+        return EINVAL;
+    }
     node->position++;
     return SUCCESS;
 }
@@ -83,10 +86,15 @@ static int inc_pos(list_node_t *node, void *data) {
  *
  * @param node The node to be decremented
  * @param data unused
- * @return int SUCCESS
+ * @return int 0 on success, EINVAL if node is NULL
  */
 static int dec_pos(list_node_t *node, void *data) {
-    node->position--;
+    if (node == NULL) {
+        return EINVAL;
+    }
+    if (node->position > 0) {
+        node->position--;
+    }
     return SUCCESS;
 }
 
@@ -100,6 +108,15 @@ static int dec_pos(list_node_t *node, void *data) {
  */
 static list_node_t *merge(list_node_t *firstNode, list_node_t *secondNode,
                           CMP_F cmp_f) {
+    if (firstNode == NULL && secondNode == NULL) {
+        return NULL;
+    } else if (cmp_f == NULL) {
+        return NULL;
+    } else if (firstNode == NULL) {
+        return secondNode;
+    } else if (secondNode == NULL) {
+        return firstNode;
+    }
     list_node_t *merged;
     if (cmp_f(firstNode->data, secondNode->data) <= 0) {
         merged = firstNode;
@@ -145,6 +162,9 @@ static list_node_t *merge(list_node_t *firstNode, list_node_t *secondNode,
  * @return list_node_t* The middle node
  */
 static list_node_t *middle(const list_node_t *head) {
+    if (head == NULL) {
+        return NULL;
+    }
     list_node_t *slow = (list_node_t *)head;
     list_node_t *fast = head->next;
 
@@ -163,6 +183,9 @@ static list_node_t *middle(const list_node_t *head) {
  * @return list_node_t* The head of the sorted list
  */
 static list_node_t *merge_sort(list_node_t *head, CMP_F cmp_f) {
+    if (head == NULL || cmp_f == NULL) {
+        return NULL;
+    }
     // merge sort algorithm taken from
     // https://www.geeksforgeeks.org/merge-sort-for-linked-list/
     if (head->next == NULL) {
@@ -190,6 +213,9 @@ static list_node_t *merge_sort(list_node_t *head, CMP_F cmp_f) {
  */
 static int local_foreach(list_node_t *head, size_t size, LOCAL_ACT_F action,
                          void *addl_data) {
+    if (head == NULL || action == NULL) {
+        return EINVAL;
+    }
     list_node_t *current_node = head;
     for (size_t i = 0; i < size; i++) {
         int err = action(current_node, addl_data);

@@ -47,6 +47,9 @@ struct weighted_graph_t {
  * @return pointer to the new node on success, NULL on failure
  */
 static struct node *node_new(const weighted_graph_t *graph, void *data) {
+    if (graph == NULL) {
+        return NULL;
+    }
     struct node *new = malloc(sizeof(*new));
     if (new == NULL) {
         return NULL;
@@ -66,6 +69,9 @@ static struct node *node_new(const weighted_graph_t *graph, void *data) {
  * @return int 0 if the nodes are equal, non-zero if the nodes are not equal
  */
 static int node_cmp(const void *value_to_find, const void *node_data) {
+    if (value_to_find == NULL || node_data == NULL) {
+        return 0;
+    }
     const struct node *node_1 = value_to_find;
     const struct node *node_2 = node_data;
     return node_1->cmp(node_1->data, node_2->data);
@@ -77,6 +83,9 @@ static int node_cmp(const void *value_to_find, const void *node_data) {
  * @param data pointer to the node to be freed
  */
 static void node_free(void *data) {
+    if (data == NULL) {
+        return;
+    }
     struct node *node = data;
     list_delete(&node->edges);
     if (node->destroy != NULL) {
@@ -115,6 +124,9 @@ static struct edge *edge_new(struct node *from, struct node *to,
  * @return int 0 if edge points to node, non-zero otherwise
  */
 static int edge_cmp(const void *value_to_find, const void *to_node) {
+    if (value_to_find == NULL) {
+        return 0;
+    }
     const struct edge *edge = value_to_find;
     const struct node *node = to_node;
     // only care about equality, not ordering
@@ -122,6 +134,9 @@ static int edge_cmp(const void *value_to_find, const void *to_node) {
 }
 
 static int add_to_pqueue_if_faster(void **neighbor, void *addl_data) {
+    if (neighbor == NULL || addl_data == NULL) {
+        return EINVAL;
+    }
     weighted_graph_t *graph = addl_data;
     double weight =
         graph_get_edge_weight(graph, graph->curr_item->data, *neighbor);
@@ -158,6 +173,7 @@ static int add_to_pqueue_if_faster(void **neighbor, void *addl_data) {
     }
     return SUCCESS;
 }
+
 /* PUBLIC FUNCTIONS */
 
 weighted_graph_t *graph_create(CMP_F cmp, FREE_F free_f) {
