@@ -5,9 +5,7 @@
 
 /* DATA */
 
-enum {
-    HASH_TABLE_DEFAULT_CAPACITY = 16, // default capacity of table
-};
+#define HASH_TABLE_DEFAULT_CAPACITY 16 // default capacity of table
 
 /**
  * @brief A function pointer to a custom-defined delete function

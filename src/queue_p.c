@@ -5,10 +5,9 @@
 #include <stdlib.h>
 
 /*DATA */
-enum {
-    SUCCESS = 0,
-    INVALID = -1,
-};
+
+#define SUCCESS 0
+#define INVALID -1
 
 /**
  * @brief structure of a queue object
@@ -98,6 +97,7 @@ int push_new_node(queue_p_t *queue, queue_p_node_t *node, size_t list_idx) {
 }
 
 /* PUBLIC FUNCTIONS */
+
 queue_p_t *queue_p_init(size_t capacity, FREE_F customfree, CMP_F compare) {
     if (compare == NULL) {
         errno = EINVAL;

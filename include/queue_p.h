@@ -5,9 +5,7 @@
 
 /* DATA */
 
-enum {
-    QUEUE_P_UNLIMITED,
-};
+#define QUEUE_P_UNLIMITED 0 // unlimited capacity
 
 /**
  * @brief structure of a queue node

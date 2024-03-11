@@ -5,10 +5,9 @@
 #include <stdlib.h>
 
 /* DATA */
-enum {
-    SUCCESS = 0,
-    INVALID = -1,
-};
+
+#define SUCCESS 0
+#define INVALID -1
 
 /**
  * @brief structure of a list node
@@ -203,6 +202,7 @@ static int local_foreach(list_node_t *head, size_t size, LOCAL_ACT_F action,
 }
 
 /* PUBLIC FUNCTIONS*/
+
 list_t *list_new(FREE_F free_f, CMP_F cmp_f) {
     list_t *list = malloc(sizeof(*list));
     if (list == NULL) {

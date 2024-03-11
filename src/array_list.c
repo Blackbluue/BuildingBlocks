@@ -8,10 +8,8 @@
 
 /* DATA */
 
-enum {
-    SUCCESS = 0,  // no error
-    INVALID = -1, // invalid input
-};
+#define SUCCESS 0  // no error
+#define INVALID -1 // invalid input
 
 /**
  * @brief The array list structure.
