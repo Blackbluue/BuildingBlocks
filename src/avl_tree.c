@@ -46,6 +46,10 @@ struct tree_t {
 /**
  * @brief Search for a node in the tree recursively.
  *
+ * If the node is not found, the function returns a pointer to the node where
+ * the new node should be inserted. If node or cmp are NULL, the function
+ * returns NULL.
+ *
  * @param node A pointer to the current node
  * @param cmp A pointer to the user-defined compare function
  * @param needle A pointer to the data to be searched for
@@ -53,7 +57,9 @@ struct tree_t {
  * the data is not found.
  */
 static struct node **tree_search(struct node **node, CMP_F cmp, void *needle) {
-    if (*node == NULL) {
+    if (node == NULL || cmp == NULL) {
+        return NULL;
+    } else if (*node == NULL) {
         return node;
     }
     int result = cmp(needle, (*node)->data);
@@ -122,6 +128,7 @@ static int balance_factor(struct node *node) {
 static inline int balanced(int balance) {
     return balance >= -1 && balance <= 1;
 }
+
 /**
  * @brief Check if the tree is heavy on the left.
  *
@@ -130,6 +137,7 @@ static inline int balanced(int balance) {
  * is not
  */
 static inline int left_heavy(int balance) { return balance > 0; }
+
 /**
  * @brief Check if the tree is heavy on the right.
  *
@@ -142,12 +150,16 @@ static inline int right_heavy(int balance) { return balance < 0; }
 /**
  * @brief Get the maximum value in the tree.
  *
+ * If node is NULL, the function returns NULL.
+ *
  * @param node A pointer to the current node
  * @return struct node** A pointer to the node containing the maximum
- * value
+ * value, or NULL.
  */
 static struct node **tree_max(struct node **node) {
-    if ((*node)->right) {
+    if (node == NULL) {
+        return NULL;
+    } else if ((*node)->right) {
         return tree_max(&(*node)->right);
     } else {
         return node;
@@ -160,7 +172,7 @@ static struct node **tree_max(struct node **node) {
  * @param node A pointer to the current node
  */
 static void rotate_left(struct node **node) {
-    if (*node == NULL) {
+    if (node == NULL || *node == NULL) {
         return;
     }
     struct node *new_root = (*node)->right;
@@ -176,6 +188,9 @@ static void rotate_left(struct node **node) {
  * @param node A pointer to the current node
  */
 static void rotate_right(struct node **node) {
+    if (node == NULL || *node == NULL) {
+        return;
+    }
     struct node *new_root = (*node)->left;
 
     (*node)->left = new_root->right;
@@ -189,7 +204,7 @@ static void rotate_right(struct node **node) {
  * @param node A pointer to the current node
  */
 static void balance_tree(struct node **node) {
-    if (*node == NULL) {
+    if (node == NULL || *node == NULL) {
         return;
     }
 
@@ -225,7 +240,9 @@ static void balance_tree(struct node **node) {
  * @param cmp A pointer to the user-defined compare function
  */
 static void insert_node(struct node **node, struct node *new, CMP_F cmp) {
-    if (*node == NULL) {
+    if (node == NULL || new == NULL || cmp == NULL) {
+        return;
+    } else if (*node == NULL) {
         *node = new;
         return;
     }
@@ -272,6 +289,9 @@ static int tree_in_order(struct node *node, ACT_F func, void *addl_data) {
  * @param addl_data A pointer to the tree to be built
  */
 static int find_each(void *node_data, void *addl_data) {
+    if (addl_data == NULL) {
+        return EINVAL;
+    }
     tree_t *found = (tree_t *)addl_data;
     // must compare the memory addresses of the data pointers to avoid adding
     // duplicate nodes

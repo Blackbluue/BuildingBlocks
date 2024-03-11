@@ -4,7 +4,7 @@
 #include <errno.h>
 #include <stdlib.h>
 
-/*DATA */
+/* DATA */
 
 #define SUCCESS 0
 #define INVALID -1
@@ -41,8 +41,14 @@ struct queue_p_t {
  * @return int the result of the comparison
  */
 int q_cmp(const void *value_to_find, const void *node_data) {
+    if (value_to_find == NULL || node_data == NULL) {
+        return 0; // stable sort on error
+    }
     int priority = *(double *)value_to_find;
     queue_p_node_t *node = queue_peek((queue_t *)node_data);
+    if (node == NULL) {
+        return 0; // stable sort on error
+    }
     if (node->priority > priority) {
         return -1;
     } else if (node->priority < priority) {
@@ -68,15 +74,15 @@ void q_dst(void *data) {
 /**
  * @brief Create a new queue and insert it into the list.
  *
- * This function is used to create a new queue and insert it into the list. It
- * is used when a new queue needs to be created and inserted into the list.
- *
  * @param queue pointer to the queue_p_t object
  * @param node pointer to the queue_p_node_t object
  * @param list_idx index to insert the new queue into the list
  * @return int 0 on success, non-zero on failure
  */
 int push_new_node(queue_p_t *queue, queue_p_node_t *node, size_t list_idx) {
+    if (queue == NULL) {
+        return EINVAL;
+    }
     queue_t *new_queue = queue_init(queue->capacity, free, queue->compare);
     if (new_queue == NULL) {
         free(node);

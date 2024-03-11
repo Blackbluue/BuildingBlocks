@@ -32,16 +32,24 @@ struct arr_list_t {
     size_t capacity;
     size_t iter_pos;
 };
+
 /* PRIVATE FUNCTIONS */
 
 /**
  * @brief Adjusts the size of the array.
  *
+ * Possible error codes:
+ * - EINVAL: The array list is NULL.
+ * - ENOMEM: The memory allocation failed.
+ *
  * @param list The array list.
  * @param new_size The new size of the array.
- * @return int 0 if successful, otherwise an error code.
+ * @return int 0 if successful, non-zero error code on error.
  */
 static int adjust_size(arr_list_t *list, size_t new_size) {
+    if (list == NULL) {
+        return EINVAL;
+    }
     void *new_array = reallocarray(list->array, new_size, list->mem_sz);
     if (new_array == NULL) {
         return ENOMEM;
@@ -57,33 +65,49 @@ static int adjust_size(arr_list_t *list, size_t new_size) {
 /**
  * @brief Shifts the elements in the array forward.
  *
+ * Possible error codes:
+ * - EINVAL: The array list is NULL or the position is out of bounds.
+ *
  * This function shifts the elements in the array forward one index, starting at
  * the given position. The opened spot at the end of the array is not cleared.
  *
  * @param list The array list.
  * @param position The position to shift forward.
+ * @return int 0 if successful, non-zero error code on error.
  */
-static void shift_forward(arr_list_t *list, size_t position) {
+static int shift_forward(arr_list_t *list, size_t position) {
+    if (list == NULL || position >= list->size) {
+        return EINVAL;
+    }
     uint8_t *dest = (uint8_t *)list->array + (position * list->mem_sz);
     memmove(dest, dest + list->mem_sz,
             (list->size - position - 1) * list->mem_sz);
+    return SUCCESS;
 }
 
 /**
  * @brief Shifts the elements in the array back.
  *
  * This function shifts the elements in the array back, starting at the given
- * position. The opened spot is not cleared.
+ * position. The opened spot is not cleared. If the position is out of bounds,
+ * it is set to the end of the array. If the array list is NULL, this function
+ * returns NULL.
  *
  * @param list The array list.
  * @param position The position to shift back.
- * @return void* The pointer to the position.
+ * @return void* The pointer to the position, or NULL.
  */
 static void *shift_back(arr_list_t *list, size_t position) {
+    if (list == NULL) {
+        return NULL;
+    } else if (position > list->size) {
+        position = list->size;
+    }
     uint8_t *dest = (uint8_t *)list->array + (position * list->mem_sz);
     memmove(dest + list->mem_sz, dest, (list->size - position) * list->mem_sz);
     return dest;
 }
+
 /* PUBLIC FUNCTIONS */
 
 arr_list_t *arr_list_new(FREE_F free_f, CMP_F cmp_f, size_t nmemb,

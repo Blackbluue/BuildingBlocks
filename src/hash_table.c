@@ -83,6 +83,10 @@ struct action_data_t {
  * @return int 0 if equal, negative if less than, positive if greater than
  */
 static int map_node_cmp(const void *to_find, const void *node_data) {
+    if (node_data == NULL) {
+        // if somehow node_data is NULL, return 0 so order is not changed
+        return 0;
+    }
     const struct table_node_t *table_node = node_data;
     return table_node->compare(to_find, table_node->key);
 }
@@ -111,6 +115,9 @@ static size_t hash(const void *data, size_t capacity) {
  * @return int
  */
 static int action_wrapper(void **node, void *addl_data) {
+    if (node == NULL || *node == NULL || addl_data == NULL) {
+        return EINVAL;
+    }
     table_node_t *table_node = *node;
     struct action_data_t *action_data = addl_data;
     return action_data->action(table_node->key, &table_node->data,
@@ -125,6 +132,9 @@ static int action_wrapper(void **node, void *addl_data) {
  * @return int 0 on success, non-zero on failure
  */
 static int copy_node(void **node_data, void *addl_data) {
+    if (node_data == NULL || *node_data == NULL || addl_data == NULL) {
+        return EINVAL;
+    }
     table_node_t *table_node = *node_data;
     hash_table_t *table = addl_data;
 
@@ -146,6 +156,9 @@ static int copy_node(void **node_data, void *addl_data) {
  * @return int 0 on success, non-zero on failure
  */
 static int resize_table(hash_table_t *table) {
+    if (table == NULL) {
+        return EINVAL;
+    }
     list_t **copy_arr =
         calloc(GROWTH_FACTOR * table->capacity, sizeof(*copy_arr));
     if (copy_arr == NULL) {
@@ -190,6 +203,9 @@ static int resize_table(hash_table_t *table) {
  * @return int
  */
 static int replace_existing(void **node_data, void *addl_data) {
+    if (node_data == NULL || *node_data == NULL || addl_data == NULL) {
+        return EINVAL;
+    }
     table_node_t *table_node = *node_data;
     struct lookup_data_t *lookup_data = addl_data;
 
@@ -211,6 +227,9 @@ static int replace_existing(void **node_data, void *addl_data) {
  * @return list_t* the bucket
  */
 static list_t *get_bucket(hash_table_t *table, const void *key) {
+    if (table == NULL) {
+        return NULL;
+    }
     size_t idx = hash(key, table->capacity);
     list_t *bucket = table->buckets[idx];
     // if hash does not exist, create new list
@@ -236,6 +255,9 @@ static list_t *get_bucket(hash_table_t *table, const void *key) {
  */
 static int insert_into_bucket(const void *key, void *data, list_t *bucket,
                               CMP_F compare) {
+    if (compare == NULL || bucket == NULL) {
+        return EINVAL;
+    }
     table_node_t *new = malloc(sizeof(*new));
     if (new == NULL) {
         return ENOMEM;
