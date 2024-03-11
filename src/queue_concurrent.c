@@ -26,10 +26,8 @@
 
 /* DATA */
 
-enum {
-    SUCCESS = 0,
-    INVALID = -1,
-};
+#define SUCCESS 0
+#define INVALID -1
 
 typedef int (*PREDICATE)(queue_c_t *queue);
 

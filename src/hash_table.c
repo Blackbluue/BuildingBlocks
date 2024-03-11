@@ -5,15 +5,14 @@
 #include <stdlib.h>
 
 /* DATA */
-enum {
-    GROWTH_FACTOR = 2, // amount to grow table by when resizing
-    MAX_LOAD = 75,     // max load factor before resizing
-    PRIME = 6967,      // prime number for hash algo
-    CONTINUE = 0,      // return value keep iterating
-    STOP = 1,          // return value to stop iterating
-    SUCCESS = 0,       // return value for success
-    INVALID = -1,      // return value for invalid arguments
-};
+
+#define GROWTH_FACTOR 2 // amount to grow table by when resizing
+#define MAX_LOAD 75     // max load factor before resizing
+#define PRIME 6967      // prime number for hash algo
+#define CONTINUE 0      // return value keep iterating
+#define STOP 1          // return value to stop iterating
+#define SUCCESS 0       // return value for success
+#define INVALID -1      // return value for invalid arguments
 
 /**
  * @brief structure of a table_node_t object

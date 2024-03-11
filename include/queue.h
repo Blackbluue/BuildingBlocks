@@ -5,9 +5,7 @@
 
 /* DATA */
 
-enum {
-    QUEUE_UNLIMITED, // unlimited capacity queue
-};
+#define QUEUE_UNLIMITED 0 // unlimited capacity queue
 
 /**
  * @brief A pointer to a user-defined free function.  This is used to free

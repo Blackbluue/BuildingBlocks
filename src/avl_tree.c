@@ -6,10 +6,10 @@
 /* DATA */
 
 enum {
-    SUCCESS = 0,
-    INVALID = -1,
     FOUND = 42,
 };
+#define SUCCESS 0  // no error
+#define INVALID -1 // invalid input
 
 /**
  * @brief structure of a node in the tree
@@ -317,6 +317,7 @@ static void clear_nodes(struct node *node, FREE_F free_func) {
 }
 
 /* PUBLIC FUNCTIONS */
+
 tree_t *tree_new(FREE_F free_func, CMP_F cmp_func) {
     if (cmp_func == NULL) {
         errno = EINVAL;

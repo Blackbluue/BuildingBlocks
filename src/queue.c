@@ -5,10 +5,9 @@
 #include <stdlib.h>
 
 /*DATA */
-enum {
-    SUCCESS = 0,
-    INVALID = -1,
-};
+
+#define SUCCESS 0
+#define INVALID -1
 
 /**
  * @brief structure of a queue object
@@ -25,6 +24,7 @@ struct queue_t {
 };
 
 /* PUBLIC FUNCTIONS*/
+
 queue_t *queue_init(size_t capacity, FREE_F customfree, CMP_F compare) {
     queue_t *queue = malloc(sizeof(*queue));
     if (queue == NULL) {

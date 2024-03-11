@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 /* DATA */
+
 /**
  * @brief A function pointer to a custom-defined delete function
  *        required to support deletion/memory deallocation of
@@ -18,6 +19,7 @@ typedef void (*FREE_F)(void *);
 typedef struct stack_t stack_t;
 
 /* FUNCTIONS */
+
 /**
  * @brief Create a new stack.
  *
