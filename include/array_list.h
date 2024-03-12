@@ -219,9 +219,8 @@ int arr_list_set(arr_list_t *list, void *data, size_t position, void *old);
  * @brief Get the item at a specific position in the list.
  *
  * If the list is NULL or position is outside the range of the list, NULL is
- * returned and errno is set to EINVAL. Note that if the list allows NULL
- * values, then it is up to the user to differentiate between a NULL value in
- * the list and an error.
+ * returned. Note that if the list allows NULL values, then it is up to the user
+ * to differentiate between a NULL value in the list and an error.
  *
  * @param list list to get the node from
  * @param position position in the list to get the node from
@@ -298,10 +297,13 @@ int arr_list_iterator_reset(arr_list_t *list);
 /**
  * @brief Get the next item in the list.
  *
- * If the iterator is at the end of the list, then NULL will be returned and
- * errno will be set to ENOTSUP. If the list is NULL, then NULL will be returned
- * and errno will be set to EINVAL. This function will have undefined behavior
- * if the list is modified while the iterator is in use.
+ * If the list is NULL, or the iterator is at the end of the list, then NULL
+ * will be returned. Note that this function may also return NULL if the next
+ * item in the list is NULL. This is not an error, and the user should check
+ * the list size before calling this function.
+ *
+ * This function will have undefined behavior if the list is modified while the
+ * iterator is in use.
  *
  * @param list list to iterate through
  * @return the next item on success, or NULL

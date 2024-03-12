@@ -90,9 +90,7 @@ void test_arr_list_get() {
     size_t position = cur_size / 2;
 
     // Should catch if get is called on an invalid list
-    errno = 0;
     CU_ASSERT_PTR_NULL(arr_list_get(INVALID_LIST, position));
-    CU_ASSERT_EQUAL(errno, EINVAL);
     // Should catch if get is called on an empty list
     CU_ASSERT_PTR_NULL(arr_list_get(EMPTY_LIST, position));
 
@@ -121,9 +119,7 @@ void test_arr_list_iterator() {
     // Should catch if function is called on an invalid list
     CU_ASSERT_EQUAL(arr_list_iterator_reset((arr_list_t *)INVALID_LIST),
                     EINVAL);
-    errno = 0;
     CU_ASSERT_PTR_NULL(arr_list_iterator_next((arr_list_t *)INVALID_LIST));
-    CU_ASSERT_EQUAL(errno, EINVAL);
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(list);
     // Confirm iterator is iterating correctly
@@ -131,9 +127,7 @@ void test_arr_list_iterator() {
     for (size_t i = 0; i < arr_list_size(list); i++) {
         CU_ASSERT_EQUAL(arr_list_iterator_next(list), &(*int_arr)[i]);
     }
-    errno = 0;
     CU_ASSERT_PTR_NULL(arr_list_iterator_next(list));
-    CU_ASSERT_EQUAL(errno, ENOTSUP);
 
     // Confirm iterator is resetting correctly
     CU_ASSERT_EQUAL(arr_list_iterator_reset(list), SUCCESS);

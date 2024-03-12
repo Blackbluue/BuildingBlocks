@@ -256,7 +256,6 @@ int arr_list_set(arr_list_t *list, void *data, size_t position, void *old) {
 
 void *arr_list_get(const arr_list_t *list, size_t position) {
     if (list == NULL || position >= list->size) {
-        errno = EINVAL;
         return NULL;
     }
     return (uint8_t *)list->array + (position * list->mem_sz);
@@ -325,10 +324,8 @@ int arr_list_iterator_reset(arr_list_t *list) {
 
 void *arr_list_iterator_next(arr_list_t *list) {
     if (list == NULL) {
-        errno = EINVAL;
         return NULL;
     } else if (list->iter_pos >= list->size) {
-        errno = ENOTSUP;
         return NULL;
     }
     return (uint8_t *)list->array + (list->iter_pos++ * list->mem_sz);
