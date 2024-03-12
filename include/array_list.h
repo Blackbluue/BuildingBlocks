@@ -249,13 +249,12 @@ int arr_list_pop(arr_list_t *list, size_t position, void *old);
  * @brief Search for an item and remove it from the list.
  *
  * If the item is found, it is removed from the list. If the list allows
- * duplicates, then only the first item found will be removed. If the list
- * was altered as a result of this call (i.e the item was found and removed),
- * then true is returned. If the item was not found, then false is returned.
+ * duplicates, then only the first item found will be removed.
  *
- * In the event of error, negative is returned and errno is set accordingly. If
- * this list does not support comparisons, it is set to ENOTSUP. If the list is
- * NULL, it is set to EINVAL.
+ * In the event of error, an appropriate error code is returned.
+ * Possible errors:
+ * - EINVAL: list is NULL
+ * - ENOTSUP: list does not support comparisons
  *
  * @param list list to remove the item from
  * @param item_to_remove the data object to be searched for

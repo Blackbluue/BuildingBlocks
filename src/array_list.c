@@ -276,13 +276,11 @@ int arr_list_pop(arr_list_t *list, size_t position, void *old) {
 
 int arr_list_remove(arr_list_t *list, void *item_to_remove) {
     if (list == NULL) {
-        errno = EINVAL;
-        return INVALID;
+        return EINVAL;
     } else if (list->cmp_f == NULL) {
-        errno = ENOTSUP;
-        return INVALID;
+        return ENOTSUP;
     } else if (list->size == 0) {
-        return false;
+        return SUCCESS;
     }
 
     for (size_t i = 0; i < list->size; i++) {
@@ -290,10 +288,10 @@ int arr_list_remove(arr_list_t *list, void *item_to_remove) {
         if (list->cmp_f(item_to_remove, element) == 0) {
             shift_forward(list, i);
             list->size--;
-            return true;
+            break;
         }
     }
-    return false;
+    return SUCCESS;
 }
 
 int arr_list_foreach(arr_list_t *list, ACT_F action_function, void *addl_data) {

@@ -140,19 +140,17 @@ void test_arr_list_remove() {
     int value_to_remove = (*int_arr)[cur_size / 2];
 
     // Should catch if remove is called on an invalid list
-    errno = 0;
     CU_ASSERT_EQUAL(
-        arr_list_remove((arr_list_t *)INVALID_LIST, &value_to_remove), INVALID);
-    CU_ASSERT_EQUAL(errno, EINVAL);
+        arr_list_remove((arr_list_t *)INVALID_LIST, &value_to_remove), EINVAL);
 
     // Function should have exited successfully
-    CU_ASSERT_EQUAL(arr_list_remove(list, &value_to_remove), true);
+    CU_ASSERT_EQUAL(arr_list_remove(list, &value_to_remove), SUCCESS);
     // Size should reflect the removal of the node
     CU_ASSERT_EQUAL_FATAL(arr_list_size(list), cur_size - 1);
     cur_size--;
 
     // The node containing the removed value should no longer be in the list
-    CU_ASSERT_EQUAL(arr_list_remove(list, &value_to_remove), false);
+    CU_ASSERT_EQUAL(arr_list_remove(list, &value_to_remove), SUCCESS);
     // Size should not have changed
     CU_ASSERT_EQUAL(arr_list_size(list), cur_size);
 
