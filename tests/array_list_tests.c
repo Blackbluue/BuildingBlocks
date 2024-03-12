@@ -156,11 +156,10 @@ void test_arr_list_remove() {
     // Size should not have changed
     CU_ASSERT_EQUAL(arr_list_size(list), cur_size);
 
-    int *popped = arr_list_pop(list, cur_size - 1);
-    CU_ASSERT_PTR_NOT_NULL_FATAL(popped);
-    CU_ASSERT_EQUAL(*popped, (*int_arr)[cur_size - 1]);
+    int popped = INVALID;
+    arr_list_pop(list, cur_size - 1, &popped);
+    CU_ASSERT_EQUAL(popped, (*int_arr)[cur_size - 1]);
     CU_ASSERT_EQUAL_FATAL(arr_list_size(list), cur_size - 1);
-    free(popped);
 }
 
 void test_arr_list_index_of() {

@@ -261,21 +261,17 @@ void *arr_list_get(const arr_list_t *list, size_t position) {
     return (uint8_t *)list->array + (position * list->mem_sz);
 }
 
-void *arr_list_pop(arr_list_t *list, size_t position) {
+int arr_list_pop(arr_list_t *list, size_t position, void *old) {
     if (list == NULL || position >= list->size) {
-        errno = EINVAL;
-        return NULL;
+        return EINVAL;
     }
-    void *old = malloc(list->mem_sz);
-    if (old == NULL) {
-        errno = ENOMEM;
-        return NULL;
+    if (old != NULL) {
+        void *element = (uint8_t *)list->array + (position * list->mem_sz);
+        memmove(old, element, list->mem_sz);
     }
-    void *element = (uint8_t *)list->array + (position * list->mem_sz);
-    memcpy(old, element, list->mem_sz);
     shift_forward(list, position);
     list->size--;
-    return old;
+    return SUCCESS;
 }
 
 int arr_list_remove(arr_list_t *list, void *item_to_remove) {

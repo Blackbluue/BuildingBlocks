@@ -232,20 +232,18 @@ void *arr_list_get(const arr_list_t *list, size_t position);
  * @brief Remove an item from the list at the given index.
  *
  * This will remove the item at the given position; all other elements after
- * will be shifted forward. Memory is allocated for the removed item and
- * returned.
+ * will be shifted forward. The removed item will be stored in the old pointer.
  *
- * In the event of error, NULL is returned and errno is set accordingly. If the
- * list is NULL or position is outside the range of the list, errno is set to
- * EINVAL. If a memory allocation error occurs, errno is set to ENOMEM. Note
- * that if the list allows NULL values, then it is up to the user to
- * differentiate between a NULL value in the list and an error.
+ * In the event of error, an appropriate error code is returned.
+ * Possible errors:
+ * - EINVAL: list is NULL or position is outside the range of the list
  *
  * @param list list to remove the node from
  * @param position position in the list to remove
- * @return the removed item in the list on success, NULL on failure
+ * @param old where to store the removed item
+ * @return 0 on success, non-zero on failure
  */
-void *arr_list_pop(arr_list_t *list, size_t position);
+int arr_list_pop(arr_list_t *list, size_t position, void *old);
 
 /**
  * @brief Search for an item and remove it from the list.
