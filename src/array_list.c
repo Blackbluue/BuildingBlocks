@@ -36,6 +36,18 @@ struct arr_list_t {
 /* PRIVATE FUNCTIONS */
 
 /**
+ * @brief Sets the error code.
+ *
+ * @param err The error code.
+ * @param value The value to set.
+ */
+static void set_err(int *err, int value) {
+    if (err != NULL) {
+        *err = value;
+    }
+}
+
+/**
  * @brief Adjusts the size of the array.
  *
  * Possible error codes:
@@ -110,22 +122,22 @@ static void *shift_back(arr_list_t *list, size_t position) {
 
 /* PUBLIC FUNCTIONS */
 
-arr_list_t *arr_list_new(FREE_F free_f, CMP_F cmp_f, size_t nmemb,
-                         size_t size) {
+arr_list_t *arr_list_new(FREE_F free_f, CMP_F cmp_f, size_t nmemb, size_t size,
+                         int *err) {
     if (nmemb == 0 || size == 0) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     }
     arr_list_t *list = malloc(sizeof(*list));
     if (list == NULL) {
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
     list->wrap = NULL;
     list->array = calloc(nmemb, size);
     if (list->array == NULL) {
         free(list);
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
     list->free_f = free_f;
@@ -138,16 +150,16 @@ arr_list_t *arr_list_new(FREE_F free_f, CMP_F cmp_f, size_t nmemb,
 }
 
 arr_list_t *arr_list_wrap(FREE_F free_f, CMP_F cmp_f, size_t nmemb, size_t size,
-                          void **arr) {
+                          void **arr, int *err) {
     if (nmemb == 0 || size == 0) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     } else if (arr == NULL) {
-        return arr_list_new(free_f, cmp_f, nmemb, size);
+        return arr_list_new(free_f, cmp_f, nmemb, size, err);
     }
     arr_list_t *list = malloc(sizeof(*list));
     if (list == NULL) {
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
     list->wrap = arr;
@@ -155,7 +167,7 @@ arr_list_t *arr_list_wrap(FREE_F free_f, CMP_F cmp_f, size_t nmemb, size_t size,
         *list->wrap = calloc(nmemb, size);
         if (*list->wrap == NULL) {
             free(list);
-            errno = ENOMEM;
+            set_err(err, ENOMEM);
             return NULL;
         }
     }

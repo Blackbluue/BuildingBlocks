@@ -51,17 +51,22 @@ typedef struct arr_list_t arr_list_t;
  * compare function will not be available. If any of these functions are called,
  * then they will result in an ENOTSUP error.
  *
- * In case of an error, this function will return NULL. If a memory allocation
- * error occurs, errno will be set to ENOMEM. If the size or nmemb values are
- * zero, errno will be set to EINVAL.
+ * In case of an error, this function will return NULL and set the error
+ * pointer if given. The error pointer may be NULL, in which case the error
+ * will not be stored.
+ * Possible errors:
+ * - ENOMEM: Memory allocation error
+ * - EINVAL: Invalid size or nmemb value
  *
  * @param free_f pointer to the free function to be used with that list
  * @param cmp_f pointer to the compare function to be used with that list
  * @param nmemb number of elements to allocate for the list
  * @param size size of each element in the list
+ * @param err where to store the error code
  * @returns pointer to allocated list on success or NULL on failure
  */
-arr_list_t *arr_list_new(FREE_F free_f, CMP_F cmp_f, size_t nmemb, size_t size);
+arr_list_t *arr_list_new(FREE_F free_f, CMP_F cmp_f, size_t nmemb, size_t size,
+                         int *err);
 
 /**
  * @brief Wrap an array in a list.
@@ -72,7 +77,7 @@ arr_list_t *arr_list_new(FREE_F free_f, CMP_F cmp_f, size_t nmemb, size_t size);
  * is deleted when arr_list_delete is called on the list object (i.e. the list
  * object is deleted). The array must either be pointing to NULL or be
  * initialized. If arr is pointing to NULL, then the list will allocate
- * memory for the array and store it as the address pointed to by arr. If the
+ * memory for the array and store it at the address pointed to by arr. If the
  * array is initialized, then the list will use the array as is. If arr itself
  * is NULL, then the behavior is identical to arr_list_new; the user will have
  * no way of accessing the array that the list is using. If the array is
@@ -90,19 +95,23 @@ arr_list_t *arr_list_new(FREE_F free_f, CMP_F cmp_f, size_t nmemb, size_t size);
  * compare function will not be available. If any of these functions are called,
  * then they will result in an ENOTSUP error.
  *
- * In case of an error, this function will return NULL. If a memory allocation
- * error occurs, errno will be set to ENOMEM. If the size value is zero, errno
- * will be set to EINVAL.
+ * In case of an error, this function will return NULL and set the error
+ * pointer if given. The error pointer may be NULL, in which case the error
+ * will not be stored.
+ * Possible errors:
+ * - ENOMEM: Memory allocation error
+ * - EINVAL: Invalid size or nmemb value
  *
  * @param free_f pointer to the free function to be used with that list
  * @param cmp_f pointer to the compare function to be used with that list
  * @param nmemb current capacity of the wrapped array
  * @param size size of each element in the wrapped array
  * @param arr pointer to the array to be wrapped
+ * @param err where to store the error code
  * @returns pointer to allocated list on success or NULL on failure
  */
 arr_list_t *arr_list_wrap(FREE_F free_f, CMP_F cmp_f, size_t nmemb, size_t size,
-                          void **arr);
+                          void **arr, int *err);
 
 /**
  * @brief Get the number of items in the list.

@@ -52,14 +52,14 @@ int clean_suite1(void) { return SUCCESS; }
 
 void test_arr_list_new() {
     // Create empty list
-    EMPTY_LIST = arr_list_new(NULL, test_compare_node, 1, sizeof(*data));
+    EMPTY_LIST = arr_list_new(NULL, test_compare_node, 1, sizeof(*data), NULL);
     CU_ASSERT_PTR_NOT_NULL_FATAL(EMPTY_LIST);
     CU_ASSERT_EQUAL(0, arr_list_size(EMPTY_LIST));
     CU_ASSERT_EQUAL(1, arr_list_capacity(EMPTY_LIST));
 
     // Verify list was created correctly
     list = arr_list_wrap(NULL, test_compare_node, SIZE, sizeof(**int_arr),
-                         &wrapped);
+                         &wrapped, NULL);
     int_arr = (int **)&wrapped;
     CU_ASSERT_PTR_NOT_NULL_FATAL(list);
     CU_ASSERT_PTR_NOT_NULL_FATAL(*int_arr);
