@@ -50,15 +50,13 @@ int find(void *node_data, void *addl_data) {
 
 void test_tree_new() {
     // Verify tree was not created correctly with no arguments supplied
-    errno = 0;
-    ssize_t res;
-    tree = tree_new(NULL, NULL);
-    CU_ASSERT_PTR_NULL(tree);       // Function exited correctly
-    CU_ASSERT_EQUAL(errno, EINVAL); // errno is correct
+    CU_ASSERT_EQUAL(tree_new(NULL, NULL, NULL), EINVAL); // error is correct
 
     // Verify tree was created correctly with all arguments supplied
-    tree = tree_new(custom_free, test_compare_node);
+    CU_ASSERT_EQUAL(tree_new(custom_free, test_compare_node, &tree), SUCCESS);
     CU_ASSERT_PTR_NOT_NULL_FATAL(tree); // Function exited correctly
+
+    ssize_t res;
     // tree size is correct
     CU_ASSERT_EQUAL(tree_query(tree, QUERY_SIZE, &res), SUCCESS);
     CU_ASSERT_EQUAL(res, 0);
@@ -196,7 +194,7 @@ void test_tree_find_all() {
     CU_ASSERT_EQUAL(errno, EINVAL);                // errno is correct
 
     // init odd/even tree
-    tree = tree_new(custom_free, test_compare_node);
+    tree_new(custom_free, test_compare_node, &tree);
     CU_ASSERT_PTR_NOT_NULL_FATAL(tree); // tree is not NULL
     for (size_t i = 0; i < CAPACITY; i++) {
         even_odd[i] = i % 2;

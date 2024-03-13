@@ -51,17 +51,18 @@ typedef struct tree_t tree_t;
  * the tree is not meant to manage the memory of the data, then the free_func
  * can be NULL. The cmp_func is used to compare the data in the tree to the
  * data being searched for and to order nodes. The cmp_func is required and
- * cannot be NULL.
+ * cannot be NULL. The created tree is stored in the *tree pointer.
  *
- * If memory allocation fails, then the function will return NULL and set errno
- * to ENOMEM. If cmp_func is NULL, then the function will return NULL and set
- * errno to EINVAL.
+ * Possible errors:
+ * - ENOMEM: Memory allocation failed.
+ * - EINVAL: The compare function or tree pointers are NULL.
  *
  * @param free_func A user-defined free function.
  * @param cmp_func A user-defined compare function.
- * @return tree_t* A pointer to the new tree.
+ * @param tree Where to store the pointer to the new tree.
+ * @return int 0 on success, non-zero on failure.
  */
-tree_t *tree_new(FREE_F free_func, CMP_F cmp_func);
+int tree_new(FREE_F free_func, CMP_F cmp_func, tree_t **tree);
 
 /**
  * @brief Query the tree.

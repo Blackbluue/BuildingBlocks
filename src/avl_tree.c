@@ -335,22 +335,17 @@ static void clear_nodes(struct node *node, FREE_F free_func) {
 
 /* PUBLIC FUNCTIONS */
 
-tree_t *tree_new(FREE_F free_func, CMP_F cmp_func) {
-    if (cmp_func == NULL) {
-        errno = EINVAL;
-        return NULL;
+int tree_new(FREE_F free_func, CMP_F cmp_func, tree_t **tree) {
+    if (cmp_func == NULL || tree == NULL) {
+        return EINVAL;
     }
-    tree_t *tree = malloc(sizeof(*tree));
-    if (tree == NULL) {
-        errno = ENOMEM;
-        return NULL;
+    *tree = calloc(1, sizeof(**tree));
+    if (*tree == NULL) {
+        return ENOMEM;
     }
-    tree->iterator = NULL;
-    tree->root = NULL;
-    tree->size = 0;
-    tree->free_func = free_func;
-    tree->cmp_func = cmp_func;
-    return tree;
+    (*tree)->free_func = free_func;
+    (*tree)->cmp_func = cmp_func;
+    return SUCCESS;
 }
 
 int tree_query(tree_t *tree, int query, ssize_t *result) {
@@ -469,8 +464,8 @@ tree_t *tree_find_all(tree_t *tree, void *data) {
         return NULL;
     }
 
-    tree_t *found = tree_new(NULL, tree->cmp_func);
-    if (found == NULL) {
+    tree_t *found = NULL;
+    if (tree_new(NULL, tree->cmp_func, &found) == ENOMEM) {
         errno = ENOMEM;
         return NULL;
     }
