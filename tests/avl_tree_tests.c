@@ -50,11 +50,14 @@ int find(void *node_data, void *addl_data) {
 
 void test_tree_new() {
     // Verify tree was not created correctly with no arguments supplied
-    CU_ASSERT_EQUAL(tree_new(NULL, NULL, NULL), EINVAL); // error is correct
+    int err = 0;
+    CU_ASSERT_PTR_NULL(tree_new(NULL, NULL, &err)); // return is correct
+    CU_ASSERT_EQUAL(err, EINVAL);                   // error is correct
 
     // Verify tree was created correctly with all arguments supplied
-    CU_ASSERT_EQUAL(tree_new(custom_free, test_compare_node, &tree), SUCCESS);
-    CU_ASSERT_PTR_NOT_NULL_FATAL(tree); // Function exited correctly
+    // Function exited correctly
+    tree = tree_new(custom_free, test_compare_node, NULL);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(tree);
 
     ssize_t res;
     // tree size is correct
@@ -190,10 +193,12 @@ void test_tree_delete() {
 void test_tree_find_all() {
     // Verify tree_find_all() fails with NULL tree
     // Function exited correctly
-    CU_ASSERT_EQUAL(tree_find_all(NULL, NULL, NULL), EINVAL);
+    int err = 0;
+    CU_ASSERT_PTR_NULL(tree_find_all(NULL, NULL, &err));
+    CU_ASSERT_EQUAL(err, EINVAL);
 
     // init odd/even tree
-    tree_new(custom_free, test_compare_node, &tree);
+    tree = tree_new(custom_free, test_compare_node, NULL);
     CU_ASSERT_PTR_NOT_NULL_FATAL(tree); // tree is not NULL
     for (size_t i = 0; i < CAPACITY; i++) {
         even_odd[i] = i % 2;
@@ -202,8 +207,7 @@ void test_tree_find_all() {
 
     // Verify tree_find_all() succeeds with valid data and tree
     int even = 0;
-    tree_t *result = NULL;
-    CU_ASSERT_EQUAL(tree_find_all(tree, &even, &result), SUCCESS);
+    tree_t *result = tree_find_all(tree, &even, NULL);
     CU_ASSERT_PTR_NOT_NULL_FATAL(result);
     ssize_t res;
     tree_query(result, QUERY_SIZE, &res);
@@ -211,8 +215,7 @@ void test_tree_find_all() {
     tree_delete(&result);
 
     int not_in_tree = 100;
-    result = NULL;
-    CU_ASSERT_EQUAL(tree_find_all(tree, &not_in_tree, &result), SUCCESS);
+    result = tree_find_all(tree, &not_in_tree, NULL);
     CU_ASSERT_PTR_NOT_NULL_FATAL(result);
     // tree is empty
     tree_query(result, QUERY_IS_EMPTY, &res);

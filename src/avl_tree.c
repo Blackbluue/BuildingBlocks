@@ -41,6 +41,17 @@ struct tree_t {
 /* PRIVATE FUNCTIONS*/
 
 /**
+ * @brief Sets the error code.
+ *
+ * @param err The error code.
+ * @param value The value to set.
+ */
+static void set_err(int *err, int value) {
+    if (err != NULL) {
+        *err = value;
+    }
+}
+/**
  * @brief Search for a node in the tree recursively.
  *
  * If the node is not found, the function returns a pointer to the node where
@@ -335,17 +346,19 @@ static void clear_nodes(struct node *node, FREE_F free_func) {
 
 /* PUBLIC FUNCTIONS */
 
-int tree_new(FREE_F free_func, CMP_F cmp_func, tree_t **tree) {
-    if (cmp_func == NULL || tree == NULL) {
-        return EINVAL;
+tree_t *tree_new(FREE_F free_func, CMP_F cmp_func, int *err) {
+    if (cmp_func == NULL) {
+        set_err(err, EINVAL);
+        return NULL;
     }
-    *tree = calloc(1, sizeof(**tree));
-    if (*tree == NULL) {
-        return ENOMEM;
+    tree_t *tree = calloc(1, sizeof(*tree));
+    if (tree == NULL) {
+        set_err(err, ENOMEM);
+        return NULL;
     }
-    (*tree)->free_func = free_func;
-    (*tree)->cmp_func = cmp_func;
-    return SUCCESS;
+    tree->free_func = free_func;
+    tree->cmp_func = cmp_func;
+    return tree;
 }
 
 int tree_query(tree_t *tree, int query, ssize_t *result) {
@@ -458,34 +471,38 @@ void *tree_find_first(tree_t *tree, void *data) {
     return *node == NULL ? NULL : (*node)->data;
 }
 
-int tree_find_all(tree_t *tree, void *data, tree_t **found) {
+tree_t *tree_find_all(tree_t *tree, void *data, int *err) {
     if (tree == NULL) {
-        return EINVAL;
+        set_err(err, EINVAL);
+        return NULL;
     }
 
-    *found = NULL;
-    if (tree_new(NULL, tree->cmp_func, found) == ENOMEM) {
-        return ENOMEM;
+    tree_t *found = tree_new(NULL, tree->cmp_func, NULL);
+    if (found == NULL) {
+        set_err(err, ENOMEM);
+        return NULL;
     }
 
     struct node **node = tree_search(&tree->root, tree->cmp_func, data);
     if (*node == NULL) {
         // tree is empty, or node not found
-        return SUCCESS;
+        return found;
     }
 
     // add the first node to the new tree
-    int err = tree_add(*found, (*node)->data);
-    if (err != SUCCESS) {
-        tree_delete(found);
-        return err;
+    int loc_err = tree_add(found, (*node)->data);
+    if (loc_err != SUCCESS) {
+        tree_delete(&found);
+        set_err(err, loc_err);
+        return NULL;
     }
-    err = tree_in_order(tree->root, find_each, *found);
-    if (err != SUCCESS) {
-        tree_delete(found);
-        return err;
+    loc_err = tree_in_order(tree->root, find_each, found);
+    if (loc_err != SUCCESS) {
+        tree_delete(&found);
+        set_err(err, loc_err);
+        return NULL;
     }
-    return SUCCESS;
+    return found;
 }
 
 int tree_foreach(tree_t *tree, ACT_F act_func, void *addl_data) {

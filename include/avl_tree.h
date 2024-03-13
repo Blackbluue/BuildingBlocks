@@ -51,18 +51,19 @@ typedef struct tree_t tree_t;
  * the tree is not meant to manage the memory of the data, then the free_func
  * can be NULL. The cmp_func is used to compare the data in the tree to the
  * data being searched for and to order nodes. The cmp_func is required and
- * cannot be NULL. The created tree is stored in the *tree pointer.
+ * cannot be NULL.
  *
+ * Errors are stored in the optional *err pointer.
  * Possible errors:
  * - ENOMEM: Memory allocation failed.
  * - EINVAL: The compare function or tree pointers are NULL.
  *
  * @param free_func A user-defined free function.
  * @param cmp_func A user-defined compare function.
- * @param tree Where to store the pointer to the new tree.
- * @return int 0 on success, non-zero on failure.
+ * @param err A pointer to the error code.
+ * @return tree_t* A pointer to the tree or NULL on error.
  */
-int tree_new(FREE_F free_func, CMP_F cmp_func, tree_t **tree);
+tree_t *tree_new(FREE_F free_func, CMP_F cmp_func, int *err);
 
 /**
  * @brief Query the tree.
@@ -179,16 +180,17 @@ void *tree_find_first(tree_t *tree, void *data);
  * The data in this tree is shared with the original tree; modifying one will
  * affect the other.
  *
+ * Errors are stored in the optional *err pointer.
  * Possible errors:
  * - EINVAL: The tree or found return pointers are NULL.
  * - ENOMEM: Memory allocation failed.
  *
  * @param tree A pointer to the tree.
  * @param data A pointer to the data to be searched for in the tree.
- * @param found A pointer to the tree where the found data will be stored.
- * @return int 0 on success, non-zero on failure.
+ * @param err A pointer to the error code.
+ * @return tree_t* A pointer to the new tree or NULL on error.
  */
-int tree_find_all(tree_t *tree, void *data, tree_t **found);
+tree_t *tree_find_all(tree_t *tree, void *data, int *err);
 
 /**
  * @brief Perform an action on all the data in the tree.
