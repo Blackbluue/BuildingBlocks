@@ -189,9 +189,8 @@ void test_tree_delete() {
 
 void test_tree_find_all() {
     // Verify tree_find_all() fails with NULL tree
-    errno = 0;
-    CU_ASSERT_PTR_NULL(tree_find_all(NULL, NULL)); // Function exited correctly
-    CU_ASSERT_EQUAL(errno, EINVAL);                // errno is correct
+    // Function exited correctly
+    CU_ASSERT_EQUAL(tree_find_all(NULL, NULL, NULL), EINVAL);
 
     // init odd/even tree
     tree_new(custom_free, test_compare_node, &tree);
@@ -203,15 +202,17 @@ void test_tree_find_all() {
 
     // Verify tree_find_all() succeeds with valid data and tree
     int even = 0;
-    ssize_t res;
-    tree_t *result = tree_find_all(tree, &even);
+    tree_t *result = NULL;
+    CU_ASSERT_EQUAL(tree_find_all(tree, &even, &result), SUCCESS);
     CU_ASSERT_PTR_NOT_NULL_FATAL(result);
+    ssize_t res;
     tree_query(result, QUERY_SIZE, &res);
     CU_ASSERT_EQUAL(res, (CAPACITY / 2)); // tree size is correct
     tree_delete(&result);
 
     int not_in_tree = 100;
-    result = tree_find_all(tree, &not_in_tree);
+    result = NULL;
+    CU_ASSERT_EQUAL(tree_find_all(tree, &not_in_tree, &result), SUCCESS);
     CU_ASSERT_PTR_NOT_NULL_FATAL(result);
     // tree is empty
     tree_query(result, QUERY_IS_EMPTY, &res);

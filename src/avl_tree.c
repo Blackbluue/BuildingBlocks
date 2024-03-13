@@ -458,38 +458,34 @@ void *tree_find_first(tree_t *tree, void *data) {
     return *node == NULL ? NULL : (*node)->data;
 }
 
-tree_t *tree_find_all(tree_t *tree, void *data) {
+int tree_find_all(tree_t *tree, void *data, tree_t **found) {
     if (tree == NULL) {
-        errno = EINVAL;
-        return NULL;
+        return EINVAL;
     }
 
-    tree_t *found = NULL;
-    if (tree_new(NULL, tree->cmp_func, &found) == ENOMEM) {
-        errno = ENOMEM;
-        return NULL;
+    *found = NULL;
+    if (tree_new(NULL, tree->cmp_func, found) == ENOMEM) {
+        return ENOMEM;
     }
 
     struct node **node = tree_search(&tree->root, tree->cmp_func, data);
     if (*node == NULL) {
         // tree is empty, or node not found
-        return found;
+        return SUCCESS;
     }
 
     // add the first node to the new tree
-    int results = tree_add(found, (*node)->data);
-    if (results != SUCCESS) {
-        tree_delete(&found);
-        errno = results;
-        return NULL;
+    int err = tree_add(*found, (*node)->data);
+    if (err != SUCCESS) {
+        tree_delete(found);
+        return err;
     }
-    results = tree_in_order(tree->root, find_each, found);
-    if (results != SUCCESS) {
-        tree_delete(&found);
-        errno = results;
-        return NULL;
+    err = tree_in_order(tree->root, find_each, *found);
+    if (err != SUCCESS) {
+        tree_delete(found);
+        return err;
     }
-    return found;
+    return SUCCESS;
 }
 
 int tree_foreach(tree_t *tree, ACT_F act_func, void *addl_data) {

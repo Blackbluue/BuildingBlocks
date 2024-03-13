@@ -171,25 +171,24 @@ void *tree_find_first(tree_t *tree, void *data);
  * @brief Find all occurrences of nodes with the given data.
  *
  * The data pointer is used to find the nodes; the tree's cmp_func will be used
- * in comparison. The data does not need to be the same pointer that was added
- * to the tree, but should be inside the tree according to the cmp_func. If
- * no nodes are found, then the function will return an empty tree.
+ * in comparison. If no nodes are found, then the function will return an empty
+ * tree.
  *
  * The returned tree must be freed by the user by calling tree_delete(). The
  * tree will not free the data in the nodes when the tree is deleted or cleared.
  * The data in this tree is shared with the original tree; modifying one will
  * affect the other.
  *
- * If tree is NULL, then the function will return NULL and set errno to EINVAL.
- * If memory allocation fails, then the function will return NULL and set errno
- * to ENOMEM.
+ * Possible errors:
+ * - EINVAL: The tree or found return pointers are NULL.
+ * - ENOMEM: Memory allocation failed.
  *
  * @param tree A pointer to the tree.
  * @param data A pointer to the data to be searched for in the tree.
- * @return tree_t* A pointer to the tree containing the data found in the tree
- * or NULL if the tree is NULL.
+ * @param found A pointer to the tree where the found data will be stored.
+ * @return int 0 on success, non-zero on failure.
  */
-tree_t *tree_find_all(tree_t *tree, void *data);
+int tree_find_all(tree_t *tree, void *data, tree_t **found);
 
 /**
  * @brief Perform an action on all the data in the tree.
