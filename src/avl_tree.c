@@ -5,9 +5,6 @@
 
 /* DATA */
 
-enum {
-    FOUND = 42,
-};
 #define SUCCESS 0  // no error
 #define INVALID -1 // invalid input
 
@@ -356,20 +353,21 @@ tree_t *tree_new(FREE_F free_func, CMP_F cmp_func) {
     return tree;
 }
 
-int tree_is_empty(tree_t *tree) {
-    if (tree == NULL) {
-        errno = EINVAL;
-        return INVALID;
+int tree_query(tree_t *tree, int query, ssize_t *result) {
+    if (tree == NULL || result == NULL) {
+        return EINVAL;
     }
-    return tree->size == 0;
-}
-
-ssize_t tree_size(tree_t *tree) {
-    if (tree == NULL) {
-        errno = EINVAL;
-        return INVALID;
+    switch (query) {
+    case QUERY_SIZE:
+        *result = tree->size;
+        break;
+    case QUERY_IS_EMPTY:
+        *result = tree->size == 0;
+        break;
+    default:
+        return ENOTSUP;
     }
-    return tree->size;
+    return SUCCESS;
 }
 
 int tree_add(tree_t *tree, void *data) {
@@ -515,7 +513,7 @@ int tree_foreach(tree_t *tree, ACT_F act_func, void *addl_data) {
 int tree_iterator_reset(tree_t *tree) {
     if (tree == NULL) {
         return EINVAL;
-    } else if (!tree_is_empty(tree)) {
+    } else if (tree->size > 0) {
         // build a new iterator
         queue_destroy(&tree->iterator);
         tree->iterator = queue_init(tree->size, NULL, tree->cmp_func);

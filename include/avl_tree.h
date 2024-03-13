@@ -4,6 +4,11 @@
 
 /* DATA */
 
+typedef enum query_cmds {
+    QUERY_SIZE,
+    QUERY_IS_EMPTY,
+} QUERIES;
+
 /**
  * @brief A pointer to a user-defined free function.  This is used to free
  *        memory allocated for tree data.  For simple data types, this
@@ -59,25 +64,29 @@ typedef struct tree_t tree_t;
 tree_t *tree_new(FREE_F free_func, CMP_F cmp_func);
 
 /**
- * @brief Check if the tree is empty.
+ * @brief Query the tree.
  *
- * If tree is NULL, then the function will return -1 and set errno to EINVAL.
+ * The query command is used to get information about the tree. The result
+ * pointer is used to store the result of the query.
+ *
+ * Possible queries:
+ * - QUERY_SIZE: Get the number of nodes in the tree.
+ * - QUERY_IS_EMPTY: Check if the tree is empty.
+ *
+ * Possible results:
+ * - QUERY_SIZE: The number of nodes in the tree.
+ * - QUERY_IS_EMPTY: 0 if the tree is not empty, non-zero if the tree is empty.
+ *
+ * Possible errors:
+ * - EINVAL: The tree or result pointers are NULL.
+ * - ENOTSUP: The query command is invalid.
  *
  * @param tree A pointer to the tree.
- * @return int non-zero if the tree is empty, 0 if the tree is not empty, and -1
- * if the tree is NULL.
+ * @param query The query command.
+ * @param result A pointer to the result of the query.
+ * @return int 0 on success, non-zero on failure.
  */
-int tree_is_empty(tree_t *tree);
-
-/**
- * @brief Get the size of the tree.
- *
- * If tree is NULL, then the function will return -1 and set errno to EINVAL.
- *
- * @param tree A pointer to the tree.
- * @return ssize_t The size of the tree or -1 if the tree is NULL.
- */
-ssize_t tree_size(tree_t *tree);
+int tree_query(tree_t *tree, int query, ssize_t *result);
 
 /**
  * @brief Add a new node to the tree.
