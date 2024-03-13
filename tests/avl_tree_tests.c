@@ -22,7 +22,7 @@ int init_suite1(void) { return 0; }
 
 int clean_suite1(void) { return 0; }
 
-void custom_free(void *data) {}
+void custom_free(void *data) { (void)data; }
 
 int test_compare_node(const void *value_to_find, const void *node_data) {
     if (*(int *)node_data > *(int *)value_to_find) {
@@ -86,32 +86,30 @@ void test_tree_add() {
 
 void test_tree_contains() {
     // Verify tree_contains() fails with NULL tree
-    errno = 0;
-    CU_ASSERT(tree_contains(NULL, NULL) ==
-              INVALID);         // Function exited correctly
-    CU_ASSERT(errno == EINVAL); // errno is correct
+    // Function exited correctly
+    CU_ASSERT_EQUAL(tree_contains(NULL, NULL), INVALID);
 
-    CU_ASSERT_FATAL(tree != NULL); // tree is not NULL
+    CU_ASSERT_PTR_NOT_NULL_FATAL(tree); // tree is not NULL
     // Verify tree_contains() succeeds with valid data and tree
     for (size_t i = 0; i < CAPACITY; i++) {
-        CU_ASSERT(tree_contains(tree, &data[i]) != false);
+        CU_ASSERT_NOT_EQUAL(tree_contains(tree, &data[i]), false);
     }
     int not_in_tree = 100;
-    CU_ASSERT(tree_contains(tree, &not_in_tree) == false);
+    CU_ASSERT_EQUAL(tree_contains(tree, &not_in_tree), false);
 }
 
 void test_tree_find_first() {
     // Verify tree_find_first() fails with NULL tree
-    ssize_t res;
-    errno = 0;
-    CU_ASSERT(tree_find_first(NULL, NULL) == NULL); // Function exited correctly
-    CU_ASSERT(errno == EINVAL);                     // errno is correct
+    // Function exited correctly
+    CU_ASSERT_PTR_NULL(tree_find_first(NULL, NULL));
 
     CU_ASSERT_FATAL(tree != NULL); // tree is not NULL
     // Verify tree_find_first() succeeds with valid data and tree
     for (size_t i = 0; i < CAPACITY; i++) {
-        CU_ASSERT(tree_find_first(tree, &data[i]) != NULL);
+        CU_ASSERT_PTR_NOT_NULL(tree_find_first(tree, &data[i]));
     }
+
+    ssize_t res;
     tree_query(tree, QUERY_SIZE, &res);
     CU_ASSERT_EQUAL(res, CAPACITY); // tree size is correct
     int not_in_tree = 100;
@@ -120,21 +118,19 @@ void test_tree_find_first() {
 
 void test_tree_foreach() {
     // Verify tree_foreach() fails with NULL tree
-    errno = 0;
-    CU_ASSERT(tree_foreach(NULL, NULL, NULL) ==
-              INVALID);         // Function exited correctly
-    CU_ASSERT(errno == EINVAL); // errno is correct
+    // Function exited correctly
+    CU_ASSERT_EQUAL(tree_foreach(NULL, NULL, NULL), INVALID);
 
-    CU_ASSERT_FATAL(tree != NULL); // tree is not NULL
+    CU_ASSERT_PTR_NOT_NULL_FATAL(tree); // tree is not NULL
     // Verify tree_foreach() succeeds with valid data and tree
     int sum = 0;
-    CU_ASSERT(tree_foreach(tree, sum_up, &sum) == SUCCESS);
-    CU_ASSERT(sum == 45); // sum is correct
+    CU_ASSERT_EQUAL(tree_foreach(tree, sum_up, &sum), SUCCESS);
+    CU_ASSERT_EQUAL(sum, 45); // sum is correct
 
     int found = 7;
-    CU_ASSERT(tree_foreach(tree, find, &found) == FOUND);
+    CU_ASSERT_EQUAL(tree_foreach(tree, find, &found), FOUND);
     int not_found = 11;
-    CU_ASSERT(tree_foreach(tree, find, &not_found) != FOUND);
+    CU_ASSERT_NOT_EQUAL(tree_foreach(tree, find, &not_found), FOUND);
 }
 
 void test_tree_iterate() {
@@ -173,7 +169,7 @@ void test_tree_remove() {
     // Verify tree_remove() succeeds with valid data and tree
     int *iptr = NULL;
     for (size_t i = 0; i < CAPACITY; i++) {
-        CU_ASSERT_EQUAL(tree_remove(tree, &data[i], &iptr), SUCCESS);
+        CU_ASSERT_EQUAL(tree_remove(tree, &data[i], (void **)&iptr), SUCCESS);
         CU_ASSERT_EQUAL(iptr, &data[i]);
         tree_query(tree, QUERY_SIZE, &res);
         CU_ASSERT_EQUAL(res, CAPACITY - i - 1); // tree size is correct

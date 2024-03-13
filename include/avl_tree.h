@@ -140,10 +140,9 @@ ssize_t tree_remove_all(tree_t *tree, void *data);
  * @brief Check if the tree contains a node with the given data.
  *
  * The data pointer is used to find the node; the tree's cmp_func will be used
- * in comparison. The data does not need to be the same pointer that was added
- * to the tree, but should be inside the tree according to the cmp_func.
+ * in comparison.
  *
- * If tree is NULL, then the function will return -1 and set errno to EINVAL.
+ * If tree is NULL, then the function will return -1.
  *
  * @param tree A pointer to the tree.
  * @param data A pointer to the data to be searched for in the tree.
@@ -156,15 +155,14 @@ int tree_contains(tree_t *tree, void *data);
  * @brief Find the first occurrence of a node with the given data.
  *
  * The data pointer is used to find the node; the tree's cmp_func will be used
- * in comparison. The data does not need to be the same pointer that was added
- * to the tree, but should be inside the tree according to the cmp_func.
+ * in comparison.
  *
- * If tree is NULL, then the function will return NULL and set errno to EINVAL.
+ * If tree is NULL, then the function will return NULL. Note that the function
+ * may also return NULL if the data is not found.
  *
  * @param tree A pointer to the tree.
  * @param data A pointer to the data to be searched for in the tree.
- * @return void* A pointer to the data found in the tree or NULL if the data was
- * not found or the tree is NULL.
+ * @return void* A pointer to the data found in the tree or NULL.
  */
 void *tree_find_first(tree_t *tree, void *data);
 
@@ -193,8 +191,7 @@ void *tree_find_first(tree_t *tree, void *data);
 tree_t *tree_find_all(tree_t *tree, void *data);
 
 /**
- * @brief Perform a user-defined action on the data contained in all of the
- *        nodes in the tree.
+ * @brief Perform an action on all the data in the tree.
  *
  * The act_func is called on each node in the tree. The node data is
  * passed into the act_func as a void pointer. The addl_data pointer can
@@ -203,7 +200,7 @@ tree_t *tree_find_all(tree_t *tree, void *data);
  * act_func returns non-zero, then the foreach_call will stop and return
  * the status code.
  *
- * If tree is NULL, then the function will return -1 and set errno to EINVAL.
+ * If tree is NULL, then the function will return -1.
  *
  * @param tree A pointer to the tree.
  * @param act_func A pointer to the user-defined action function.
@@ -237,11 +234,10 @@ int tree_iterator_reset(tree_t *tree);
  * This function has undefined behavior if the tree is modified between calls
  * to tree_iterator_reset() and tree_iterator_next().
  *
- * If tree is NULL, then the function will return NULL and set errno to EINVAL.
+ * If tree is NULL, then the function will return NULL.
  *
  * @param tree A pointer to the tree.
- * @return void* A pointer to the data in the next node in the tree or NULL if
- * the end of the tree is reached or the tree is NULL.
+ * @return void* A pointer to the data in the next node in the tree or NULL.
  */
 void *tree_iterator_next(tree_t *tree);
 

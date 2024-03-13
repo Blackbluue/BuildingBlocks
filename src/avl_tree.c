@@ -450,7 +450,6 @@ ssize_t tree_remove_all(tree_t *tree, void *data) {
 
 int tree_contains(tree_t *tree, void *data) {
     if (tree == NULL) {
-        errno = EINVAL;
         return INVALID;
     }
     return *tree_search(&tree->root, tree->cmp_func, data) != NULL;
@@ -458,14 +457,10 @@ int tree_contains(tree_t *tree, void *data) {
 
 void *tree_find_first(tree_t *tree, void *data) {
     if (tree == NULL) {
-        errno = EINVAL;
         return NULL;
     }
     struct node **node = tree_search(&tree->root, tree->cmp_func, data);
-    if (*node == NULL) {
-        return NULL;
-    }
-    return (*node)->data;
+    return *node == NULL ? NULL : (*node)->data;
 }
 
 tree_t *tree_find_all(tree_t *tree, void *data) {
@@ -504,9 +499,8 @@ tree_t *tree_find_all(tree_t *tree, void *data) {
 
 int tree_foreach(tree_t *tree, ACT_F act_func, void *addl_data) {
     if (tree == NULL || act_func == NULL) {
-        // set errno instead of returning EINVAL to differentiate between
+        // return -1 instead of returning EINVAL to differentiate between
         // tree_foreach() failing and act_func() failing
-        errno = EINVAL;
         return INVALID;
     }
     return tree_in_order(tree->root, act_func, addl_data);
@@ -533,12 +527,9 @@ int tree_iterator_reset(tree_t *tree) {
 
 void *tree_iterator_next(tree_t *tree) {
     if (tree == NULL) {
-        errno = EINVAL;
         return NULL;
-    } else if (tree->iterator != NULL) {
-        return queue_dequeue(tree->iterator);
     }
-    return NULL;
+    return tree->iterator == NULL ? NULL : queue_dequeue(tree->iterator);
 }
 
 int tree_clear(tree_t *tree) {
