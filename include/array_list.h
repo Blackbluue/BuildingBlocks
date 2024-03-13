@@ -5,6 +5,13 @@
 
 /* DATA */
 
+typedef enum query_cmds {
+    QUERY_SIZE,
+    QUERY_CAPACITY,
+    QUERY_IS_EMPTY,
+    QUERY_IS_FULL,
+} QUERIES;
+
 /**
  * @brief A pointer to a user-defined free function.
  *
@@ -114,24 +121,34 @@ arr_list_t *arr_list_wrap(FREE_F free_f, CMP_F cmp_f, size_t nmemb, size_t size,
                           void **arr, int *err);
 
 /**
- * @brief Get the number of items in the list.
+ * @brief Query the array.
  *
- * If the list is NULL, then -1 is returned.
+ * The query command is used to get information about the array. The result
+ * pointer is used to store the result of the query.
  *
- * @param list pointer to list object to be checked
- * @return ssize_t size of the list, -1 on failure
+ * Possible queries:
+ * - QUERY_SIZE: Get the number of nodes in the array.
+ * - QUERY_CAPACITY: Get the capacity of the array.
+ * - QUERY_IS_EMPTY: Check if the array is empty.
+ * - QUERY_IS_FULL: Check if the array is full.
+ *
+ * Possible results:
+ * - QUERY_SIZE: The number of nodes in the array.
+ * - QUERY_CAPACITY: The capacity of the array.
+ * - QUERY_IS_EMPTY: 0 if the array is not empty, non-zero if the array is
+ * - QUERY_IS_FULL: 0 if the array is not full, non-zero if the array is full
+ * empty.
+ *
+ * Possible errors:
+ * - EINVAL: The array or result pointers are NULL.
+ * - ENOTSUP: The query command is invalid.
+ *
+ * @param list A pointer to the array.
+ * @param query The query command.
+ * @param result A pointer to the result of the query.
+ * @return int 0 on success, non-zero on failure.
  */
-ssize_t arr_list_size(const arr_list_t *list);
-
-/**
- * @brief Get the capacity of the list.
- *
- * If the list is NULL, then -1 is returned.
- *
- * @param list pointer to list object to be checked
- * @return ssize_t size of the list, -1 on failure
- */
-ssize_t arr_list_capacity(const arr_list_t *list);
+int arr_list_query(const arr_list_t *list, int query, ssize_t *result);
 
 /**
  * @brief Resize the list to the new capacity.
@@ -161,24 +178,6 @@ int arr_list_resize(arr_list_t *list, size_t new_capacity);
  * @return 0 on success, non-zero on failure
  */
 int arr_list_trim(arr_list_t *list);
-
-/**
- * @brief Check if the list is empty.
- *
- * @param list pointer to list object to be checked
- * @returns 0 if list is not empty, negative if list is NULL, non-zero if list
- * is empty
- */
-int arr_list_is_empty(const arr_list_t *list);
-
-/**
- * @brief Check if the list is full.
- *
- * @param list pointer to list object to be checked
- * @returns 0 if list is not full, negative if list is NULL, non-zero if list is
- * full
- */
-int arr_list_is_full(const arr_list_t *list);
 
 /**
  * @brief Insert a new item into the list at a specific position.

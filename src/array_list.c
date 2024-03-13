@@ -181,18 +181,27 @@ arr_list_t *arr_list_wrap(FREE_F free_f, CMP_F cmp_f, size_t nmemb, size_t size,
     return list;
 }
 
-ssize_t arr_list_size(const arr_list_t *list) {
-    if (list == NULL) {
-        return INVALID;
+int arr_list_query(const arr_list_t *list, int query, ssize_t *result) {
+    if (list == NULL || result == NULL) {
+        return EINVAL;
     }
-    return list->size;
-}
-
-ssize_t arr_list_capacity(const arr_list_t *list) {
-    if (list == NULL) {
-        return INVALID;
+    switch (query) {
+    case QUERY_SIZE:
+        *result = list->size;
+        break;
+    case QUERY_CAPACITY:
+        *result = list->capacity;
+        break;
+    case QUERY_IS_EMPTY:
+        *result = list->size == 0;
+        break;
+    case QUERY_IS_FULL:
+        *result = list->size == list->capacity;
+        break;
+    default:
+        return ENOTSUP;
     }
-    return list->capacity;
+    return SUCCESS;
 }
 
 int arr_list_resize(arr_list_t *list, size_t new_capacity) {
@@ -211,20 +220,6 @@ int arr_list_trim(arr_list_t *list) {
         return SUCCESS;
     }
     return adjust_size(list, list->size);
-}
-
-int arr_list_is_empty(const arr_list_t *list) {
-    if (list == NULL) {
-        return INVALID;
-    }
-    return list->size == 0;
-}
-
-int arr_list_is_full(const arr_list_t *list) {
-    if (list == NULL) {
-        return INVALID;
-    }
-    return list->size == list->capacity;
 }
 
 int arr_list_insert(arr_list_t *list, void *data, size_t position) {

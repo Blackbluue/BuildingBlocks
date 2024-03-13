@@ -38,6 +38,7 @@ int make_mod(void *data, void *addl_data) {
 }
 
 int count_three(void *data, void *addl_data) {
+    (void)data;
     if (*(size_t *)addl_data < 3) {
         (*(size_t *)addl_data)++;
         return SUCCESS;
@@ -54,8 +55,13 @@ void test_arr_list_new() {
     // Create empty list
     EMPTY_LIST = arr_list_new(NULL, test_compare_node, 1, sizeof(*data), NULL);
     CU_ASSERT_PTR_NOT_NULL_FATAL(EMPTY_LIST);
-    CU_ASSERT_EQUAL(0, arr_list_size(EMPTY_LIST));
-    CU_ASSERT_EQUAL(1, arr_list_capacity(EMPTY_LIST));
+    ssize_t res = INVALID;
+    // list size is correct
+    CU_ASSERT_EQUAL(arr_list_query(EMPTY_LIST, QUERY_SIZE, &res), SUCCESS);
+    CU_ASSERT_EQUAL(res, 0);
+    // list is empty
+    CU_ASSERT_EQUAL(arr_list_query(EMPTY_LIST, QUERY_CAPACITY, &res), SUCCESS);
+    CU_ASSERT_EQUAL(res, 1);
 
     // Verify list was created correctly
     list = arr_list_wrap(NULL, test_compare_node, SIZE, sizeof(**int_arr),
@@ -63,8 +69,12 @@ void test_arr_list_new() {
     int_arr = (int **)&wrapped;
     CU_ASSERT_PTR_NOT_NULL_FATAL(list);
     CU_ASSERT_PTR_NOT_NULL_FATAL(*int_arr);
-    CU_ASSERT_EQUAL(arr_list_size(list), 0);
-    CU_ASSERT_EQUAL(arr_list_capacity(list), SIZE);
+    // list size is correct
+    CU_ASSERT_EQUAL(arr_list_query(list, QUERY_SIZE, &res), SUCCESS);
+    CU_ASSERT_EQUAL(res, 0);
+    // list is empty
+    CU_ASSERT_EQUAL(arr_list_query(list, QUERY_CAPACITY, &res), SUCCESS);
+    CU_ASSERT_EQUAL(res, SIZE);
 }
 
 void test_arr_list_insert() {
@@ -81,12 +91,16 @@ void test_arr_list_insert() {
     }
 
     // list size is correct
-    CU_ASSERT_EQUAL(arr_list_size(list), SIZE);
+    ssize_t res = INVALID;
+    arr_list_query(list, QUERY_SIZE, &res);
+    CU_ASSERT_EQUAL(res, SIZE);
 }
 
 void test_arr_list_get() {
     CU_ASSERT_PTR_NOT_NULL_FATAL(list);
-    size_t cur_size = arr_list_size(list);
+    ssize_t res = INVALID;
+    arr_list_query(list, QUERY_SIZE, &res);
+    size_t cur_size = res;
     size_t position = cur_size / 2;
 
     // Should catch if get is called on an invalid list
@@ -110,7 +124,9 @@ void test_arr_list_sort() {
     CU_ASSERT_EQUAL(arr_list_sort(list), SUCCESS);
     // Verify list should now be sorted in descending order
     int prev = (*int_arr)[0];
-    for (size_t i = 1; i < arr_list_size(list); i++) {
+    ssize_t res = INVALID;
+    arr_list_query(list, QUERY_SIZE, &res);
+    for (size_t i = 1; i < (size_t)res; i++) {
         CU_ASSERT_TRUE_FATAL(prev <= (*int_arr)[i]);
     }
 }
@@ -124,7 +140,9 @@ void test_arr_list_iterator() {
     CU_ASSERT_PTR_NOT_NULL_FATAL(list);
     // Confirm iterator is iterating correctly
     CU_ASSERT_EQUAL(arr_list_iterator_reset(list), SUCCESS);
-    for (size_t i = 0; i < arr_list_size(list); i++) {
+    ssize_t res = INVALID;
+    arr_list_query(list, QUERY_SIZE, &res);
+    for (size_t i = 0; i < (size_t)res; i++) {
         CU_ASSERT_EQUAL(arr_list_iterator_next(list), &(*int_arr)[i]);
     }
     CU_ASSERT_PTR_NULL(arr_list_iterator_next(list));
@@ -136,7 +154,9 @@ void test_arr_list_iterator() {
 
 void test_arr_list_remove() {
     CU_ASSERT_PTR_NOT_NULL_FATAL(list);
-    size_t cur_size = arr_list_size(list);
+    ssize_t res = INVALID;
+    arr_list_query(list, QUERY_SIZE, &res);
+    size_t cur_size = res;
     int value_to_remove = (*int_arr)[cur_size / 2];
 
     // Should catch if remove is called on an invalid list
@@ -146,23 +166,28 @@ void test_arr_list_remove() {
     // Function should have exited successfully
     CU_ASSERT_EQUAL(arr_list_remove(list, &value_to_remove), SUCCESS);
     // Size should reflect the removal of the node
-    CU_ASSERT_EQUAL_FATAL(arr_list_size(list), cur_size - 1);
+    arr_list_query(list, QUERY_SIZE, &res);
+    CU_ASSERT_EQUAL_FATAL(res, cur_size - 1);
     cur_size--;
 
     // The node containing the removed value should no longer be in the list
     CU_ASSERT_EQUAL(arr_list_remove(list, &value_to_remove), SUCCESS);
     // Size should not have changed
-    CU_ASSERT_EQUAL(arr_list_size(list), cur_size);
+    arr_list_query(list, QUERY_SIZE, &res);
+    CU_ASSERT_EQUAL(res, cur_size);
 
     int popped = INVALID;
     arr_list_pop(list, cur_size - 1, &popped);
     CU_ASSERT_EQUAL(popped, (*int_arr)[cur_size - 1]);
-    CU_ASSERT_EQUAL_FATAL(arr_list_size(list), cur_size - 1);
+    arr_list_query(list, QUERY_SIZE, &res);
+    CU_ASSERT_EQUAL_FATAL(res, cur_size - 1);
 }
 
 void test_arr_list_index_of() {
     CU_ASSERT_PTR_NOT_NULL_FATAL(list);
-    size_t cur_size = arr_list_size(list);
+    ssize_t res = INVALID;
+    arr_list_query(list, QUERY_SIZE, &res);
+    size_t cur_size = res;
     size_t position = cur_size / 2;
     int value_to_find = (*int_arr)[position];
 
@@ -183,7 +208,9 @@ void test_arr_list_index_of() {
 
 void test_arr_list_set() {
     CU_ASSERT_PTR_NOT_NULL_FATAL(list);
-    size_t cur_size = arr_list_size(list);
+    ssize_t res = INVALID;
+    arr_list_query(list, QUERY_SIZE, &res);
+    size_t cur_size = res;
     size_t position = cur_size / 2;
     int value_to_set = 42;
 
@@ -198,7 +225,8 @@ void test_arr_list_set() {
     CU_ASSERT_EQUAL(arr_list_set(list, &value_to_set, position, &old_value),
                     SUCCESS);
     // Size should not change
-    CU_ASSERT_EQUAL(arr_list_size(list), cur_size);
+    arr_list_query(list, QUERY_SIZE, &res);
+    CU_ASSERT_EQUAL(res, cur_size);
     // The old value should be the same as the value that was in the list
     CU_ASSERT_EQUAL(old_val_check, old_value);
     // The node containing the set value should now be in the list
@@ -216,7 +244,9 @@ void test_arr_list_foreach() {
     // Ensure the user defined action was done to the list nodes
     CU_ASSERT_TRUE((*int_arr)[0] == 0 && (*int_arr)[1] == 1);
     // Ensure the user defined action was done to the correct number of nodes
-    CU_ASSERT_EQUAL(iterations, arr_list_size(list));
+    ssize_t res = INVALID;
+    arr_list_query(list, QUERY_SIZE, &res);
+    CU_ASSERT_EQUAL(iterations, res);
 
     iterations = 0;
     CU_ASSERT_EQUAL(arr_list_foreach(list, count_three, &iterations), INVALID);
@@ -231,7 +261,9 @@ void test_arr_list_clear() {
     // Function should have exited successfully
     CU_ASSERT_EQUAL(arr_list_clear(list), SUCCESS);
     // list should now be empty
-    CU_ASSERT_EQUAL(arr_list_size(list), 0)
+    ssize_t res = INVALID;
+    arr_list_query(list, QUERY_SIZE, &res);
+    CU_ASSERT_EQUAL(res, 0);
     CU_ASSERT_PTR_NULL(arr_list_get(list, 0));
     CU_ASSERT_EQUAL((*int_arr)[0], 0);
 }
