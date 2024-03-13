@@ -107,35 +107,32 @@ int tree_add(tree_t *tree, void *data);
  * @brief Remove a node from the tree.
  *
  * The data pointer is used to find the node to be removed; the tree's cmp_func
- * will be used in comparison. The data does not need to be the same pointer
- * that was added to the tree, but should be inside the tree according to the
- * cmp_func.
+ * will be used in comparison. If old is not NULL, then it will be used to
+ * store the removed data
  *
- * If tree is NULL, then the function will return NULL and set errno to EINVAL.
+ * Possible errors:
+ * - EINVAL: The tree is NULL.
  *
  * @param tree A pointer to the tree.
  * @param data A pointer to the data to be removed from the tree.
- * @return void* A pointer to the data that was removed from the tree or NULL if
- * the data was not found.
+ * @param old A pointer to the data that was removed from the tree.
+ * @return int 0 on success, non-zero on failure.
  */
-void *tree_remove(tree_t *tree, void *data);
+int tree_remove(tree_t *tree, void *data, void **old);
 
 /**
  * @brief Remove all nodes from the tree.
  *
  * The data pointer is used to find the nodes to be removed; the tree's
- * cmp_func will be used in comparison. The data does not need to be the same
- * pointer that was added to the tree, but should be inside the tree according
- * to the cmp_func. This function will free the data in the tree if the tree was
- * created with a free_func. If the user does not want the memory to be freed,
- * then tree_remove() should be used directly.
+ * cmp_func will be used in comparison. This function will free the data in the
+ * tree if the tree was created with a free_func. If the user does not want the
+ * memory to be freed, then tree_remove() should be used directly.
  *
- * If tree is NULL, then the function will return -1 and set errno to EINVAL.
+ * If tree is NULL, then the function will return -1.
  *
  * @param tree A pointer to the tree.
  * @param data A pointer to the data to be removed from the tree.
- * @return int The number of nodes removed from the tree or -1 if the tree is
- * NULL.
+ * @return int The number of nodes removed from the tree or -1 on error.
  */
 ssize_t tree_remove_all(tree_t *tree, void *data);
 

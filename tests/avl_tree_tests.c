@@ -166,14 +166,15 @@ void test_tree_iterate() {
 void test_tree_remove() {
     // Verify tree_remove() fails with NULL tree
     ssize_t res;
-    errno = 0;
-    CU_ASSERT(tree_remove(NULL, NULL) == NULL); // Function exited correctly
-    CU_ASSERT(errno == EINVAL);                 // errno is correct
+    // Function exited correctly
+    CU_ASSERT_EQUAL(tree_remove(NULL, NULL, NULL), EINVAL);
 
     CU_ASSERT_FATAL(tree != NULL); // tree is not NULL
     // Verify tree_remove() succeeds with valid data and tree
+    int *iptr = NULL;
     for (size_t i = 0; i < CAPACITY; i++) {
-        CU_ASSERT(tree_remove(tree, &data[i]) == &data[i]);
+        CU_ASSERT_EQUAL(tree_remove(tree, &data[i], &iptr), SUCCESS);
+        CU_ASSERT_EQUAL(iptr, &data[i]);
         tree_query(tree, QUERY_SIZE, &res);
         CU_ASSERT_EQUAL(res, CAPACITY - i - 1); // tree size is correct
     }
@@ -227,16 +228,14 @@ void test_tree_find_all() {
 void test_tree_remove_all() {
     // Verify tree_remove_all() fails with NULL tree
     ssize_t res;
-    errno = 0;
-    CU_ASSERT(tree_remove_all(NULL, NULL) ==
-              INVALID);         // Function exited correctly
-    CU_ASSERT(errno == EINVAL); // errno is correct
+    // Function exited correctly
+    CU_ASSERT_EQUAL(tree_remove_all(NULL, NULL), INVALID);
 
-    CU_ASSERT_FATAL(tree != NULL); // tree is not NULL
+    CU_ASSERT_PTR_NOT_NULL_FATAL(tree); // tree is not NULL
     // Verify tree_remove_all() succeeds with valid data and tree
     int even = 0;
     size_t even_cnt = (CAPACITY / 2);
-    CU_ASSERT(tree_remove_all(tree, &even) == even_cnt);
+    CU_ASSERT_EQUAL(tree_remove_all(tree, &even), even_cnt);
     tree_query(tree, QUERY_SIZE, &res);
     CU_ASSERT_EQUAL(res, CAPACITY - even_cnt); // tree size is correct
 }

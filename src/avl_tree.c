@@ -383,16 +383,15 @@ int tree_add(tree_t *tree, void *data) {
     return SUCCESS;
 }
 
-void *tree_remove(tree_t *tree, void *data) {
+int tree_remove(tree_t *tree, void *data, void **old) {
     if (tree == NULL) {
-        errno = EINVAL;
-        return NULL;
+        return EINVAL;
     } else if (tree->size == 0) {
-        return NULL;
+        return SUCCESS;
     }
     struct node **to_remove = tree_search(&tree->root, tree->cmp_func, data);
     if (*to_remove == NULL) {
-        return NULL;
+        return SUCCESS;
     }
 
     struct node *to_promote = NULL;
@@ -414,17 +413,19 @@ void *tree_remove(tree_t *tree, void *data) {
     }
 
     void *removed = (*to_remove)->data;
+    if (old != NULL) {
+        *old = removed;
+    }
     free(*to_remove);
 
     *to_remove = to_promote;
     balance_tree(to_remove);
     tree->size--;
-    return removed;
+    return SUCCESS;
 }
 
 ssize_t tree_remove_all(tree_t *tree, void *data) {
     if (tree == NULL) {
-        errno = EINVAL;
         return INVALID;
     } else if (tree->size == 0) {
         return 0;
@@ -434,7 +435,8 @@ ssize_t tree_remove_all(tree_t *tree, void *data) {
     // allowed
     struct node **node = tree_search(&tree->root, tree->cmp_func, data);
     while (*node != NULL) {
-        void *to_remove = tree_remove(tree, data);
+        void *to_remove = NULL;
+        tree_remove(tree, data, &to_remove);
         if (tree->free_func != NULL) {
             tree->free_func(to_remove);
         }
