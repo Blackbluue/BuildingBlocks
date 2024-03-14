@@ -1,14 +1,10 @@
 #ifndef HASH_TABLE_H
 #define HASH_TABLE_H
 
+#include "buildingblocks.h"
 #include <unistd.h>
 
 /* DATA */
-
-typedef enum query_cmds {
-    QUERY_SIZE,
-    QUERY_IS_EMPTY,
-} QUERIES;
 
 #define HASH_TABLE_DEFAULT_CAPACITY 16 // default capacity of table
 

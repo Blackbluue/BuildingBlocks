@@ -1,13 +1,10 @@
 #ifndef AVL_TREE_H
 #define AVL_TREE_H
+
+#include "buildingblocks.h"
 #include <unistd.h>
 
 /* DATA */
-
-typedef enum query_cmds {
-    QUERY_SIZE,
-    QUERY_IS_EMPTY,
-} QUERIES;
 
 /**
  * @brief A pointer to a user-defined free function.  This is used to free
