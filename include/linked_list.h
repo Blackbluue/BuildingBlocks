@@ -127,9 +127,9 @@ int list_insert(list_t *list, void *data, size_t position);
 /**
  * @brief Get the data at a specific position in the list.
  *
- * If an error occurs, then NULL will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: list is NULL or position is invalid
+ * If list is NULL or position is invalid, then NULL will be returned. Note that
+ * if the list allows NULL values or is empty, then this function will also
+ * return NULL.
  *
  * @param list list to get the node from
  * @param position position in the list to get the node from
@@ -140,9 +140,7 @@ void *list_get(const list_t *list, size_t position);
 /**
  * @brief Get the size of the list.
  *
- * If an error occurs, then -1 will be returned.
- * Possible error codes are:
- * - EINVAL: list is NULL
+ * If list is NULL, then -1 will be returned.
  *
  * @param list list to get the size of
  * @return the size of the list on success, -1 on failure
@@ -152,9 +150,7 @@ ssize_t list_size(const list_t *list);
 /**
  * @brief Check if the list object is empty.
  *
- * If an error occurs, then -1 will be returned.
- * Possible error codes are:
- * - EINVAL: list is NULL
+ * If list is NULL, then -1 will be returned.
  *
  * @param list pointer to linked list object to be checked
  * @returns 0 if list is not empty or list is NULL, non-zero if list is empty,
@@ -165,9 +161,8 @@ int list_is_empty(const list_t *list);
 /**
  * @brief Pop the head out of the list.
  *
- * If an error occurs, then NULL will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: list is NULL
+ * If list is NULL, then NULL will be returned. Note that if the list allows
+ * NULL values or is empty, then this function will also return NULL.
  *
  * @param list list to pop out of
  * @return the popped data on success, NULL on failure
@@ -177,9 +172,8 @@ void *list_pop_head(list_t *list);
 /**
  * @brief Pop the tail out of the list.
  *
- * If an error occurs, then NULL will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: list is NULL
+ * If list is NULL, then NULL will be returned. Note that if the list allows
+ * NULL values or is empty, then this function will also return NULL.
  *
  * @param list list to pop out of
  * @return the popped data on success, NULL on failure
@@ -189,9 +183,8 @@ void *list_pop_tail(list_t *list);
 /**
  * @brief Get the data from the head of the list without popping.
  *
- * If an error occurs, then NULL will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: list is NULL
+ * If list is NULL, then NULL will be returned. Note that if the list allows
+ * NULL values or is empty, then this function will also return NULL.
  *
  * @param list list to peeked out of
  * @return the head on success, NULL on failure
@@ -201,9 +194,8 @@ void *list_peek_head(const list_t *list);
 /**
  * @brief Get the data from the tail of the list without popping.
  *
- * If an error occurs, then NULL will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: list is NULL
+ * If list is NULL, then NULL will be returned. Note that if the list allows
+ * NULL values or is empty, then this function will also return NULL.
  *
  * @param list list to peeked out of
  * @return the tail on success, NULL on failure

@@ -325,7 +325,6 @@ int list_insert(list_t *list, void *data, size_t position) {
 
 void *list_get(const list_t *list, size_t position) {
     if (list == NULL || position >= list->size) {
-        errno = EINVAL;
         return NULL;
     }
     list_node_t *current_node = list->head;
@@ -345,7 +344,6 @@ int list_is_empty(const list_t *list) {
 
 void *list_pop_head(list_t *list) {
     if (list == NULL) {
-        errno = EINVAL;
         return NULL;
     } else if (list->head == NULL) {
         return NULL;
@@ -369,7 +367,6 @@ void *list_pop_head(list_t *list) {
 
 void *list_pop_tail(list_t *list) {
     if (list == NULL) {
-        errno = EINVAL;
         return NULL;
     } else if (list->tail == NULL) {
         return NULL;
@@ -399,7 +396,6 @@ void *list_pop_tail(list_t *list) {
 
 void *list_peek_head(const list_t *list) {
     if (list == NULL) {
-        errno = EINVAL;
         return NULL;
     } else if (list->head == NULL) {
         return NULL;
@@ -409,7 +405,6 @@ void *list_peek_head(const list_t *list) {
 
 void *list_peek_tail(const list_t *list) {
     if (list == NULL) {
-        errno = EINVAL;
         return NULL;
     } else if (list->tail == NULL) {
         return NULL;
