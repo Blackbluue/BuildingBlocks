@@ -211,16 +211,17 @@ void *list_peek_tail(const list_t *list);
  * it is up to the user to differentiate between a NULL value in the list
  * and an error.
  *
- * If an error occurs, then NULL will be returned and errno will be set.
+ * If an error occurs, then NULL will be returned.
  * Possible error codes are:
  * - EINVAL: list is NULL
  * - ENOTSUP: list does not support comparisons
  *
  * @param list list to remove the node from
  * @param item_to_remove the data object to be searched for
+ * @param err pointer to the error code
  * @return the value in the removed node on success, NULL on failure
  */
-void *list_remove(list_t *list, void *item_to_remove);
+void *list_remove(list_t *list, void *item_to_remove, int *err);
 
 /**
  * @brief Perform a user defined action on the data in list.

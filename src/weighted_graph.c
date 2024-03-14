@@ -257,7 +257,7 @@ void *graph_remove_node(weighted_graph_t *graph, void *data) {
         return NULL;
     }
 
-    struct node *removed = list_remove(graph->nodes, data);
+    struct node *removed = list_remove(graph->nodes, data, NULL);
     if (removed == NULL) {
         errno = ENOENT; // item not found in graph
         return NULL;
@@ -267,7 +267,7 @@ void *graph_remove_node(weighted_graph_t *graph, void *data) {
     struct node *curr_node = list_iterator_next(graph->nodes);
     while (curr_node) {
         // will skip nodes with no edges
-        while (list_remove(curr_node->edges, removed)) {
+        while (list_remove(curr_node->edges, removed, NULL)) {
             // removes all edges that point to the removed node
         }
         if (list_size(curr_node->edges) == 0) {
@@ -483,7 +483,7 @@ int graph_remove_edge(weighted_graph_t *graph, const void *src,
         return ENOENT;
     }
 
-    struct edge *checker = list_remove(from->edges, to);
+    struct edge *checker = list_remove(from->edges, to, NULL);
     if (checker) {
         free(checker);
         return SUCCESS;

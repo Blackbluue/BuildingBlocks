@@ -118,7 +118,7 @@ void *queue_remove(queue_t *queue, void *item_to_remove) {
         errno = ENOTSUP;
         return NULL;
     }
-    return list_remove(queue->q_data, item_to_remove);
+    return list_remove(queue->q_data, item_to_remove, NULL);
 }
 
 void *queue_find_first(const queue_t *queue, const void *value_to_find) {

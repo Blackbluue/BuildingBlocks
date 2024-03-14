@@ -253,10 +253,10 @@ void test_list_remove() {
 
     CU_ASSERT_FATAL(NULL != list);
     // Should catch if remove is called on an invalid list
-    removed_value = list_remove(invalid_list, (void *)&value_to_remove);
+    removed_value = list_remove(invalid_list, (void *)&value_to_remove, NULL);
     CU_ASSERT(NULL == removed_value);
 
-    removed_value = list_remove(list, (void *)&value_to_remove);
+    removed_value = list_remove(list, (void *)&value_to_remove, NULL);
     // Function should have exited successfully
     CU_ASSERT(value_to_remove == *removed_value);
     // Size should reflect the removal of the node
@@ -264,7 +264,7 @@ void test_list_remove() {
     CU_ASSERT(4 == list_size(list));
 
     // The node containing the removed value should no longer be in the list
-    removed_value = list_remove(list, (void *)&value_to_remove);
+    removed_value = list_remove(list, (void *)&value_to_remove, NULL);
     CU_ASSERT(NULL == removed_value);
 }
 

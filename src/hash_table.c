@@ -408,7 +408,7 @@ void *hash_table_remove(hash_table_t *table, const void *key) {
     if (table->buckets[idx] == NULL) {
         return NULL;
     }
-    table_node_t *node = list_remove(table->buckets[idx], (void *)key);
+    table_node_t *node = list_remove(table->buckets[idx], (void *)key, NULL);
     if (node == NULL) {
         return NULL;
     }

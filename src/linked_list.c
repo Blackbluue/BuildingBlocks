@@ -419,12 +419,12 @@ void *list_peek_tail(const list_t *list) {
     return list->tail->data;
 }
 
-void *list_remove(list_t *list, void *item_to_remove) {
+void *list_remove(list_t *list, void *item_to_remove, int *err) {
     if (list == NULL) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     } else if (list->compare_function == NULL) {
-        errno = ENOTSUP;
+        set_err(err, ENOTSUP);
         return NULL;
     } else if (list->size == 0) {
         return NULL;

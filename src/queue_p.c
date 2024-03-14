@@ -289,7 +289,7 @@ queue_p_node_t *queue_p_remove(queue_p_t *queue, void *item_to_remove) {
         if (node != NULL) {
             queue->size--;
             if (queue_is_empty(inner_q)) {
-                list_remove(queue->list, inner_q);
+                list_remove(queue->list, inner_q, NULL);
                 queue_destroy(&inner_q);
             }
             return node;
