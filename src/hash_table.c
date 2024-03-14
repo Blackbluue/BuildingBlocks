@@ -372,7 +372,7 @@ void *hash_table_lookup(const hash_table_t *table, const void *key) {
         return NULL;
     }
     size_t idx = hash(key, table->capacity);
-    table_node_t *node = list_find_first(table->buckets[idx], key);
+    table_node_t *node = list_find_first(table->buckets[idx], key, NULL);
     return node != NULL ? node->data : NULL;
 }
 

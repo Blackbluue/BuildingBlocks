@@ -510,12 +510,12 @@ void *list_iterator_next(list_t *list, int *err) {
     return data;
 }
 
-void *list_find_first(const list_t *list, const void *search_data) {
+void *list_find_first(const list_t *list, const void *search_data, int *err) {
     if (list == NULL) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     } else if (list->compare_function == NULL) {
-        errno = ENOTSUP;
+        set_err(err, ENOTSUP);
         return NULL;
     } else if (list->size == 0) {
         return NULL;
@@ -531,12 +531,12 @@ void *list_find_first(const list_t *list, const void *search_data) {
     return NULL;
 }
 
-list_t *list_find_all(const list_t *list, const void *search_data) {
+list_t *list_find_all(const list_t *list, const void *search_data, int *err) {
     if (list == NULL) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     } else if (list->compare_function == NULL) {
-        errno = ENOTSUP;
+        set_err(err, ENOTSUP);
         return NULL;
     } else if (list->size == 0) {
         return NULL;
@@ -544,16 +544,16 @@ list_t *list_find_all(const list_t *list, const void *search_data) {
 
     list_t *found_list = list_new(NULL, list->compare_function, NULL);
     if (found_list == NULL) {
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
     list_node_t *current_node = list->head;
     for (size_t i = 0; i < list->size; i++) {
         if (list->compare_function(search_data, current_node->data) == 0) {
-            int err = list_push_tail(found_list, current_node->data);
-            if (err != SUCCESS) {
+            int loc_err = list_push_tail(found_list, current_node->data);
+            if (loc_err != SUCCESS) {
                 list_delete(&found_list);
-                errno = err;
+                set_err(err, loc_err);
                 return NULL;
             }
         }

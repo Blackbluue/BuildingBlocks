@@ -273,16 +273,17 @@ void *list_iterator_next(list_t *list, int *err);
 /**
  * @brief Find the first occurrence of a node containing the search_data.
  *
- * If an error occurs, then NULL will be returned and errno will be set.
+ * If an error occurs, then NULL will be returned.
  * Possible error codes are:
  * - EINVAL: list is NULL
  * - ENOTSUP: list does not support comparisons
  *
  * @param list list to search through
  * @param search_data pointer to the data to be searched for
+ * @param err pointer to the error code
  * @return the data found on success, NULL on failure
  */
-void *list_find_first(const list_t *list, const void *search_data);
+void *list_find_first(const list_t *list, const void *search_data, int *err);
 
 /**
  * @brief Find all occurrences of a node containing the search_data.
@@ -295,7 +296,7 @@ void *list_find_first(const list_t *list, const void *search_data);
  * the returned list; however, deleting/clearing the returned list will not
  * affect the original list.
  *
- * If an error occurs, then NULL will be returned and errno will be set.
+ * If an error occurs, then NULL will be returned.
  * Possible error codes are:
  * - EINVAL: list is NULL
  * - ENOTSUP: list does not support comparisons
@@ -304,9 +305,10 @@ void *list_find_first(const list_t *list, const void *search_data);
  * @param list list to search through
  * @param search_data is the pointer to the address of the data to be searched
  *                    for
+ * @param err pointer to the error code
  * @return pointer to list of all found occurrences on success, NULL on failure
  */
-list_t *list_find_all(const list_t *list, const void *search_data);
+list_t *list_find_all(const list_t *list, const void *search_data, int *err);
 
 /**
  * @brief Sort list as per user defined compare function.

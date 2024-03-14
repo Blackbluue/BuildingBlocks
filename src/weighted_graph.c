@@ -303,7 +303,7 @@ int graph_iterate_neighbors(weighted_graph_t *graph, void *center, ACT_F func,
         return EINVAL;
     }
 
-    struct node *curr_node = list_find_first(graph->nodes, center);
+    struct node *curr_node = list_find_first(graph->nodes, center, NULL);
     if (curr_node == NULL) {
         return ENOENT;
     }
@@ -400,7 +400,7 @@ int graph_contains(const weighted_graph_t *graph, const void *data) {
         errno = EINVAL;
         return FAILURE;
     }
-    return list_find_first(graph->nodes, data) == NULL;
+    return list_find_first(graph->nodes, data, NULL) == NULL;
 }
 
 int graph_add_edge(weighted_graph_t *graph, void *src, void *dst,
@@ -409,11 +409,11 @@ int graph_add_edge(weighted_graph_t *graph, void *src, void *dst,
         return EINVAL;
     }
 
-    struct node *from = list_find_first(graph->nodes, src);
+    struct node *from = list_find_first(graph->nodes, src, NULL);
     if (from == NULL) {
         return ENOENT;
     }
-    struct node *to = list_find_first(graph->nodes, dst);
+    struct node *to = list_find_first(graph->nodes, dst, NULL);
     if (to == NULL) {
         return ENOENT;
     }
@@ -425,7 +425,7 @@ int graph_add_edge(weighted_graph_t *graph, void *src, void *dst,
             return ENOMEM;
         }
     } else {
-        struct edge *checker = list_find_first(from->edges, to);
+        struct edge *checker = list_find_first(from->edges, to, NULL);
         if (checker) {
             checker->weight = weight;
             return SUCCESS;
@@ -449,18 +449,18 @@ double graph_get_edge_weight(const weighted_graph_t *graph, const void *src,
         return NAN;
     }
 
-    struct node *from = list_find_first(graph->nodes, src);
+    struct node *from = list_find_first(graph->nodes, src, NULL);
     if (from == NULL) {
         errno = ENOENT;
         return NAN;
     }
-    struct node *to = list_find_first(graph->nodes, dst);
+    struct node *to = list_find_first(graph->nodes, dst, NULL);
     if (to == NULL) {
         errno = ENOENT;
         return NAN;
     }
 
-    struct edge *checker = list_find_first(from->edges, to);
+    struct edge *checker = list_find_first(from->edges, to, NULL);
     if (checker == NULL) {
         errno = ENOENT;
         return NAN;
@@ -474,11 +474,11 @@ int graph_remove_edge(weighted_graph_t *graph, const void *src,
         return EINVAL;
     }
 
-    struct node *from = list_find_first(graph->nodes, src);
+    struct node *from = list_find_first(graph->nodes, src, NULL);
     if (from == NULL) {
         return ENOENT;
     }
-    struct node *to = list_find_first(graph->nodes, dst);
+    struct node *to = list_find_first(graph->nodes, dst, NULL);
     if (to == NULL) {
         return ENOENT;
     }
@@ -497,7 +497,7 @@ ssize_t graph_out_degree_size(const weighted_graph_t *graph, const void *src) {
         return FAILURE;
     }
 
-    struct node *from = list_find_first(graph->nodes, src);
+    struct node *from = list_find_first(graph->nodes, src, NULL);
     if (from == NULL) {
         errno = ENOENT;
         return FAILURE;
@@ -512,7 +512,7 @@ ssize_t graph_in_degree_size(const weighted_graph_t *graph, const void *dst) {
         return FAILURE;
     }
 
-    struct node *to = list_find_first(graph->nodes, dst);
+    struct node *to = list_find_first(graph->nodes, dst, NULL);
     if (dst == NULL) {
         errno = ENOENT;
         return FAILURE;

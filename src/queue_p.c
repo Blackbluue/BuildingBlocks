@@ -253,7 +253,7 @@ queue_p_node_t *queue_p_get_priority(const queue_p_t *queue, size_t position,
         return NULL;
     }
 
-    queue_t *current_queue = list_find_first(queue->list, &priority);
+    queue_t *current_queue = list_find_first(queue->list, &priority, NULL);
     if (current_queue == NULL) {
         return NULL;
     }

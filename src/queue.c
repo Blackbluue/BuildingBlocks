@@ -129,7 +129,7 @@ void *queue_find_first(const queue_t *queue, const void *value_to_find) {
         errno = ENOTSUP;
         return NULL;
     }
-    return list_find_first(queue->q_data, value_to_find);
+    return list_find_first(queue->q_data, value_to_find, NULL);
 }
 
 int queue_clear(queue_t *queue) {

@@ -275,16 +275,16 @@ void test_list_find_first() {
 
     CU_ASSERT_FATAL(NULL != list);
     // Should catch if function is called on an invalid list
-    node_data = list_find_first(invalid_list, (void *)&value_to_find);
+    node_data = list_find_first(invalid_list, (void *)&value_to_find, NULL);
     CU_ASSERT(NULL == node_data);
 
     // Should not be able to find the value removed in the previous test
-    node_data = list_find_first(list, (void *)&value_to_find);
+    node_data = list_find_first(list, (void *)&value_to_find, NULL);
     CU_ASSERT(NULL == node_data);
 
     // Change the value we are looking for to one that is still in the list
     value_to_find--;
-    node_data = list_find_first(list, (void *)&value_to_find);
+    node_data = list_find_first(list, (void *)&value_to_find, NULL);
 
     // Ensure function exited successfully
     CU_ASSERT_FATAL(NULL != node_data);
@@ -320,17 +320,17 @@ void test_list_find_all() {
 
     CU_ASSERT_FATAL(NULL != list);
     // Should catch if function is called on an invalid list
-    result_list = list_find_all(test_list, (void *)&value_to_find);
+    result_list = list_find_all(test_list, (void *)&value_to_find, NULL);
     CU_ASSERT(NULL == result_list);
 
     // create empty list
     test_list = list_new((FREE_F)custom_free, (CMP_F)test_compare_node, NULL);
 
     // Should catch if function is called on an empty list
-    result_list = list_find_all(test_list, (void *)&value_to_find);
+    result_list = list_find_all(test_list, (void *)&value_to_find, NULL);
     CU_ASSERT(NULL == result_list);
 
-    result_list = list_find_all(list, (void *)&value_to_find);
+    result_list = list_find_all(list, (void *)&value_to_find, NULL);
 
     // Ensure function exited successfully
     CU_ASSERT_FATAL(NULL != result_list);
