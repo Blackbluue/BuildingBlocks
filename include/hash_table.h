@@ -117,9 +117,9 @@ int hash_table_set(hash_table_t *table, void *data, const void *key);
 /**
  * @brief Look up an item in the table by key.
  *
- * If an error occurs, NULL is returned and errno is set appropriately.
- * Possible error codes include:
- * - EINVAL: table or key are NULL
+ * If table or key are NULL, NULL is returned. If the key is not found in the
+ * table, NULL is returned. The user should check to tell the difference
+ * between a NULL return value and a NULL table/key error.
  *
  * @param table pointer to table address
  * @param key key for data being searched for

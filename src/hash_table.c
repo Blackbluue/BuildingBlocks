@@ -355,7 +355,6 @@ int hash_table_set(hash_table_t *table, void *data, const void *key) {
 
 void *hash_table_lookup(const hash_table_t *table, const void *key) {
     if (table == NULL || key == NULL) {
-        errno = EINVAL;
         return NULL;
     } else if (table->size == 0) {
         return NULL;
