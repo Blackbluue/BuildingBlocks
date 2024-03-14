@@ -388,7 +388,6 @@ int hash_table_iterate(hash_table_t *table, ACT_TABLE_F action,
 
 void *hash_table_remove(hash_table_t *table, const void *key) {
     if (table == NULL || key == NULL) {
-        errno = EINVAL;
         return NULL;
     } else if (table->size == 0) {
         return NULL;

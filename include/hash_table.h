@@ -118,7 +118,7 @@ int hash_table_set(hash_table_t *table, void *data, const void *key);
  * @brief Look up an item in the table by key.
  *
  * If table or key are NULL, NULL is returned. If the key is not found in the
- * table, NULL is returned. The user should check to tell the difference
+ * table, NULL is also returned. The user should check to tell the difference
  * between a NULL return value and a NULL table/key error.
  *
  * @param table pointer to table address
@@ -151,13 +151,13 @@ int hash_table_iterate(hash_table_t *table, ACT_TABLE_F action,
 /**
  * @brief Remove an item from the hash table.
  *
- * If an error occurs, NULL is returned and errno is set appropriately.
- * Possible error codes include:
- * - EINVAL: table or key are NULL
+ * If table or key are NULL, NULL is returned. If the key is not found in the
+ * table, NULL is also returned. The user should check to tell the difference
+ * between a NULL return value and a NULL table/key error.
  *
  * @param table the table to remove the item from
  * @param key key of data to be removed
- * @return void * data that was removed
+ * @return void * data that was removed, or NULL
  */
 void *hash_table_remove(hash_table_t *table, const void *key);
 
