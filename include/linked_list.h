@@ -1,6 +1,7 @@
 #ifndef LINKED_LIST_H
 #define LINKED_LIST_H
 
+#include "buildingblocks.h"
 #include <unistd.h>
 
 /* DATA */
@@ -55,6 +56,32 @@ typedef struct list_t list_t;
  * @returns pointer to allocated list on success or NULL on failure
  */
 list_t *list_new(FREE_F free_f, CMP_F cmp_f);
+
+/**
+ * @brief Query the list.
+ *
+ * The query command is used to get information about the list. The result
+ * pointer is used to store the result of the query.
+ *
+ * Possible queries:
+ * - QUERY_SIZE: Get the number of nodes in the list.
+ * - QUERY_IS_EMPTY: Check if the list is empty.
+ *
+ * Possible results:
+ * - QUERY_SIZE: The number of nodes in the list.
+ * - QUERY_IS_EMPTY: 0 if the list is not empty, non-zero if the list is
+ * empty.
+ *
+ * Possible errors:
+ * - EINVAL: The list or result pointers are NULL.
+ * - ENOTSUP: The query command is invalid.
+ *
+ * @param list A pointer to the list.
+ * @param query The query command.
+ * @param result A pointer to the result of the query.
+ * @return int 0 on success, non-zero on failure.
+ */
+int list_query(const list_t *list, int query, ssize_t *result);
 
 /**
  * @brief Push a new node onto the head of list.
@@ -113,19 +140,19 @@ void *list_get(const list_t *list, size_t position);
 /**
  * @brief Get the size of the list.
  *
- * If an error occurs, then -1 will be returned and errno will be set.
+ * If an error occurs, then -1 will be returned.
  * Possible error codes are:
  * - EINVAL: list is NULL
  *
- * @param list pointer to linked list object to be checked
- * @return ssize_t size of the list, -1 on failure
+ * @param list list to get the size of
+ * @return the size of the list on success, -1 on failure
  */
 ssize_t list_size(const list_t *list);
 
 /**
  * @brief Check if the list object is empty.
  *
- * If an error occurs, then -1 will be returned and errno will be set.
+ * If an error occurs, then -1 will be returned.
  * Possible error codes are:
  * - EINVAL: list is NULL
  *

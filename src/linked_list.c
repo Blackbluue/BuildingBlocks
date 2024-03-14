@@ -244,6 +244,22 @@ list_t *list_new(FREE_F free_f, CMP_F cmp_f) {
     return list;
 }
 
+int list_query(const list_t *list, int query, ssize_t *result) {
+    if (list == NULL || result == NULL) {
+        return EINVAL;
+    }
+    switch (query) {
+    case QUERY_SIZE:
+        *result = list->size;
+        return SUCCESS;
+    case QUERY_IS_EMPTY:
+        *result = list->size == 0;
+        return SUCCESS;
+    default:
+        return ENOTSUP;
+    }
+}
+
 int list_push_head(list_t *list, void *data) {
     if (list == NULL) {
         return EINVAL;
@@ -320,19 +336,11 @@ void *list_get(const list_t *list, size_t position) {
 }
 
 ssize_t list_size(const list_t *list) {
-    if (list == NULL) {
-        errno = EINVAL;
-        return INVALID;
-    }
-    return list->size;
+    return list == NULL ? INVALID : list->size;
 }
 
 int list_is_empty(const list_t *list) {
-    if (list == NULL) {
-        errno = EINVAL;
-        return INVALID;
-    }
-    return list->size == 0;
+    return list == NULL ? INVALID : list->size == 0;
 }
 
 void *list_pop_head(list_t *list) {
