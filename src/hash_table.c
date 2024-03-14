@@ -300,6 +300,22 @@ hash_table_t *hash_table_init(size_t capacity, FREE_F free_f, CMP_F cmp_f) {
     return table;
 }
 
+int hash_table_query(const hash_table_t *table, int query, ssize_t *result) {
+    if (table == NULL || result == NULL) {
+        return EINVAL;
+    }
+    switch (query) {
+    case QUERY_SIZE:
+        *result = table->size;
+        return SUCCESS;
+    case QUERY_IS_EMPTY:
+        *result = table->size == 0;
+        return SUCCESS;
+    default:
+        return ENOTSUP;
+    }
+}
+
 int hash_table_set(hash_table_t *table, void *data, const void *key) {
     if (table == NULL || key == NULL) {
         return EINVAL;
@@ -335,14 +351,6 @@ int hash_table_set(hash_table_t *table, void *data, const void *key) {
         }
         return err;
     }
-}
-
-ssize_t hash_table_size(const hash_table_t *table) {
-    if (table == NULL) {
-        errno = EINVAL;
-        return INVALID;
-    }
-    return table->size;
 }
 
 void *hash_table_lookup(const hash_table_t *table, const void *key) {

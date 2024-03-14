@@ -5,6 +5,11 @@
 
 /* DATA */
 
+typedef enum query_cmds {
+    QUERY_SIZE,
+    QUERY_IS_EMPTY,
+} QUERIES;
+
 #define HASH_TABLE_DEFAULT_CAPACITY 16 // default capacity of table
 
 /**
@@ -65,6 +70,32 @@ typedef struct hash_table_t hash_table_t;
 hash_table_t *hash_table_init(size_t capacity, FREE_F free_f, CMP_F cmp_f);
 
 /**
+ * @brief Query the table.
+ *
+ * The query command is used to get information about the table. The result
+ * pointer is used to store the result of the query.
+ *
+ * Possible queries:
+ * - QUERY_SIZE: Get the number of key/value pairs in the table.
+ * - QUERY_IS_EMPTY: Check if the table is empty.
+ *
+ * Possible results:
+ * - QUERY_SIZE: The number of key/value pairs in the table.
+ * - QUERY_IS_EMPTY: 0 if the table is not empty, non-zero if the table is
+ * empty.
+ *
+ * Possible errors:
+ * - EINVAL: The table or result pointers are NULL.
+ * - ENOTSUP: The query command is invalid.
+ *
+ * @param list A pointer to the table.
+ * @param query The query command.
+ * @param result A pointer to the result of the query.
+ * @return int 0 on success, non-zero on failure.
+ */
+int hash_table_query(const hash_table_t *table, int query, ssize_t *result);
+
+/**
  * @brief Add an item to the table.
  *
  * If the key already exists in the table, the data will be updated. Otherwise,
@@ -82,18 +113,6 @@ hash_table_t *hash_table_init(size_t capacity, FREE_F free_f, CMP_F cmp_f);
  * @return int 0 on success, non-zero on failure
  */
 int hash_table_set(hash_table_t *table, void *data, const void *key);
-
-/**
- * @brief Return the size of the hash table.
- *
- * If an error occurs, -1 is returned and errno is set appropriately.
- * Possible error codes include:
- * - EINVAL: table is NULL
- *
- * @param table pointer to table address
- * @return size_t size of table, -1 if table is NULL
- */
-ssize_t hash_table_size(const hash_table_t *table);
 
 /**
  * @brief Look up an item in the table by key.
