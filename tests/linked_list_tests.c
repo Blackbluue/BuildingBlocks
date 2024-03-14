@@ -37,13 +37,13 @@ int clean_suite1(void) { return 0; }
 
 void test_list_new() {
     // Verify list was created correctly with no arguments supplied
-    list = list_new(NULL, NULL);
+    list = list_new(NULL, NULL, NULL);
     CU_ASSERT_PTR_NOT_NULL_FATAL(list); // Function exited correctly
     list_delete(&list);
     // NOLINTNEXTLINE
 
     // Verify list was created correctly with all arguments supplied
-    list = list_new(custom_free, test_compare_node);
+    list = list_new(custom_free, test_compare_node, NULL);
     CU_ASSERT_PTR_NOT_NULL_FATAL(list); // Function exited correctly
     // NOLINTNEXTLINE
     CU_ASSERT(0 == list_size(list)); // list size is correct
@@ -324,7 +324,7 @@ void test_list_find_all() {
     CU_ASSERT(NULL == result_list);
 
     // create empty list
-    test_list = list_new((FREE_F)custom_free, (CMP_F)test_compare_node);
+    test_list = list_new((FREE_F)custom_free, (CMP_F)test_compare_node, NULL);
 
     // Should catch if function is called on an empty list
     result_list = list_find_all(test_list, (void *)&value_to_find);
@@ -360,7 +360,8 @@ void test_list_get() {
     CU_ASSERT(NULL == node);
 
     // Should catch if get is called on an empty list
-    invalid_list = list_new((FREE_F)custom_free, (CMP_F)test_compare_node);
+    invalid_list =
+        list_new((FREE_F)custom_free, (CMP_F)test_compare_node, NULL);
     CU_ASSERT_FATAL(NULL != invalid_list);
     node = list_get(invalid_list, position);
     CU_ASSERT(NULL == node);

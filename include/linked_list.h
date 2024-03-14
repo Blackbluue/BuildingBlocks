@@ -44,18 +44,19 @@ typedef struct list_t list_t;
  *
  * If free_f is NULL, then data stored in the list will not be free'd. If cmp_f
  * is NULL, then certain functions that require a compare function will not be
- * available. If any of these functions are called, then errno will be set to
- * ENOTSUP.
+ * available. If any of these functions are called, they will result in an
+ * ENOTSUP error.
  *
- * If an error occurs, then NULL will be returned and errno will be set.
+ * If an error occurs, then NULL will be returned.
  * Possible error codes are:
  * - ENOMEM: memory allocation failed
  *
  * @param free_f pointer to the free function to be used with that list
  * @param cmp_f pointer to the compare function to be used with that list
+ * @param err pointer to the error code
  * @returns pointer to allocated list on success or NULL on failure
  */
-list_t *list_new(FREE_F free_f, CMP_F cmp_f);
+list_t *list_new(FREE_F free_f, CMP_F cmp_f, int *err);
 
 /**
  * @brief Query the list.

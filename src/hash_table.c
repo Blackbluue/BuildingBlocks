@@ -152,7 +152,7 @@ static int copy_node(void **node_data, void *addl_data) {
     size_t idx = hash(table_node->key, table->capacity);
     if (table->buckets[idx] == NULL) {
         // list will not manage memory of table_node
-        table->buckets[idx] = list_new(NULL, map_node_cmp);
+        table->buckets[idx] = list_new(NULL, map_node_cmp, NULL);
         if (table->buckets[idx] == NULL) {
             return ENOMEM;
         }
@@ -246,7 +246,7 @@ static list_t *get_bucket(hash_table_t *table, const void *key) {
     // if hash does not exist, create new list
     if (bucket == NULL) {
         // list will not manage memory of table_node
-        bucket = list_new(NULL, map_node_cmp);
+        bucket = list_new(NULL, map_node_cmp, NULL);
         if (bucket == NULL) {
             return NULL;
         }

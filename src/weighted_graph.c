@@ -186,7 +186,7 @@ weighted_graph_t *graph_create(CMP_F cmp, FREE_F free_f) {
         errno = ENOMEM;
         return NULL;
     }
-    graph->nodes = list_new(node_free, node_cmp);
+    graph->nodes = list_new(node_free, node_cmp, NULL);
     if (graph->nodes == NULL) {
         free(graph);
         errno = ENOMEM;
@@ -372,7 +372,7 @@ list_t *graph_find_path(weighted_graph_t *graph, const void *start,
     queue_p_clear(graph->to_process);
     hash_table_clear(graph->distance_from_origin);
 
-    list_t *results = list_new(NULL, graph->cmp);
+    list_t *results = list_new(NULL, graph->cmp, NULL);
     if (results == NULL) {
         hash_table_clear(graph->previous);
         errno = ENOMEM;
@@ -420,7 +420,7 @@ int graph_add_edge(weighted_graph_t *graph, void *src, void *dst,
 
     // check if the edge already exists, if so, update the weight
     if (from->edges == NULL) {
-        from->edges = list_new(free, edge_cmp);
+        from->edges = list_new(free, edge_cmp, NULL);
         if (from->edges == NULL) {
             return ENOMEM;
         }

@@ -114,7 +114,7 @@ queue_p_t *queue_p_init(size_t capacity, FREE_F customfree, CMP_F compare) {
         errno = ENOMEM;
         return NULL;
     }
-    queue->list = list_new(q_dst, q_cmp);
+    queue->list = list_new(q_dst, q_cmp, NULL);
     if (queue->list == NULL) {
         free(queue);
         errno = ENOMEM;

@@ -31,7 +31,7 @@ queue_t *queue_init(size_t capacity, FREE_F customfree, CMP_F compare) {
         errno = ENOMEM;
         return NULL;
     }
-    queue->q_data = list_new(customfree, compare);
+    queue->q_data = list_new(customfree, compare, NULL);
     if (queue->q_data == NULL) {
         free(queue);
         errno = ENOMEM;

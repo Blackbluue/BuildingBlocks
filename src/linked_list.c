@@ -47,6 +47,17 @@ typedef int (*LOCAL_ACT_F)(list_node_t *node_data, void *addl_data);
 /* PRIVATE FUNCTIONS*/
 
 /**
+ * @brief Sets the error code.
+ *
+ * @param err The error code.
+ * @param value The value to set.
+ */
+static void set_err(int *err, int value) {
+    if (err != NULL) {
+        *err = value;
+    }
+}
+/**
  * @brief Create a new list node.
  *
  * @param data data to be stored in the node
@@ -229,16 +240,12 @@ static int local_foreach(list_node_t *head, size_t size, LOCAL_ACT_F action,
 
 /* PUBLIC FUNCTIONS*/
 
-list_t *list_new(FREE_F free_f, CMP_F cmp_f) {
-    list_t *list = malloc(sizeof(*list));
+list_t *list_new(FREE_F free_f, CMP_F cmp_f, int *err) {
+    list_t *list = calloc(1, sizeof(*list));
     if (list == NULL) {
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
-    list->size = 0;
-    list->head = NULL;
-    list->tail = NULL;
-    list->current = NULL;
     list->customfree = free_f;
     list->compare_function = cmp_f;
     return list;
@@ -533,7 +540,7 @@ list_t *list_find_all(const list_t *list, const void *search_data) {
         return NULL;
     }
 
-    list_t *found_list = list_new(NULL, list->compare_function);
+    list_t *found_list = list_new(NULL, list->compare_function, NULL);
     if (found_list == NULL) {
         errno = ENOMEM;
         return NULL;
