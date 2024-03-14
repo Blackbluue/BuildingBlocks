@@ -85,6 +85,7 @@ static list_node_t *create_node(void *data, list_node_t *next,
  * @return int 0 on success, EINVAL if node is NULL
  */
 static int inc_pos(list_node_t *node, void *data) {
+    (void)(data);
     if (node == NULL) {
         return EINVAL;
     }
@@ -100,6 +101,7 @@ static int inc_pos(list_node_t *node, void *data) {
  * @return int 0 on success, EINVAL if node is NULL
  */
 static int dec_pos(list_node_t *node, void *data) {
+    (void)(data);
     if (node == NULL) {
         return EINVAL;
     }
@@ -342,7 +344,7 @@ void *list_get(const list_t *list, size_t position) {
 }
 
 ssize_t list_size(const list_t *list) {
-    return list == NULL ? INVALID : list->size;
+    return list == NULL ? INVALID : (ssize_t)list->size;
 }
 
 int list_is_empty(const list_t *list) {
@@ -490,12 +492,12 @@ int list_iterator_reset(list_t *list) {
     return SUCCESS;
 }
 
-void *list_iterator_next(list_t *list) {
+void *list_iterator_next(list_t *list, int *err) {
     if (list == NULL) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     } else if (list->current == NULL) {
-        errno = EOPNOTSUPP;
+        set_err(err, ENOTSUP);
         return NULL;
     }
     void *data = list->current->data;

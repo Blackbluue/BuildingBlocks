@@ -264,7 +264,7 @@ void *graph_remove_node(weighted_graph_t *graph, void *data) {
     }
 
     list_iterator_reset(graph->nodes);
-    struct node *curr_node = list_iterator_next(graph->nodes);
+    struct node *curr_node = list_iterator_next(graph->nodes, NULL);
     while (curr_node) {
         // will skip nodes with no edges
         while (list_remove(curr_node->edges, removed, NULL)) {
@@ -273,7 +273,7 @@ void *graph_remove_node(weighted_graph_t *graph, void *data) {
         if (list_size(curr_node->edges) == 0) {
             list_delete(&curr_node->edges);
         }
-        curr_node = list_iterator_next(graph->nodes);
+        curr_node = list_iterator_next(graph->nodes, NULL);
     }
 
     list_delete(&removed->edges);
@@ -286,13 +286,13 @@ int graph_iterate_nodes(weighted_graph_t *graph, ACT_F func, void *obj) {
     }
 
     list_iterator_reset(graph->nodes);
-    struct node *curr = list_iterator_next(graph->nodes);
+    struct node *curr = list_iterator_next(graph->nodes, NULL);
     while (curr) {
         int err = func(&curr->data, obj);
         if (err) {
             return err;
         }
-        curr = list_iterator_next(graph->nodes);
+        curr = list_iterator_next(graph->nodes, NULL);
     }
     return SUCCESS;
 }
@@ -312,13 +312,13 @@ int graph_iterate_neighbors(weighted_graph_t *graph, void *center, ACT_F func,
         return SUCCESS;
     }
     list_iterator_reset(curr_node->edges);
-    struct edge *curr_edge = list_iterator_next(curr_node->edges);
+    struct edge *curr_edge = list_iterator_next(curr_node->edges, NULL);
     while (curr_edge) {
         int err = func(&curr_edge->to->data, obj);
         if (err) {
             return err;
         }
-        curr_edge = list_iterator_next(curr_node->edges);
+        curr_edge = list_iterator_next(curr_node->edges, NULL);
     }
     return SUCCESS;
 }
@@ -520,24 +520,24 @@ ssize_t graph_in_degree_size(const weighted_graph_t *graph, const void *dst) {
 
     size_t count = 0;
     list_iterator_reset(graph->nodes);
-    struct node *curr_node = list_iterator_next(graph->nodes);
+    struct node *curr_node = list_iterator_next(graph->nodes, NULL);
     while (curr_node) {
         // skip any nodes with no outgoing edges
         if (curr_node->edges == NULL) {
-            curr_node = list_iterator_next(graph->nodes);
+            curr_node = list_iterator_next(graph->nodes, NULL);
             continue;
         }
         list_iterator_reset(curr_node->edges);
-        struct edge *curr_edge = list_iterator_next(curr_node->edges);
+        struct edge *curr_edge = list_iterator_next(curr_node->edges, NULL);
         while (curr_edge) {
             if (curr_edge->to == to) {
                 ++count;
             }
 
-            curr_edge = list_iterator_next(curr_node->edges);
+            curr_edge = list_iterator_next(curr_node->edges, NULL);
         }
 
-        curr_node = list_iterator_next(graph->nodes);
+        curr_node = list_iterator_next(graph->nodes, NULL);
     }
 
     return count;

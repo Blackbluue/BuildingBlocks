@@ -178,7 +178,7 @@ int queue_p_enqueue(queue_p_t *queue, void *data, double priority) {
 
     size_t list_idx = 0;
     list_iterator_reset(queue->list);
-    queue_t *inner_q = list_iterator_next(queue->list);
+    queue_t *inner_q = list_iterator_next(queue->list, NULL);
     if (inner_q == NULL) {
         // priority queue is empty, create new queue and insert it into the list
         return push_new_node(queue, node, list_idx);
@@ -204,7 +204,7 @@ int queue_p_enqueue(queue_p_t *queue, void *data, double priority) {
             }
             return err;
         }
-    } while ((inner_q = list_iterator_next(queue->list)) != NULL);
+    } while ((inner_q = list_iterator_next(queue->list, NULL)) != NULL);
     // node priority is less than all other queue priorities
     // create new queue and append it to the list
     return push_new_node(queue, node, list_idx);
@@ -234,14 +234,14 @@ queue_p_node_t *queue_p_get(const queue_p_t *queue, size_t position) {
     }
 
     list_iterator_reset(queue->list);
-    queue_t *inner_q = list_iterator_next(queue->list);
+    queue_t *inner_q = list_iterator_next(queue->list, NULL);
     do {
         if (queue_size(inner_q) > position) {
             return queue_get(inner_q, position);
         } else {
             position -= queue_size(inner_q);
         }
-    } while ((inner_q = list_iterator_next(queue->list)) != NULL);
+    } while ((inner_q = list_iterator_next(queue->list, NULL)) != NULL);
     // should never reach this point
     return NULL;
 }
@@ -284,7 +284,7 @@ queue_p_node_t *queue_p_remove(queue_p_t *queue, void *item_to_remove) {
     }
     list_iterator_reset(queue->list);
     queue_t *inner_q;
-    while ((inner_q = list_iterator_next(queue->list)) != NULL) {
+    while ((inner_q = list_iterator_next(queue->list, NULL)) != NULL) {
         queue_p_node_t *node = queue_remove(inner_q, item_to_remove);
         if (node != NULL) {
             queue->size--;
@@ -308,7 +308,7 @@ queue_p_node_t *queue_p_find_first(const queue_p_t *queue,
     }
     list_iterator_reset(queue->list);
     queue_t *inner_q;
-    while ((inner_q = list_iterator_next(queue->list)) != NULL) {
+    while ((inner_q = list_iterator_next(queue->list, NULL)) != NULL) {
         queue_p_node_t *node = queue_find_first(inner_q, value_to_find);
         if (node != NULL) {
             return node;

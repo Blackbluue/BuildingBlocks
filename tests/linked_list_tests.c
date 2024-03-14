@@ -227,19 +227,19 @@ void test_list_iterator() {
 
     // Should catch if function is called on an invalid list
     CU_ASSERT(0 != list_iterator_reset(invalid_list));
-    CU_ASSERT(NULL == list_iterator_next(invalid_list));
+    CU_ASSERT(NULL == list_iterator_next(invalid_list, NULL));
 
     CU_ASSERT_FATAL(NULL != list);
     // Confirm iterator is iterating correctly
     CU_ASSERT(0 == list_iterator_reset(list));
     for (size_t i = 0; i < list_size(list); i++) {
-        CU_ASSERT(&data[i] == list_iterator_next(list));
+        CU_ASSERT(&data[i] == list_iterator_next(list, NULL));
     }
-    CU_ASSERT(NULL == list_iterator_next(list));
+    CU_ASSERT(NULL == list_iterator_next(list, NULL));
 
     // Confirm iterator is resetting correctly
     CU_ASSERT(0 == list_iterator_reset(list));
-    CU_ASSERT(&data[0] == list_iterator_next(list));
+    CU_ASSERT(&data[0] == list_iterator_next(list, NULL));
 
     // Size shouldn't have changed
     // NOLINTNEXTLINE

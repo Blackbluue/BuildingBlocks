@@ -262,12 +262,13 @@ int list_iterator_reset(list_t *list);
  *
  * Possible error codes are:
  * - EINVAL: list is NULL
- * - EOPNOTSUPP: reached the end of the list
+ * - ENOTSUP: reached the end of the list
  *
  * @param list list to iterate through
+ * @param err pointer to the error code
  * @return the data in the next node on success, or NULL on failure
  */
-void *list_iterator_next(list_t *list);
+void *list_iterator_next(list_t *list, int *err);
 
 /**
  * @brief Find the first occurrence of a node containing the search_data.
