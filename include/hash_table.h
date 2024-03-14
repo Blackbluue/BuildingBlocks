@@ -57,17 +57,19 @@ typedef struct hash_table_t hash_table_t;
  * a capacity of 0 is given, the default capacity will be used. The given
  * compare function is used for looking up keys in the table.
  *
- * If an error occurs, NULL is returned and errno is set appropriately.
- * Possible error codes include:
+ * If an error occurs, NULL is returned and the output variable is set
+ * appropriately. Possible error codes include:
  * - EINVAL: cmp_f is NULL
  * - ENOMEM: memory allocation fails
  *
  * @param capacity initial capacity of the table
  * @param free_f pointer to the user defined free function
  * @param cmp_f pointer to the user defined key compare function
+ * @param err pointer to error code
  * @return hash_table_t pointer to allocated table
  */
-hash_table_t *hash_table_init(size_t capacity, FREE_F free_f, CMP_F cmp_f);
+hash_table_t *hash_table_init(size_t capacity, FREE_F free_f, CMP_F cmp_f,
+                              int *err);
 
 /**
  * @brief Query the table.

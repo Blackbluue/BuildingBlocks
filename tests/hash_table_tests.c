@@ -25,7 +25,12 @@ void custom_free(void *mem_addr) { (void)mem_addr; }
 void test_hash_table_init() {
     size_t capacity = sizeof(data) / sizeof(data[0]);
     // Verify hash_table was created correctly
-    hash_table = hash_table_init(capacity, custom_free, (CMP_F)strcmp);
+    int err = SUCCESS;
+    CU_ASSERT_PTR_NULL(hash_table_init(capacity, NULL, NULL, &err));
+    CU_ASSERT_EQUAL(err, EINVAL);
+
+    hash_table = hash_table_init(capacity, custom_free, (CMP_F)strcmp, NULL);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(hash_table);
 }
 
 void test_hash_table_set() {

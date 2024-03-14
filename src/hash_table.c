@@ -76,6 +76,17 @@ struct action_data_t {
 /* PRIVATE FUNCTIONS */
 
 /**
+ * @brief Sets the error code.
+ *
+ * @param err The error code.
+ * @param value The value to set.
+ */
+static inline void set_err(int *err, int value) {
+    if (err != NULL) {
+        *err = value;
+    }
+}
+/**
  * @brief Comparison function to pass to list_new.
  *
  * @param to_find the key to find
@@ -276,14 +287,15 @@ static int insert_into_bucket(const void *key, void *data, list_t *bucket,
 
 /* PUBLIC FUNCTIONS */
 
-hash_table_t *hash_table_init(size_t capacity, FREE_F free_f, CMP_F cmp_f) {
+hash_table_t *hash_table_init(size_t capacity, FREE_F free_f, CMP_F cmp_f,
+                              int *err) {
     if (cmp_f == NULL) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     }
     hash_table_t *table = malloc(sizeof(*table));
     if (table == NULL) {
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
 
@@ -291,7 +303,7 @@ hash_table_t *hash_table_init(size_t capacity, FREE_F free_f, CMP_F cmp_f) {
     table->buckets = calloc(table->capacity, sizeof(*(table->buckets)));
     if (table->buckets == NULL) {
         free(table);
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
     table->size = 0;

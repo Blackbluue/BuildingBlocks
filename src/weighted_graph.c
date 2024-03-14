@@ -199,7 +199,7 @@ weighted_graph_t *graph_create(CMP_F cmp, FREE_F free_f) {
         errno = ENOMEM;
         return NULL;
     }
-    graph->previous = hash_table_init(0, NULL, cmp);
+    graph->previous = hash_table_init(0, NULL, cmp, NULL);
     if (graph->previous == NULL) {
         list_delete(&graph->nodes);
         queue_p_destroy(&graph->to_process);
@@ -207,7 +207,7 @@ weighted_graph_t *graph_create(CMP_F cmp, FREE_F free_f) {
         errno = ENOMEM;
         return NULL;
     }
-    graph->distance_from_origin = hash_table_init(0, NULL, cmp);
+    graph->distance_from_origin = hash_table_init(0, NULL, cmp, NULL);
     if (graph->distance_from_origin == NULL) {
         list_delete(&graph->nodes);
         queue_p_destroy(&graph->to_process);
