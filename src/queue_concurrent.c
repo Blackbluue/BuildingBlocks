@@ -90,6 +90,7 @@ struct queue_c_t {
     bool is_destroying;
     bool cancel_wait;
 };
+
 /* PRIVATE FUNCTIONS */
 
 /**
@@ -357,6 +358,7 @@ static int timed_wait_for(queue_c_t *queue, pthread_cond_t *cond,
     manual_lock(queue);
     return SUCCESS;
 }
+
 /* PUBLIC FUNCTIONS */
 
 queue_c_t *queue_c_init(size_t capacity, FREE_F customfree) {
@@ -366,9 +368,9 @@ queue_c_t *queue_c_init(size_t capacity, FREE_F customfree) {
         return NULL;
     }
 
-    queue_c->queue = queue_init(capacity, customfree, NULL);
+    int err = SUCCESS;
+    queue_c->queue = queue_init(capacity, customfree, NULL, &err);
     if (queue_c->queue == NULL) {
-        int err = errno;
         free(queue_c);
         errno = err;
         return NULL;

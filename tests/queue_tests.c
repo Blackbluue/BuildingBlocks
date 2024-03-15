@@ -39,11 +39,9 @@ int test_compare_node(const void *value_to_find, const void *node_data) {
 
 void test_queue_init() {
     // Verify queue was created correctly
-    queue = queue_init(CAPACITY, custom_free, test_compare_node);
+    queue = queue_init(CAPACITY, custom_free, test_compare_node, NULL);
     CU_ASSERT_PTR_NOT_NULL(queue);
-    // NOLINTNEXTLINE
     CU_ASSERT_EQUAL(queue_capacity(queue), CAPACITY);
-    // NOLINTNEXTLINE
     CU_ASSERT_EQUAL(queue_size(queue), 0);
 }
 
@@ -83,7 +81,6 @@ void test_queue_dequeue() {
     for (size_t i = 0; queue_size(queue) > 0; i++) {
         node = queue_dequeue(queue);
         CU_ASSERT_PTR_NOT_NULL_FATAL(node);
-        // NOLINTNEXTLINE
         CU_ASSERT_PTR_EQUAL(node, &data[i]);
     }
 

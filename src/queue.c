@@ -23,22 +23,36 @@ struct queue_t {
     bool support_lookup;
 };
 
+/* PRIVATE FUNCTIONS*/
+
+/**
+ * @brief Sets the error code.
+ *
+ * @param err The error code.
+ * @param value The value to set.
+ */
+static void set_err(int *err, int value) {
+    if (err != NULL) {
+        *err = value;
+    }
+}
+
 /* PUBLIC FUNCTIONS*/
 
-queue_t *queue_init(size_t capacity, FREE_F customfree, CMP_F compare) {
+queue_t *queue_init(size_t capacity, FREE_F customfree, CMP_F compare,
+                    int *err) {
     queue_t *queue = malloc(sizeof(*queue));
     if (queue == NULL) {
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
-    queue->q_data = list_new(customfree, compare, NULL);
+    queue->q_data = list_new(customfree, compare, err);
     if (queue->q_data == NULL) {
         free(queue);
-        errno = ENOMEM;
         return NULL;
     }
-    queue->support_lookup = compare != NULL;
     queue->capacity = capacity;
+    queue->support_lookup = compare != NULL;
     return queue;
 }
 

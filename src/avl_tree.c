@@ -520,9 +520,10 @@ int tree_iterator_reset(tree_t *tree) {
     } else if (tree->size > 0) {
         // build a new iterator
         queue_destroy(&tree->iterator);
-        tree->iterator = queue_init(tree->size, NULL, tree->cmp_func);
+        int err = SUCCESS;
+        tree->iterator = queue_init(tree->size, NULL, tree->cmp_func, &err);
         if (tree->iterator == NULL) {
-            return ENOMEM;
+            return err;
         }
         int results = tree_in_order(tree->root, build_iter, tree->iterator);
         if (results != SUCCESS) {

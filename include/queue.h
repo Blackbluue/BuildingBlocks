@@ -42,18 +42,19 @@ typedef struct queue_t queue_t;
  * queue will use the compare function in look up operations. If NULL is given,
  * these operations will not be supported.
  *
- * If an error occurs, NULL will be returned and errno will be set.
+ * If an error occurs, NULL will be returned.
  * Possible error codes are:
- * - EINVAL: compare function is NULL
  * - ENOMEM: memory allocation failed
  *
  * @param capacity max number of nodes the queue will hold
  * @param customfree pointer to user defined free function
  * @note if the user passes in NULL, the queue will not free the data
  * @param compare pointer to user defined compare function
+ * @param err pointer to integer to store error code
  * @returns pointer to allocated queue on success or NULL on failure
  */
-queue_t *queue_init(size_t capacity, FREE_F customfree, CMP_F compare);
+queue_t *queue_init(size_t capacity, FREE_F customfree, CMP_F compare,
+                    int *err);
 
 /**
  * @brief Check if queue is full.

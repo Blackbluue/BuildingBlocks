@@ -57,6 +57,7 @@ static void set_err(int *err, int value) {
         *err = value;
     }
 }
+
 /**
  * @brief Create a new list node.
  *

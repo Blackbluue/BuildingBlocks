@@ -83,12 +83,14 @@ int push_new_node(queue_p_t *queue, queue_p_node_t *node, size_t list_idx) {
     if (queue == NULL) {
         return EINVAL;
     }
-    queue_t *new_queue = queue_init(queue->capacity, free, queue->compare);
+    int err = SUCCESS;
+    queue_t *new_queue =
+        queue_init(queue->capacity, free, queue->compare, &err);
     if (new_queue == NULL) {
         free(node);
-        return ENOMEM;
+        return err;
     }
-    int err = queue_enqueue(new_queue, node);
+    err = queue_enqueue(new_queue, node);
     if (err != SUCCESS) {
         queue_destroy(&new_queue);
         return err;
