@@ -62,9 +62,7 @@ queue_t *queue_init(size_t capacity, FREE_F customfree, CMP_F compare,
  * If the queue's capacity is 0 (unlimited), this function will always return
  * false.
  *
- * If an error occurs, -1 will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: queue is NULL
+ * If queue is NULL, -1 will be returned.
  *
  * @param queue pointer queue object
  * @return 0 if queue is not full, positive if full, -1 on error.
@@ -74,9 +72,7 @@ int queue_is_full(const queue_t *queue);
 /**
  * @brief Check if queue is empty.
  *
- * If an error occurs, -1 will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: queue is NULL
+ * If queue is NULL, -1 will be returned.
  *
  * @param queue pointer queue object
  * @return 0 if queue is not empty, positive if empty, -1 on error.
@@ -88,9 +84,7 @@ int queue_is_empty(const queue_t *queue);
  *
  * A queue with 0 capacity is considered to have unlimited capacity.
  *
- * If an error occurs, -1 will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: queue is NULL
+ * If queue is NULL, -1 will be returned.
  *
  * @param queue pointer to queue to get capacity of
  * @return the capacity of the queue, -1 on error.
@@ -100,9 +94,7 @@ ssize_t queue_capacity(const queue_t *queue);
 /**
  * @brief Get the current size of the queue.
  *
- * If an error occurs, -1 will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: queue is NULL
+ * If queue is NULL, -1 will be returned.
  *
  * @param queue pointer to queue to get size of
  * @return the number of elements in the queue, -1 on error.
@@ -112,7 +104,7 @@ ssize_t queue_size(const queue_t *queue);
 /**
  * @brief Push a new node into the queue.
  *
- * If an error occurs, non-zero will be returned and errno will be set.
+ * If an error occurs, non-zero will be returned.
  * Possible error codes are:
  * - EINVAL: queue is NULL
  * - EOVERFLOW: queue is full
@@ -127,9 +119,7 @@ int queue_enqueue(queue_t *queue, void *data);
 /**
  * @brief Pop the front node out of the queue.
  *
- * If an error occurs, NULL will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: queue is NULL
+ * If queue is NULL, NULL will be returned.
  *
  * @param queue pointer to queue pointer to pop the node off of
  * @return the 0 on success, NULL on error.
@@ -139,9 +129,7 @@ void *queue_dequeue(queue_t *queue);
 /**
  * @brief Get the data from the node at a specific position in the queue.
  *
- * If an error occurs, NULL will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: queue is NULL
+ * If queue is NULL, NULL will be returned.
  *
  * @param queue pointer to queue pointer to get the node from
  * @param position position in the queue to get the node from
@@ -152,9 +140,7 @@ void *queue_get(const queue_t *queue, size_t position);
 /**
  * @brief Get the data from the node at the front of the queue without popping.
  *
- * If an error occurs, NULL will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: queue is NULL
+ * If queue is NULL, NULL will be returned.
  *
  * @param queue pointer to queue pointer to peek
  * @return the pointer to the head on success, NULL on error.
