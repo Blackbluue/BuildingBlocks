@@ -110,26 +110,27 @@ void *queue_peek(const queue_t *queue) {
     return list_peek_head(queue->q_data);
 }
 
-void *queue_remove(queue_t *queue, void *item_to_remove) {
+void *queue_remove(queue_t *queue, void *item_to_remove, int *err) {
     if (queue == NULL) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     } else if (queue->support_lookup == false) {
-        errno = ENOTSUP;
+        set_err(err, ENOTSUP);
         return NULL;
     }
-    return list_remove(queue->q_data, item_to_remove, NULL);
+    return list_remove(queue->q_data, item_to_remove, err);
 }
 
-void *queue_find_first(const queue_t *queue, const void *value_to_find) {
+void *queue_find_first(const queue_t *queue, const void *value_to_find,
+                       int *err) {
     if (queue == NULL) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     } else if (queue->support_lookup == false) {
-        errno = ENOTSUP;
+        set_err(err, ENOTSUP);
         return NULL;
     }
-    return list_find_first(queue->q_data, value_to_find, NULL);
+    return list_find_first(queue->q_data, value_to_find, err);
 }
 
 int queue_clear(queue_t *queue) {

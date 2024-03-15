@@ -150,7 +150,7 @@ void *queue_peek(const queue_t *queue);
 /**
  * @brief Remove the first occurrence of a value in the queue.
  *
- * If an error occurs, NULL will be returned and errno will be set.
+ * If an error occurs, NULL will be returned.
  * Possible error codes are:
  * - EINVAL: queue is NULL
  * - ENOTSUP: queue does not support lookup operations
@@ -159,12 +159,12 @@ void *queue_peek(const queue_t *queue);
  * @param item_to_remove pointer to value to remove
  * @return pointer to the removed value, NULL if not found or on error
  */
-void *queue_remove(queue_t *queue, void *item_to_remove);
+void *queue_remove(queue_t *queue, void *item_to_remove, int *err);
 
 /**
  * @brief Find the first occurrence of a value in the queue.
  *
- * If an error occurs, NULL will be returned and errno will be set.
+ * If an error occurs, NULL will be returned.
  * Possible error codes are:
  * - EINVAL: queue is NULL
  * - ENOTSUP: queue does not support lookup operations
@@ -174,7 +174,8 @@ void *queue_remove(queue_t *queue, void *item_to_remove);
  * @return pointer to the first occurrence of the value in the queue, NULL if
  *         not found or queue is NULL
  */
-void *queue_find_first(const queue_t *queue, const void *value_to_find);
+void *queue_find_first(const queue_t *queue, const void *value_to_find,
+                       int *err);
 
 /**
  * @brief Clear all nodes out of a queue.

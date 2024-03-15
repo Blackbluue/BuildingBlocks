@@ -166,18 +166,18 @@ void test_queue_find_first() {
     queue_t *invalid_queue = NULL;
 
     // Should catch if find is called on an invalid queue
-    void *node = queue_find_first(invalid_queue, NULL);
+    void *node = queue_find_first(invalid_queue, NULL, NULL);
     CU_ASSERT_PTR_NULL(node);
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(queue);
     // Should catch if find is called on NULL data
-    node = queue_find_first(queue, NULL);
+    node = queue_find_first(queue, NULL, NULL);
     CU_ASSERT_PTR_NULL(node);
 
     // check random positions in the queue
     size_t indexes[] = {0, 3, 1, 4, 2};
     for (size_t i = 0; i < CAPACITY; i++) {
-        node = queue_find_first(queue, &data[indexes[i]]);
+        node = queue_find_first(queue, &data[indexes[i]], NULL);
         CU_ASSERT_PTR_NOT_NULL_FATAL(node);
         CU_ASSERT_EQUAL(*(int *)node, data[indexes[i]]);
     }
@@ -190,22 +190,22 @@ void test_queue_remove() {
     queue_t *invalid_queue = NULL;
 
     // Should catch if find is called on an invalid queue
-    void *node = queue_remove(invalid_queue, NULL);
+    void *node = queue_remove(invalid_queue, NULL, NULL);
     CU_ASSERT_PTR_NULL(node);
 
     CU_ASSERT_PTR_NOT_NULL_FATAL(queue);
     // Should catch if remove is called on NULL data
-    node = queue_remove(queue, NULL);
+    node = queue_remove(queue, NULL, NULL);
     CU_ASSERT_PTR_NULL(node);
 
     // check random positions in the queue
     size_t indexes[] = {0, 3, 1, 4, 2};
     for (size_t i = 0; i < CAPACITY; i++) {
-        node = queue_remove(queue, &data[indexes[i]]);
+        node = queue_remove(queue, &data[indexes[i]], NULL);
         CU_ASSERT_PTR_NOT_NULL_FATAL(node);
         CU_ASSERT_EQUAL(*(int *)node, data[indexes[i]]);
         // confirm removal
-        node = queue_find_first(queue, &data[indexes[i]]);
+        node = queue_find_first(queue, &data[indexes[i]], NULL);
         CU_ASSERT_PTR_NULL(node);
     }
 
