@@ -377,10 +377,9 @@ list_t *graph_find_path(weighted_graph_t *graph, const void *start,
     queue_p_clear(graph->to_process);
     hash_table_clear(graph->distance_from_origin);
 
-    list_t *results = list_new(NULL, graph->cmp, NULL);
+    list_t *results = list_new(NULL, graph->cmp, err);
     if (results == NULL) {
         hash_table_clear(graph->previous);
-        errno = ENOMEM;
         return NULL;
     }
     void *curr = (void *)end;

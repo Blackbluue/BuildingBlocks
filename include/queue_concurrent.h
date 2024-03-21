@@ -30,7 +30,7 @@ typedef struct queue_c_t queue_c_t;
  *
  * A capacity of 0 will create a queue with unlimited capacity.
  *
- * Possible errno values:
+ * Possible error values:
  * - ENOMEM: malloc failed to allocate memory
  *
  * @param capacity max number of nodes the queue will hold
@@ -366,7 +366,7 @@ int queue_c_enqueue(queue_c_t *queue, void *data);
  * threads waiting for the queue to not be full, and potentially the variable
  * for empty.
  *
- * Possible errno values:
+ * Possible error values:
  * - EINVAL: queue is NULL
  * - EINTR: queue is destroyed while waiting to lock
  *
@@ -413,7 +413,7 @@ int queue_c_clear(queue_c_t *queue);
  * this function will proceed with destroying the queue. It will then signal
  * other threads about the destruction.
  *
- * Possible errno values:
+ * Possible error values:
  * - EINVAL: queue is NULL or destroyed before this function is called
  * - EINTR: queue is destroyed while waiting to lock
  *
