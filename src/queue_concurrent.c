@@ -94,6 +94,18 @@ struct queue_c_t {
 /* PRIVATE FUNCTIONS */
 
 /**
+ * @brief Sets the error code.
+ *
+ * @param err The error code.
+ * @param value The value to set.
+ */
+static void set_err(int *err, int value) {
+    if (err != NULL) {
+        *err = value;
+    }
+}
+
+/**
  * @brief Initialize thread constructs.
  *
  * @param queue pointer to queue object
@@ -361,18 +373,16 @@ static int timed_wait_for(queue_c_t *queue, pthread_cond_t *cond,
 
 /* PUBLIC FUNCTIONS */
 
-queue_c_t *queue_c_init(size_t capacity, FREE_F customfree) {
+queue_c_t *queue_c_init(size_t capacity, FREE_F customfree, int *err) {
     queue_c_t *queue_c = malloc(sizeof(*queue_c));
     if (queue_c == NULL) {
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
 
-    int err = SUCCESS;
-    queue_c->queue = queue_init(capacity, customfree, NULL, &err);
+    queue_c->queue = queue_init(capacity, customfree, NULL, err);
     if (queue_c->queue == NULL) {
         free(queue_c);
-        errno = err;
         return NULL;
     }
 

@@ -30,12 +30,16 @@ typedef struct queue_c_t queue_c_t;
  *
  * A capacity of 0 will create a queue with unlimited capacity.
  *
+ * Possible errno values:
+ * - ENOMEM: malloc failed to allocate memory
+ *
  * @param capacity max number of nodes the queue will hold
  * @param customfree pointer to user defined free function
  * @note if the user passes in NULL, the queue will not free the data
+ * @param err pointer to error code
  * @returns pointer to allocated queue on success or NULL on failure
  */
-queue_c_t *queue_c_init(size_t capacity, FREE_F customfree);
+queue_c_t *queue_c_init(size_t capacity, FREE_F customfree, int *err);
 
 /**
  * @brief Check if queue is full.
