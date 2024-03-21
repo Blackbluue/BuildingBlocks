@@ -62,7 +62,7 @@ int queue_is_full(const queue_t *queue) {
     } else if (queue->capacity == QUEUE_UNLIMITED) {
         return false;
     }
-    return list_size(queue->q_data) == queue->capacity;
+    return (size_t)list_size(queue->q_data) == queue->capacity;
 }
 
 int queue_is_empty(const queue_t *queue) {
@@ -70,10 +70,7 @@ int queue_is_empty(const queue_t *queue) {
 }
 
 ssize_t queue_capacity(const queue_t *queue) {
-    if (queue == NULL) {
-        return INVALID;
-    }
-    return queue == NULL ? INVALID : queue->capacity;
+    return queue == NULL ? INVALID : (ssize_t)queue->capacity;
 }
 
 ssize_t queue_size(const queue_t *queue) {
@@ -97,7 +94,7 @@ void *queue_dequeue(queue_t *queue) {
 }
 
 void *queue_get(const queue_t *queue, size_t position) {
-    if (queue == NULL || position >= list_size(queue->q_data)) {
+    if (queue == NULL || position >= (size_t)list_size(queue->q_data)) {
         return NULL;
     }
     return list_get(queue->q_data, position);

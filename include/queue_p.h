@@ -67,9 +67,7 @@ queue_p_t *queue_p_init(size_t capacity, FREE_F customfree, CMP_F compare);
  * If the queue capacity is 0, the queue is unlimited and this function will
  * always return 0.
  *
- * If an error occurs, this function will return -1 and set errno.
- * Possible error codes are:
- * - EINVAL: queue is NULL
+ * If queue is NULL, this function will return -1
  *
  * @param queue pointer queue object
  * @return 0 if queue is not full, non-zero if queue is full, -1 on error
@@ -79,9 +77,7 @@ int queue_p_is_full(const queue_p_t *queue);
 /**
  * @brief Check if queue is empty.
  *
- * If an error occurs, this function will return -1 and set errno.
- * Possible error codes are:
- * - EINVAL: queue is NULL
+ * If queue is NULL, this function will return -1
  *
  * @param queue pointer queue object
  * @return 0 if queue is not empty, non-zero if queue is empty, -1 on error
@@ -93,9 +89,7 @@ int queue_p_is_empty(const queue_p_t *queue);
  *
  * If the queue capacity is 0, the queue is unlimited.
  *
- * If an error occurs, this function will return -1 and set errno.
- * Possible error codes are:
- * - EINVAL: queue is NULL
+ * If queue is NULL, this function will return -1
  *
  * @param queue pointer to queue to get capacity of
  * @return the capacity of the queue, -1 if queue is NULL
@@ -105,9 +99,7 @@ ssize_t queue_p_capacity(const queue_p_t *queue);
 /**
  * @brief Get the current size of the queue.
  *
- * If an error occurs, this function will return -1 and set errno.
- * Possible error codes are:
- * - EINVAL: queue is NULL
+ * If queue is NULL, this function will return -1
  *
  * @param queue pointer to queue to get size of
  * @return the number of elements in the queue, -1 on error
@@ -135,9 +127,7 @@ int queue_p_enqueue(queue_p_t *queue, void *data, double priority);
  * The returned structure contains information on the dequeued node. The
  * structure must be freed after use.
  *
- * If an error occurs, this function will return NULL and set errno.
- * Possible error codes are:
- * - EINVAL: queue is NULL
+ * If queue is NULL, this function will return NULL
  *
  * @param queue pointer to queue pointer to pop the node off of
  * @return pointer to popped queue node on success, NULL on failure
@@ -184,9 +174,7 @@ queue_p_node_t *queue_p_get_priority(const queue_p_t *queue, size_t position,
 /**
  * @brief Get the data from the node at the front of the queue without popping.
  *
- * If an error occurs, this function will return NULL and set errno.
- * Possible error codes are:
- * - EINVAL: queue is NULL
+ * If queue is NULL, this function will return NULL
  *
  * @param queue pointer to queue pointer to peek
  * @return pointer to peeked queue node on success, NULL on failure

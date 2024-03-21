@@ -2,6 +2,7 @@
 #include "linked_list.h"
 #include "queue.h"
 #include <errno.h>
+#include <stdbool.h>
 #include <stdlib.h>
 
 /* DATA */
@@ -131,37 +132,23 @@ queue_p_t *queue_p_init(size_t capacity, FREE_F customfree, CMP_F compare) {
 
 int queue_p_is_full(const queue_p_t *queue) {
     if (queue == NULL) {
-        errno = EINVAL;
         return INVALID;
-    }
-    if (queue->capacity == QUEUE_P_UNLIMITED) {
-        return 0;
+    } else if (queue->capacity == QUEUE_P_UNLIMITED) {
+        return false;
     }
     return queue->size == queue->capacity;
 }
 
 int queue_p_is_empty(const queue_p_t *queue) {
-    if (queue == NULL) {
-        errno = EINVAL;
-        return INVALID;
-    }
-    return queue->size == 0;
+    return queue == NULL ? INVALID : queue->size == 0;
 }
 
 ssize_t queue_p_capacity(const queue_p_t *queue) {
-    if (queue == NULL) {
-        errno = EINVAL;
-        return INVALID;
-    }
-    return queue->capacity;
+    return queue == NULL ? INVALID : (ssize_t)queue->capacity;
 }
 
 ssize_t queue_p_size(const queue_p_t *queue) {
-    if (queue == NULL) {
-        errno = EINVAL;
-        return INVALID;
-    }
-    return queue->size;
+    return queue == NULL ? INVALID : (ssize_t)queue->size;
 }
 
 int queue_p_enqueue(queue_p_t *queue, void *data, double priority) {
@@ -213,10 +200,7 @@ int queue_p_enqueue(queue_p_t *queue, void *data, double priority) {
 }
 
 queue_p_node_t *queue_p_dequeue(queue_p_t *queue) {
-    if (queue == NULL) {
-        errno = EINVAL;
-        return NULL;
-    } else if (queue_p_is_empty(queue)) {
+    if (queue == NULL || queue_p_is_empty(queue)) {
         return NULL;
     }
     queue_t *current_queue = list_peek_head(queue->list);
@@ -267,10 +251,7 @@ queue_p_node_t *queue_p_get_priority(const queue_p_t *queue, size_t position,
 }
 
 queue_p_node_t *queue_p_peek(const queue_p_t *queue) {
-    if (queue == NULL) {
-        errno = EINVAL;
-        return NULL;
-    } else if (queue_p_is_empty(queue)) {
+    if (queue == NULL || queue_p_is_empty(queue)) {
         return NULL;
     }
     queue_t *current_queue = list_peek_head(queue->list);
