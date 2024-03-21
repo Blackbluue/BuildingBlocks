@@ -46,16 +46,16 @@ typedef struct weighted_graph_t weighted_graph_t;
  *
  * If free_f is NULL, then data stored in the queue will not be free'd.
  *
- * On error, the function will return NULL and set errno. Possible error codes
- * are:
+ * On error, the function will return NULL. Possible error codes are:
  * - EINVAL: compare function is NULL
  * - ENOMEM: memory allocation failed
  *
  * @param compare pointer to user defined compare function
  * @param free_f pointer to a function to free queue data
+ * @param err pointer to an integer to store the error code
  * @return A pointer to a weighted graph.
  */
-weighted_graph_t *graph_create(CMP_F cmp, FREE_F free_f);
+weighted_graph_t *graph_create(CMP_F cmp, FREE_F free_f, int *err);
 
 /**
  * @brief Return the number of nodes in the graph.

@@ -41,6 +41,18 @@ struct weighted_graph_t {
 /* PRIVATE FUNCTIONS */
 
 /**
+ * @brief Sets the error code.
+ *
+ * @param err The error code.
+ * @param value The value to set.
+ */
+static void set_err(int *err, int value) {
+    if (err != NULL) {
+        *err = value;
+    }
+}
+
+/**
  * @brief Create a new node
  *
  * @param graph pointer to the graph
@@ -177,44 +189,40 @@ static int add_to_pqueue_if_faster(void **neighbor, void *addl_data) {
 
 /* PUBLIC FUNCTIONS */
 
-weighted_graph_t *graph_create(CMP_F cmp, FREE_F free_f) {
+weighted_graph_t *graph_create(CMP_F cmp, FREE_F free_f, int *err) {
     if (cmp == NULL) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     }
     weighted_graph_t *graph = malloc(sizeof(*graph));
     if (graph == NULL) {
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
-    graph->nodes = list_new(node_free, node_cmp, NULL);
+    graph->nodes = list_new(node_free, node_cmp, err);
     if (graph->nodes == NULL) {
         free(graph);
-        errno = ENOMEM;
         return NULL;
     }
-    graph->to_process = queue_p_init(0, NULL, node_cmp, NULL);
+    graph->to_process = queue_p_init(0, NULL, node_cmp, err);
     if (graph->to_process == NULL) {
         list_delete(&graph->nodes);
         free(graph);
-        errno = ENOMEM;
         return NULL;
     }
-    graph->previous = hash_table_init(0, NULL, cmp, NULL);
+    graph->previous = hash_table_init(0, NULL, cmp, err);
     if (graph->previous == NULL) {
         list_delete(&graph->nodes);
         queue_p_destroy(&graph->to_process);
         free(graph);
-        errno = ENOMEM;
         return NULL;
     }
-    graph->distance_from_origin = hash_table_init(0, NULL, cmp, NULL);
+    graph->distance_from_origin = hash_table_init(0, NULL, cmp, err);
     if (graph->distance_from_origin == NULL) {
         list_delete(&graph->nodes);
         queue_p_destroy(&graph->to_process);
         hash_table_destroy(&graph->previous);
         free(graph);
-        errno = ENOMEM;
         return NULL;
     }
     graph->cmp = cmp;
