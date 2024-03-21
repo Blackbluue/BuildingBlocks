@@ -152,7 +152,7 @@ static int add_to_pqueue_if_faster(void **neighbor, void *addl_data) {
     }
     weighted_graph_t *graph = addl_data;
     double weight =
-        graph_get_edge_weight(graph, graph->curr_item->data, *neighbor);
+        graph_get_edge_weight(graph, graph->curr_item->data, *neighbor, NULL);
     double distance = weight + graph->curr_item->priority;
 
     union double_pointer current_best = {
@@ -256,15 +256,15 @@ int graph_add_node(weighted_graph_t *graph, void *data) {
     }
 }
 
-void *graph_remove_node(weighted_graph_t *graph, void *data) {
+void *graph_remove_node(weighted_graph_t *graph, void *data, int *err) {
     if (graph == NULL || data == NULL) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     }
 
     struct node *removed = list_remove(graph->nodes, data, NULL);
     if (removed == NULL) {
-        errno = ENOENT; // item not found in graph
+        set_err(err, ENOENT); // item not found in graph
         return NULL;
     }
 
@@ -329,29 +329,29 @@ int graph_iterate_neighbors(weighted_graph_t *graph, void *center, ACT_F func,
 }
 
 list_t *graph_find_path(weighted_graph_t *graph, const void *start,
-                        const void *end) {
+                        const void *end, int *err) {
     if (graph == NULL || start == NULL || end == NULL) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     }
 
     // Nothing in Dijkstra's changes these items or neighbors; casting is safe
     struct node *new = node_new(graph, (void *)start);
     if (new == NULL) {
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
-    int err = queue_p_enqueue(graph->to_process, new, 0);
-    if (err) {
+    int loc_err = queue_p_enqueue(graph->to_process, new, 0);
+    if (loc_err) {
         node_free(new);
-        errno = err;
+        set_err(err, loc_err);
         return NULL;
     }
-    err = hash_table_set(graph->previous, NULL, start);
-    if (err) {
+    loc_err = hash_table_set(graph->previous, NULL, start);
+    if (loc_err) {
         queue_p_clear(graph->to_process);
         node_free(new);
-        errno = err;
+        set_err(err, loc_err);
         return NULL;
     }
 
@@ -361,16 +361,16 @@ list_t *graph_find_path(weighted_graph_t *graph, const void *start,
             break;
         }
 
-        err = graph_iterate_neighbors(
+        loc_err = graph_iterate_neighbors(
             (weighted_graph_t *)graph, graph->curr_item->data,
             add_to_pqueue_if_faster, (weighted_graph_t *)graph);
         node_free(graph->curr_item->data);
         free(graph->curr_item);
-        if (err) {
+        if (loc_err) {
             queue_p_clear(graph->to_process);
             hash_table_clear(graph->previous);
             hash_table_clear(graph->distance_from_origin);
-            errno = err;
+            set_err(err, loc_err);
             return NULL;
         }
     }
@@ -385,11 +385,11 @@ list_t *graph_find_path(weighted_graph_t *graph, const void *start,
     }
     void *curr = (void *)end;
     while (curr) {
-        err = list_push_head(results, curr);
-        if (err) {
+        loc_err = list_push_head(results, curr);
+        if (loc_err) {
             hash_table_clear(graph->previous);
             list_delete(&results);
-            errno = err;
+            set_err(err, loc_err);
             return NULL;
         }
 
@@ -446,26 +446,26 @@ int graph_add_edge(weighted_graph_t *graph, void *src, void *dst,
 }
 
 double graph_get_edge_weight(const weighted_graph_t *graph, const void *src,
-                             const void *dst) {
+                             const void *dst, int *err) {
     if (graph == NULL || src == NULL || dst == NULL) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NAN;
     }
 
     struct node *from = list_find_first(graph->nodes, src, NULL);
     if (from == NULL) {
-        errno = ENOENT;
+        set_err(err, ENOENT);
         return NAN;
     }
     struct node *to = list_find_first(graph->nodes, dst, NULL);
     if (to == NULL) {
-        errno = ENOENT;
+        set_err(err, ENOENT);
         return NAN;
     }
 
     struct edge *checker = list_find_first(from->edges, to, NULL);
     if (checker == NULL) {
-        errno = ENOENT;
+        set_err(err, ENOENT);
         return NAN;
     }
     return checker->weight;
@@ -494,30 +494,32 @@ int graph_remove_edge(weighted_graph_t *graph, const void *src,
     return ENOENT;
 }
 
-ssize_t graph_out_degree_size(const weighted_graph_t *graph, const void *src) {
+ssize_t graph_out_degree_size(const weighted_graph_t *graph, const void *src,
+                              int *err) {
     if (graph == NULL || src == NULL) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return FAILURE;
     }
 
     struct node *from = list_find_first(graph->nodes, src, NULL);
     if (from == NULL) {
-        errno = ENOENT;
+        set_err(err, ENOENT);
         return FAILURE;
     }
     // node might not have any edges yet
     return from->edges == NULL ? 0 : list_size(from->edges);
 }
 
-ssize_t graph_in_degree_size(const weighted_graph_t *graph, const void *dst) {
+ssize_t graph_in_degree_size(const weighted_graph_t *graph, const void *dst,
+                             int *err) {
     if (graph == NULL || dst == NULL) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return FAILURE;
     }
 
     struct node *to = list_find_first(graph->nodes, dst, NULL);
     if (dst == NULL) {
-        errno = ENOENT;
+        set_err(err, ENOENT);
         return FAILURE;
     }
 
