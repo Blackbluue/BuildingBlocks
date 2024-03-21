@@ -227,14 +227,13 @@ queue_p_node_t *queue_p_dequeue(queue_p_t *queue) {
 
 queue_p_node_t *queue_p_get(const queue_p_t *queue, size_t position) {
     if (queue == NULL || position >= queue->size) {
-        errno = EINVAL;
         return NULL;
     }
 
     list_iterator_reset(queue->list);
     queue_t *inner_q = list_iterator_next(queue->list, NULL);
     do {
-        if (queue_size(inner_q) > position) {
+        if ((size_t)queue_size(inner_q) > position) {
             return queue_get(inner_q, position);
         } else {
             position -= queue_size(inner_q);
@@ -247,7 +246,6 @@ queue_p_node_t *queue_p_get(const queue_p_t *queue, size_t position) {
 queue_p_node_t *queue_p_get_priority(const queue_p_t *queue, size_t position,
                                      double priority) {
     if (queue == NULL) {
-        errno = EINVAL;
         return NULL;
     }
 
@@ -271,10 +269,7 @@ queue_p_node_t *queue_p_peek(const queue_p_t *queue) {
 }
 
 queue_p_node_t *queue_p_remove(queue_p_t *queue, void *item_to_remove) {
-    if (queue == NULL) {
-        errno = EINVAL;
-        return NULL;
-    } else if (queue_p_is_empty(queue)) {
+    if (queue == NULL || queue_p_is_empty(queue)) {
         return NULL;
     }
     list_iterator_reset(queue->list);
@@ -295,10 +290,7 @@ queue_p_node_t *queue_p_remove(queue_p_t *queue, void *item_to_remove) {
 
 queue_p_node_t *queue_p_find_first(const queue_p_t *queue,
                                    const void *value_to_find) {
-    if (queue == NULL) {
-        errno = EINVAL;
-        return NULL;
-    } else if (queue_p_is_empty(queue)) {
+    if (queue == NULL || queue_p_is_empty(queue)) {
         return NULL;
     }
     list_iterator_reset(queue->list);

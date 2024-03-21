@@ -141,9 +141,7 @@ queue_p_node_t *queue_p_dequeue(queue_p_t *queue);
  *
  * The position is based on the entire queue, irrespective of priority.
  *
- * If an error occurs, this function will return NULL and set errno.
- * Possible error codes are:
- * - EINVAL: queue is NULL or position is out of range
+ * If queue is NULL or position is out of range, this function will return NULL.
  *
  * @param queue pointer to queue pointer to get the node from
  * @param position position in the queue to get the node from
@@ -160,9 +158,7 @@ queue_p_node_t *queue_p_get(const queue_p_t *queue, size_t position);
  * 2 and the priority is 1, the function will return the node with position
  * 2 in the queue in relation to all the other nodes with priority 1.
  *
- * If an error occurs, this function will return NULL and set errno.
- * Possible error codes are:
- * - EINVAL: queue is NULL
+ * If queue is NULL, this function will return NULL.
  *
  * @param queue pointer to queue pointer to get the node from
  * @param position position in the queue to get the node from
@@ -190,9 +186,7 @@ queue_p_node_t *queue_p_peek(const queue_p_t *queue);
  * The returned structure contains information on the dequeued node. The
  * structure must be freed after use.
  *
- * If an error occurs, this function will return NULL and set errno.
- * Possible error codes are:
- * - EINVAL: queue is NULL
+ * If queue is NULL, this function will return NULL.
  *
  * @param queue pointer to queue to search
  * @param item_to_remove pointer to value to remove
@@ -204,9 +198,7 @@ queue_p_node_t *queue_p_remove(queue_p_t *queue, void *item_to_remove);
 /**
  * @brief Find the first occurrence of a value in the queue.
  *
- * If an error occurs, this function will return NULL and set errno.
- * Possible error codes are:
- * - EINVAL: queue is NULL
+ * If queue is NULL, this function will return NULL.
  *
  * @param queue pointer to queue to search
  * @param value_to_find pointer to value to find
