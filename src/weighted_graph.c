@@ -192,7 +192,7 @@ weighted_graph_t *graph_create(CMP_F cmp, FREE_F free_f) {
         errno = ENOMEM;
         return NULL;
     }
-    graph->to_process = queue_p_init(0, NULL, node_cmp);
+    graph->to_process = queue_p_init(0, NULL, node_cmp, NULL);
     if (graph->to_process == NULL) {
         list_delete(&graph->nodes);
         free(graph);

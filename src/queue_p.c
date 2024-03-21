@@ -30,6 +30,18 @@ struct queue_p_t {
 /* PRIVATE FUNCTIONS */
 
 /**
+ * @brief Sets the error code.
+ *
+ * @param err The error code.
+ * @param value The value to set.
+ */
+static void set_err(int *err, int value) {
+    if (err != NULL) {
+        *err = value;
+    }
+}
+
+/**
  * @brief Compare priorities to find the correct queue.
  *
  * Compares a given priority to the priority of a list of queues. Returns 0 if
@@ -107,20 +119,20 @@ int push_new_node(queue_p_t *queue, queue_p_node_t *node, size_t list_idx) {
 
 /* PUBLIC FUNCTIONS */
 
-queue_p_t *queue_p_init(size_t capacity, FREE_F customfree, CMP_F compare) {
+queue_p_t *queue_p_init(size_t capacity, FREE_F customfree, CMP_F compare,
+                        int *err) {
     if (compare == NULL) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     }
     queue_p_t *queue = malloc(sizeof(*queue));
     if (queue == NULL) {
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
-    queue->list = list_new(q_dst, q_cmp, NULL);
+    queue->list = list_new(q_dst, q_cmp, err);
     if (queue->list == NULL) {
         free(queue);
-        errno = ENOMEM;
         return NULL;
     }
     queue->capacity = capacity;

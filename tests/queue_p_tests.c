@@ -32,7 +32,7 @@ static void reset_queue(queue_p_t *queue) {
     }
 }
 
-void custom_free(void *mem_addr) {}
+void custom_free(void *mem_addr) { (void)mem_addr; }
 
 int test_compare_node(const void *value_to_find, const void *node_data) {
     const int *needle = value_to_find;
@@ -52,7 +52,7 @@ int clean_suite1(void) { return 0; }
 
 void test_queue_p_init() {
     // Verify queue_p was created correctly
-    queue_p = queue_p_init(CAPACITY, custom_free, test_compare_node);
+    queue_p = queue_p_init(CAPACITY, custom_free, test_compare_node, NULL);
     CU_ASSERT_FATAL(NULL != queue_p);
     // NOLINTNEXTLINE
     CU_ASSERT(CAPACITY == queue_p_capacity(queue_p));

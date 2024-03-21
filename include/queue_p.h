@@ -48,7 +48,7 @@ typedef struct queue_p_t queue_p_t;
  * the queue will be limited to the given capacity. If free_f is NULL, then data
  * stored in the queue will not be free'd.
  *
- * On error, the function will return NULL and set errno.
+ * On error, the function will return NULL.
  * Possible error codes are:
  * - EINVAL: compare function is NULL
  * - ENOMEM: memory allocation failed
@@ -57,9 +57,11 @@ typedef struct queue_p_t queue_p_t;
  * @param customfree pointer to a function to free queue data
  * @note if the customfree in NULL, the queue will not free the data
  * @param compare pointer to user defined compare function
+ * @param err pointer to integer to store error code
  * @returns pointer to allocated priority queue on success, NULL on failure
  */
-queue_p_t *queue_p_init(size_t capacity, FREE_F customfree, CMP_F compare);
+queue_p_t *queue_p_init(size_t capacity, FREE_F customfree, CMP_F compare,
+                        int *err);
 
 /**
  * @brief Check if queue is full.
