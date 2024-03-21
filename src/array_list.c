@@ -36,6 +36,18 @@ struct arr_list_t {
 /* PRIVATE FUNCTIONS */
 
 /**
+ * @brief Sets the error code.
+ *
+ * @param err The error code.
+ * @param value The value to set.
+ */
+static void set_err(int *err, int value) {
+    if (err != NULL) {
+        *err = value;
+    }
+}
+
+/**
  * @brief Adjusts the size of the array.
  *
  * Possible error codes:
@@ -110,22 +122,22 @@ static void *shift_back(arr_list_t *list, size_t position) {
 
 /* PUBLIC FUNCTIONS */
 
-arr_list_t *arr_list_new(FREE_F free_f, CMP_F cmp_f, size_t nmemb,
-                         size_t size) {
+arr_list_t *arr_list_new(FREE_F free_f, CMP_F cmp_f, size_t nmemb, size_t size,
+                         int *err) {
     if (nmemb == 0 || size == 0) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     }
     arr_list_t *list = malloc(sizeof(*list));
     if (list == NULL) {
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
     list->wrap = NULL;
     list->array = calloc(nmemb, size);
     if (list->array == NULL) {
         free(list);
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
     list->free_f = free_f;
@@ -138,16 +150,16 @@ arr_list_t *arr_list_new(FREE_F free_f, CMP_F cmp_f, size_t nmemb,
 }
 
 arr_list_t *arr_list_wrap(FREE_F free_f, CMP_F cmp_f, size_t nmemb, size_t size,
-                          void **arr) {
+                          void **arr, int *err) {
     if (nmemb == 0 || size == 0) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     } else if (arr == NULL) {
-        return arr_list_new(free_f, cmp_f, nmemb, size);
+        return arr_list_new(free_f, cmp_f, nmemb, size, err);
     }
     arr_list_t *list = malloc(sizeof(*list));
     if (list == NULL) {
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
     list->wrap = arr;
@@ -155,7 +167,7 @@ arr_list_t *arr_list_wrap(FREE_F free_f, CMP_F cmp_f, size_t nmemb, size_t size,
         *list->wrap = calloc(nmemb, size);
         if (*list->wrap == NULL) {
             free(list);
-            errno = ENOMEM;
+            set_err(err, ENOMEM);
             return NULL;
         }
     }
@@ -169,18 +181,27 @@ arr_list_t *arr_list_wrap(FREE_F free_f, CMP_F cmp_f, size_t nmemb, size_t size,
     return list;
 }
 
-ssize_t arr_list_size(const arr_list_t *list) {
-    if (list == NULL) {
-        return INVALID;
+int arr_list_query(const arr_list_t *list, int query, ssize_t *result) {
+    if (list == NULL || result == NULL) {
+        return EINVAL;
     }
-    return list->size;
-}
-
-ssize_t arr_list_capacity(const arr_list_t *list) {
-    if (list == NULL) {
-        return INVALID;
+    switch (query) {
+    case QUERY_SIZE:
+        *result = list->size;
+        break;
+    case QUERY_CAPACITY:
+        *result = list->capacity;
+        break;
+    case QUERY_IS_EMPTY:
+        *result = list->size == 0;
+        break;
+    case QUERY_IS_FULL:
+        *result = list->size == list->capacity;
+        break;
+    default:
+        return ENOTSUP;
     }
-    return list->capacity;
+    return SUCCESS;
 }
 
 int arr_list_resize(arr_list_t *list, size_t new_capacity) {
@@ -199,20 +220,6 @@ int arr_list_trim(arr_list_t *list) {
         return SUCCESS;
     }
     return adjust_size(list, list->size);
-}
-
-int arr_list_is_empty(const arr_list_t *list) {
-    if (list == NULL) {
-        return INVALID;
-    }
-    return list->size == 0;
-}
-
-int arr_list_is_full(const arr_list_t *list) {
-    if (list == NULL) {
-        return INVALID;
-    }
-    return list->size == list->capacity;
 }
 
 int arr_list_insert(arr_list_t *list, void *data, size_t position) {
@@ -244,38 +251,31 @@ int arr_list_set(arr_list_t *list, void *data, size_t position, void *old) {
 
 void *arr_list_get(const arr_list_t *list, size_t position) {
     if (list == NULL || position >= list->size) {
-        errno = EINVAL;
         return NULL;
     }
     return (uint8_t *)list->array + (position * list->mem_sz);
 }
 
-void *arr_list_pop(arr_list_t *list, size_t position) {
+int arr_list_pop(arr_list_t *list, size_t position, void *old) {
     if (list == NULL || position >= list->size) {
-        errno = EINVAL;
-        return NULL;
+        return EINVAL;
     }
-    void *old = malloc(list->mem_sz);
-    if (old == NULL) {
-        errno = ENOMEM;
-        return NULL;
+    if (old != NULL) {
+        void *element = (uint8_t *)list->array + (position * list->mem_sz);
+        memmove(old, element, list->mem_sz);
     }
-    void *element = (uint8_t *)list->array + (position * list->mem_sz);
-    memcpy(old, element, list->mem_sz);
     shift_forward(list, position);
     list->size--;
-    return old;
+    return SUCCESS;
 }
 
 int arr_list_remove(arr_list_t *list, void *item_to_remove) {
     if (list == NULL) {
-        errno = EINVAL;
-        return INVALID;
+        return EINVAL;
     } else if (list->cmp_f == NULL) {
-        errno = ENOTSUP;
-        return INVALID;
+        return ENOTSUP;
     } else if (list->size == 0) {
-        return false;
+        return SUCCESS;
     }
 
     for (size_t i = 0; i < list->size; i++) {
@@ -283,10 +283,10 @@ int arr_list_remove(arr_list_t *list, void *item_to_remove) {
         if (list->cmp_f(item_to_remove, element) == 0) {
             shift_forward(list, i);
             list->size--;
-            return true;
+            break;
         }
     }
-    return false;
+    return SUCCESS;
 }
 
 int arr_list_foreach(arr_list_t *list, ACT_F action_function, void *addl_data) {
@@ -313,10 +313,8 @@ int arr_list_iterator_reset(arr_list_t *list) {
 
 void *arr_list_iterator_next(arr_list_t *list) {
     if (list == NULL) {
-        errno = EINVAL;
         return NULL;
     } else if (list->iter_pos >= list->size) {
-        errno = ENOTSUP;
         return NULL;
     }
     return (uint8_t *)list->array + (list->iter_pos++ * list->mem_sz);

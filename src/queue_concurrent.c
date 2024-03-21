@@ -90,7 +90,20 @@ struct queue_c_t {
     bool is_destroying;
     bool cancel_wait;
 };
+
 /* PRIVATE FUNCTIONS */
+
+/**
+ * @brief Sets the error code.
+ *
+ * @param err The error code.
+ * @param value The value to set.
+ */
+static void set_err(int *err, int value) {
+    if (err != NULL) {
+        *err = value;
+    }
+}
 
 /**
  * @brief Initialize thread constructs.
@@ -357,20 +370,19 @@ static int timed_wait_for(queue_c_t *queue, pthread_cond_t *cond,
     manual_lock(queue);
     return SUCCESS;
 }
+
 /* PUBLIC FUNCTIONS */
 
-queue_c_t *queue_c_init(size_t capacity, FREE_F customfree) {
+queue_c_t *queue_c_init(size_t capacity, FREE_F customfree, int *err) {
     queue_c_t *queue_c = malloc(sizeof(*queue_c));
     if (queue_c == NULL) {
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
 
-    queue_c->queue = queue_init(capacity, customfree, NULL);
+    queue_c->queue = queue_init(capacity, customfree, NULL, err);
     if (queue_c->queue == NULL) {
-        int err = errno;
         free(queue_c);
-        errno = err;
         return NULL;
     }
 
@@ -380,7 +392,6 @@ queue_c_t *queue_c_init(size_t capacity, FREE_F customfree) {
 
 int queue_c_is_full(queue_c_t *queue) {
     if (queue == NULL || queue->is_destroying) {
-        errno = EINVAL;
         return INVALID;
     } else if (queue_capacity(queue->queue) == QUEUE_UNLIMITED) {
         return 0;
@@ -428,7 +439,6 @@ int queue_c_timed_wait_for_not_full(queue_c_t *queue, time_t timeout) {
 
 int queue_c_is_empty(queue_c_t *queue) {
     if (queue == NULL || queue->is_destroying) {
-        errno = EINVAL;
         return INVALID;
     }
     return queue_is_empty(queue->queue);
@@ -510,7 +520,6 @@ int queue_c_unlock(queue_c_t *queue) {
 
 ssize_t queue_c_capacity(queue_c_t *queue) {
     if (queue == NULL || queue->is_destroying) {
-        errno = EINVAL;
         return INVALID;
     }
     return queue_capacity(queue->queue);
@@ -518,7 +527,6 @@ ssize_t queue_c_capacity(queue_c_t *queue) {
 
 ssize_t queue_c_size(queue_c_t *queue) {
     if (queue == NULL || queue->is_destroying) {
-        errno = EINVAL;
         return INVALID;
     }
     return queue_size(queue->queue);
@@ -554,16 +562,16 @@ int queue_c_enqueue(queue_c_t *queue, void *data) {
     return SUCCESS;
 }
 
-void *queue_c_dequeue(queue_c_t *queue) {
+void *queue_c_dequeue(queue_c_t *queue, int *err) {
     if (queue == NULL || queue->is_destroying) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     }
 
     // deadlock error can be ignored, it was caused by one of the lock functions
     // check if destruction was called while waiting for lock
     if (lock_queue(queue) == EINTR) {
-        errno = EINTR;
+        set_err(err, EINTR);
         return NULL;
     } else if (queue_c_is_empty(queue)) {
         unlock_queue(queue);
@@ -584,7 +592,6 @@ void *queue_c_dequeue(queue_c_t *queue) {
 
 void *queue_c_peek(queue_c_t *queue) {
     if (queue == NULL || queue->is_destroying) {
-        errno = EINVAL;
         return NULL;
     }
     return queue_peek(queue->queue);
@@ -612,8 +619,7 @@ int queue_c_clear(queue_c_t *queue) {
 int queue_c_destroy(queue_c_t **queue_addr) {
     if (queue_addr == NULL || *queue_addr == NULL ||
         (*queue_addr)->is_destroying) {
-        errno = EINVAL;
-        return INVALID;
+        return EINVAL;
     }
     // deadlock error can be ignored, it was caused by one of the lock functions
     // check if destruction was called while waiting for lock

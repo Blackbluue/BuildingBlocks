@@ -1,6 +1,7 @@
 #ifndef HASH_TABLE_H
 #define HASH_TABLE_H
 
+#include "buildingblocks.h"
 #include <unistd.h>
 
 /* DATA */
@@ -52,17 +53,45 @@ typedef struct hash_table_t hash_table_t;
  * a capacity of 0 is given, the default capacity will be used. The given
  * compare function is used for looking up keys in the table.
  *
- * If an error occurs, NULL is returned and errno is set appropriately.
- * Possible error codes include:
+ * If an error occurs, NULL is returned and the output variable is set
+ * appropriately. Possible error codes include:
  * - EINVAL: cmp_f is NULL
  * - ENOMEM: memory allocation fails
  *
  * @param capacity initial capacity of the table
  * @param free_f pointer to the user defined free function
  * @param cmp_f pointer to the user defined key compare function
+ * @param err pointer to error code
  * @return hash_table_t pointer to allocated table
  */
-hash_table_t *hash_table_init(size_t capacity, FREE_F free_f, CMP_F cmp_f);
+hash_table_t *hash_table_init(size_t capacity, FREE_F free_f, CMP_F cmp_f,
+                              int *err);
+
+/**
+ * @brief Query the table.
+ *
+ * The query command is used to get information about the table. The result
+ * pointer is used to store the result of the query.
+ *
+ * Possible queries:
+ * - QUERY_SIZE: Get the number of key/value pairs in the table.
+ * - QUERY_IS_EMPTY: Check if the table is empty.
+ *
+ * Possible results:
+ * - QUERY_SIZE: The number of key/value pairs in the table.
+ * - QUERY_IS_EMPTY: 0 if the table is not empty, non-zero if the table is
+ * empty.
+ *
+ * Possible errors:
+ * - EINVAL: The table or result pointers are NULL.
+ * - ENOTSUP: The query command is invalid.
+ *
+ * @param list A pointer to the table.
+ * @param query The query command.
+ * @param result A pointer to the result of the query.
+ * @return int 0 on success, non-zero on failure.
+ */
+int hash_table_query(const hash_table_t *table, int query, ssize_t *result);
 
 /**
  * @brief Add an item to the table.
@@ -84,23 +113,11 @@ hash_table_t *hash_table_init(size_t capacity, FREE_F free_f, CMP_F cmp_f);
 int hash_table_set(hash_table_t *table, void *data, const void *key);
 
 /**
- * @brief Return the size of the hash table.
- *
- * If an error occurs, -1 is returned and errno is set appropriately.
- * Possible error codes include:
- * - EINVAL: table is NULL
- *
- * @param table pointer to table address
- * @return size_t size of table, -1 if table is NULL
- */
-ssize_t hash_table_size(const hash_table_t *table);
-
-/**
  * @brief Look up an item in the table by key.
  *
- * If an error occurs, NULL is returned and errno is set appropriately.
- * Possible error codes include:
- * - EINVAL: table or key are NULL
+ * If table or key are NULL, NULL is returned. If the key is not found in the
+ * table, NULL is also returned. The user should check to tell the difference
+ * between a NULL return value and a NULL table/key error.
  *
  * @param table pointer to table address
  * @param key key for data being searched for
@@ -132,13 +149,13 @@ int hash_table_iterate(hash_table_t *table, ACT_TABLE_F action,
 /**
  * @brief Remove an item from the hash table.
  *
- * If an error occurs, NULL is returned and errno is set appropriately.
- * Possible error codes include:
- * - EINVAL: table or key are NULL
+ * If table or key are NULL, NULL is returned. If the key is not found in the
+ * table, NULL is also returned. The user should check to tell the difference
+ * between a NULL return value and a NULL table/key error.
  *
  * @param table the table to remove the item from
  * @param key key of data to be removed
- * @return void * data that was removed
+ * @return void * data that was removed, or NULL
  */
 void *hash_table_remove(hash_table_t *table, const void *key);
 

@@ -19,7 +19,7 @@ int clean_suite1(void) { return 0; }
  *
  * @param mem_addr pointer of the item to be free'd
  */
-void custom_free(void *mem_addr) { return; }
+void custom_free(void *mem_addr) { (void)mem_addr; }
 
 void test_stack_init() {
     // Verify stack was created correctly

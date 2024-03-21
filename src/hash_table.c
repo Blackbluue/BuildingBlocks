@@ -76,6 +76,17 @@ struct action_data_t {
 /* PRIVATE FUNCTIONS */
 
 /**
+ * @brief Sets the error code.
+ *
+ * @param err The error code.
+ * @param value The value to set.
+ */
+static inline void set_err(int *err, int value) {
+    if (err != NULL) {
+        *err = value;
+    }
+}
+/**
  * @brief Comparison function to pass to list_new.
  *
  * @param to_find the key to find
@@ -141,7 +152,7 @@ static int copy_node(void **node_data, void *addl_data) {
     size_t idx = hash(table_node->key, table->capacity);
     if (table->buckets[idx] == NULL) {
         // list will not manage memory of table_node
-        table->buckets[idx] = list_new(NULL, map_node_cmp);
+        table->buckets[idx] = list_new(NULL, map_node_cmp, NULL);
         if (table->buckets[idx] == NULL) {
             return ENOMEM;
         }
@@ -235,7 +246,7 @@ static list_t *get_bucket(hash_table_t *table, const void *key) {
     // if hash does not exist, create new list
     if (bucket == NULL) {
         // list will not manage memory of table_node
-        bucket = list_new(NULL, map_node_cmp);
+        bucket = list_new(NULL, map_node_cmp, NULL);
         if (bucket == NULL) {
             return NULL;
         }
@@ -276,14 +287,15 @@ static int insert_into_bucket(const void *key, void *data, list_t *bucket,
 
 /* PUBLIC FUNCTIONS */
 
-hash_table_t *hash_table_init(size_t capacity, FREE_F free_f, CMP_F cmp_f) {
+hash_table_t *hash_table_init(size_t capacity, FREE_F free_f, CMP_F cmp_f,
+                              int *err) {
     if (cmp_f == NULL) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     }
     hash_table_t *table = malloc(sizeof(*table));
     if (table == NULL) {
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
 
@@ -291,13 +303,29 @@ hash_table_t *hash_table_init(size_t capacity, FREE_F free_f, CMP_F cmp_f) {
     table->buckets = calloc(table->capacity, sizeof(*(table->buckets)));
     if (table->buckets == NULL) {
         free(table);
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
     table->size = 0;
     table->customfree = free_f;
     table->compare = cmp_f;
     return table;
+}
+
+int hash_table_query(const hash_table_t *table, int query, ssize_t *result) {
+    if (table == NULL || result == NULL) {
+        return EINVAL;
+    }
+    switch (query) {
+    case QUERY_SIZE:
+        *result = table->size;
+        return SUCCESS;
+    case QUERY_IS_EMPTY:
+        *result = table->size == 0;
+        return SUCCESS;
+    default:
+        return ENOTSUP;
+    }
 }
 
 int hash_table_set(hash_table_t *table, void *data, const void *key) {
@@ -337,23 +365,14 @@ int hash_table_set(hash_table_t *table, void *data, const void *key) {
     }
 }
 
-ssize_t hash_table_size(const hash_table_t *table) {
-    if (table == NULL) {
-        errno = EINVAL;
-        return INVALID;
-    }
-    return table->size;
-}
-
 void *hash_table_lookup(const hash_table_t *table, const void *key) {
     if (table == NULL || key == NULL) {
-        errno = EINVAL;
         return NULL;
     } else if (table->size == 0) {
         return NULL;
     }
     size_t idx = hash(key, table->capacity);
-    table_node_t *node = list_find_first(table->buckets[idx], key);
+    table_node_t *node = list_find_first(table->buckets[idx], key, NULL);
     return node != NULL ? node->data : NULL;
 }
 
@@ -381,7 +400,6 @@ int hash_table_iterate(hash_table_t *table, ACT_TABLE_F action,
 
 void *hash_table_remove(hash_table_t *table, const void *key) {
     if (table == NULL || key == NULL) {
-        errno = EINVAL;
         return NULL;
     } else if (table->size == 0) {
         return NULL;
@@ -390,7 +408,7 @@ void *hash_table_remove(hash_table_t *table, const void *key) {
     if (table->buckets[idx] == NULL) {
         return NULL;
     }
-    table_node_t *node = list_remove(table->buckets[idx], (void *)key);
+    table_node_t *node = list_remove(table->buckets[idx], (void *)key, NULL);
     if (node == NULL) {
         return NULL;
     }

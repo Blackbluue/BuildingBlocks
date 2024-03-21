@@ -1,6 +1,7 @@
 #ifndef LINKED_LIST_H
 #define LINKED_LIST_H
 
+#include "buildingblocks.h"
 #include <unistd.h>
 
 /* DATA */
@@ -43,18 +44,45 @@ typedef struct list_t list_t;
  *
  * If free_f is NULL, then data stored in the list will not be free'd. If cmp_f
  * is NULL, then certain functions that require a compare function will not be
- * available. If any of these functions are called, then errno will be set to
- * ENOTSUP.
+ * available. If any of these functions are called, they will result in an
+ * ENOTSUP error.
  *
- * If an error occurs, then NULL will be returned and errno will be set.
+ * If an error occurs, then NULL will be returned.
  * Possible error codes are:
  * - ENOMEM: memory allocation failed
  *
  * @param free_f pointer to the free function to be used with that list
  * @param cmp_f pointer to the compare function to be used with that list
+ * @param err pointer to the error code
  * @returns pointer to allocated list on success or NULL on failure
  */
-list_t *list_new(FREE_F free_f, CMP_F cmp_f);
+list_t *list_new(FREE_F free_f, CMP_F cmp_f, int *err);
+
+/**
+ * @brief Query the list.
+ *
+ * The query command is used to get information about the list. The result
+ * pointer is used to store the result of the query.
+ *
+ * Possible queries:
+ * - QUERY_SIZE: Get the number of nodes in the list.
+ * - QUERY_IS_EMPTY: Check if the list is empty.
+ *
+ * Possible results:
+ * - QUERY_SIZE: The number of nodes in the list.
+ * - QUERY_IS_EMPTY: 0 if the list is not empty, non-zero if the list is
+ * empty.
+ *
+ * Possible errors:
+ * - EINVAL: The list or result pointers are NULL.
+ * - ENOTSUP: The query command is invalid.
+ *
+ * @param list A pointer to the list.
+ * @param query The query command.
+ * @param result A pointer to the result of the query.
+ * @return int 0 on success, non-zero on failure.
+ */
+int list_query(const list_t *list, int query, ssize_t *result);
 
 /**
  * @brief Push a new node onto the head of list.
@@ -100,9 +128,9 @@ int list_insert(list_t *list, void *data, size_t position);
 /**
  * @brief Get the data at a specific position in the list.
  *
- * If an error occurs, then NULL will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: list is NULL or position is invalid
+ * If list is NULL or position is invalid, then NULL will be returned. Note that
+ * if the list allows NULL values or is empty, then this function will also
+ * return NULL.
  *
  * @param list list to get the node from
  * @param position position in the list to get the node from
@@ -113,21 +141,17 @@ void *list_get(const list_t *list, size_t position);
 /**
  * @brief Get the size of the list.
  *
- * If an error occurs, then -1 will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: list is NULL
+ * If list is NULL, then -1 will be returned.
  *
- * @param list pointer to linked list object to be checked
- * @return ssize_t size of the list, -1 on failure
+ * @param list list to get the size of
+ * @return the size of the list on success, -1 on failure
  */
 ssize_t list_size(const list_t *list);
 
 /**
  * @brief Check if the list object is empty.
  *
- * If an error occurs, then -1 will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: list is NULL
+ * If list is NULL, then -1 will be returned.
  *
  * @param list pointer to linked list object to be checked
  * @returns 0 if list is not empty or list is NULL, non-zero if list is empty,
@@ -138,9 +162,8 @@ int list_is_empty(const list_t *list);
 /**
  * @brief Pop the head out of the list.
  *
- * If an error occurs, then NULL will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: list is NULL
+ * If list is NULL, then NULL will be returned. Note that if the list allows
+ * NULL values or is empty, then this function will also return NULL.
  *
  * @param list list to pop out of
  * @return the popped data on success, NULL on failure
@@ -150,9 +173,8 @@ void *list_pop_head(list_t *list);
 /**
  * @brief Pop the tail out of the list.
  *
- * If an error occurs, then NULL will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: list is NULL
+ * If list is NULL, then NULL will be returned. Note that if the list allows
+ * NULL values or is empty, then this function will also return NULL.
  *
  * @param list list to pop out of
  * @return the popped data on success, NULL on failure
@@ -162,9 +184,8 @@ void *list_pop_tail(list_t *list);
 /**
  * @brief Get the data from the head of the list without popping.
  *
- * If an error occurs, then NULL will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: list is NULL
+ * If list is NULL, then NULL will be returned. Note that if the list allows
+ * NULL values or is empty, then this function will also return NULL.
  *
  * @param list list to peeked out of
  * @return the head on success, NULL on failure
@@ -174,9 +195,8 @@ void *list_peek_head(const list_t *list);
 /**
  * @brief Get the data from the tail of the list without popping.
  *
- * If an error occurs, then NULL will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: list is NULL
+ * If list is NULL, then NULL will be returned. Note that if the list allows
+ * NULL values or is empty, then this function will also return NULL.
  *
  * @param list list to peeked out of
  * @return the tail on success, NULL on failure
@@ -191,16 +211,17 @@ void *list_peek_tail(const list_t *list);
  * it is up to the user to differentiate between a NULL value in the list
  * and an error.
  *
- * If an error occurs, then NULL will be returned and errno will be set.
+ * If an error occurs, then NULL will be returned.
  * Possible error codes are:
  * - EINVAL: list is NULL
  * - ENOTSUP: list does not support comparisons
  *
  * @param list list to remove the node from
  * @param item_to_remove the data object to be searched for
+ * @param err pointer to the error code
  * @return the value in the removed node on success, NULL on failure
  */
-void *list_remove(list_t *list, void *item_to_remove);
+void *list_remove(list_t *list, void *item_to_remove, int *err);
 
 /**
  * @brief Perform a user defined action on the data in list.
@@ -241,26 +262,28 @@ int list_iterator_reset(list_t *list);
  *
  * Possible error codes are:
  * - EINVAL: list is NULL
- * - EOPNOTSUPP: reached the end of the list
+ * - ENOTSUP: reached the end of the list
  *
  * @param list list to iterate through
+ * @param err pointer to the error code
  * @return the data in the next node on success, or NULL on failure
  */
-void *list_iterator_next(list_t *list);
+void *list_iterator_next(list_t *list, int *err);
 
 /**
  * @brief Find the first occurrence of a node containing the search_data.
  *
- * If an error occurs, then NULL will be returned and errno will be set.
+ * If an error occurs, then NULL will be returned.
  * Possible error codes are:
  * - EINVAL: list is NULL
  * - ENOTSUP: list does not support comparisons
  *
  * @param list list to search through
  * @param search_data pointer to the data to be searched for
+ * @param err pointer to the error code
  * @return the data found on success, NULL on failure
  */
-void *list_find_first(const list_t *list, const void *search_data);
+void *list_find_first(const list_t *list, const void *search_data, int *err);
 
 /**
  * @brief Find all occurrences of a node containing the search_data.
@@ -273,7 +296,7 @@ void *list_find_first(const list_t *list, const void *search_data);
  * the returned list; however, deleting/clearing the returned list will not
  * affect the original list.
  *
- * If an error occurs, then NULL will be returned and errno will be set.
+ * If an error occurs, then NULL will be returned.
  * Possible error codes are:
  * - EINVAL: list is NULL
  * - ENOTSUP: list does not support comparisons
@@ -282,9 +305,10 @@ void *list_find_first(const list_t *list, const void *search_data);
  * @param list list to search through
  * @param search_data is the pointer to the address of the data to be searched
  *                    for
+ * @param err pointer to the error code
  * @return pointer to list of all found occurrences on success, NULL on failure
  */
-list_t *list_find_all(const list_t *list, const void *search_data);
+list_t *list_find_all(const list_t *list, const void *search_data, int *err);
 
 /**
  * @brief Sort list as per user defined compare function.

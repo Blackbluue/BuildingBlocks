@@ -2,6 +2,7 @@
 #include "linked_list.h"
 #include "queue.h"
 #include <errno.h>
+#include <stdbool.h>
 #include <stdlib.h>
 
 /* DATA */
@@ -27,6 +28,18 @@ struct queue_p_t {
 };
 
 /* PRIVATE FUNCTIONS */
+
+/**
+ * @brief Sets the error code.
+ *
+ * @param err The error code.
+ * @param value The value to set.
+ */
+static void set_err(int *err, int value) {
+    if (err != NULL) {
+        *err = value;
+    }
+}
 
 /**
  * @brief Compare priorities to find the correct queue.
@@ -83,12 +96,14 @@ int push_new_node(queue_p_t *queue, queue_p_node_t *node, size_t list_idx) {
     if (queue == NULL) {
         return EINVAL;
     }
-    queue_t *new_queue = queue_init(queue->capacity, free, queue->compare);
+    int err = SUCCESS;
+    queue_t *new_queue =
+        queue_init(queue->capacity, free, queue->compare, &err);
     if (new_queue == NULL) {
         free(node);
-        return ENOMEM;
+        return err;
     }
-    int err = queue_enqueue(new_queue, node);
+    err = queue_enqueue(new_queue, node);
     if (err != SUCCESS) {
         queue_destroy(&new_queue);
         return err;
@@ -104,20 +119,20 @@ int push_new_node(queue_p_t *queue, queue_p_node_t *node, size_t list_idx) {
 
 /* PUBLIC FUNCTIONS */
 
-queue_p_t *queue_p_init(size_t capacity, FREE_F customfree, CMP_F compare) {
+queue_p_t *queue_p_init(size_t capacity, FREE_F customfree, CMP_F compare,
+                        int *err) {
     if (compare == NULL) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     }
     queue_p_t *queue = malloc(sizeof(*queue));
     if (queue == NULL) {
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
-    queue->list = list_new(q_dst, q_cmp);
+    queue->list = list_new(q_dst, q_cmp, err);
     if (queue->list == NULL) {
         free(queue);
-        errno = ENOMEM;
         return NULL;
     }
     queue->capacity = capacity;
@@ -129,37 +144,23 @@ queue_p_t *queue_p_init(size_t capacity, FREE_F customfree, CMP_F compare) {
 
 int queue_p_is_full(const queue_p_t *queue) {
     if (queue == NULL) {
-        errno = EINVAL;
         return INVALID;
-    }
-    if (queue->capacity == QUEUE_P_UNLIMITED) {
-        return 0;
+    } else if (queue->capacity == QUEUE_P_UNLIMITED) {
+        return false;
     }
     return queue->size == queue->capacity;
 }
 
 int queue_p_is_empty(const queue_p_t *queue) {
-    if (queue == NULL) {
-        errno = EINVAL;
-        return INVALID;
-    }
-    return queue->size == 0;
+    return queue == NULL ? INVALID : queue->size == 0;
 }
 
 ssize_t queue_p_capacity(const queue_p_t *queue) {
-    if (queue == NULL) {
-        errno = EINVAL;
-        return INVALID;
-    }
-    return queue->capacity;
+    return queue == NULL ? INVALID : (ssize_t)queue->capacity;
 }
 
 ssize_t queue_p_size(const queue_p_t *queue) {
-    if (queue == NULL) {
-        errno = EINVAL;
-        return INVALID;
-    }
-    return queue->size;
+    return queue == NULL ? INVALID : (ssize_t)queue->size;
 }
 
 int queue_p_enqueue(queue_p_t *queue, void *data, double priority) {
@@ -178,7 +179,7 @@ int queue_p_enqueue(queue_p_t *queue, void *data, double priority) {
 
     size_t list_idx = 0;
     list_iterator_reset(queue->list);
-    queue_t *inner_q = list_iterator_next(queue->list);
+    queue_t *inner_q = list_iterator_next(queue->list, NULL);
     if (inner_q == NULL) {
         // priority queue is empty, create new queue and insert it into the list
         return push_new_node(queue, node, list_idx);
@@ -204,17 +205,14 @@ int queue_p_enqueue(queue_p_t *queue, void *data, double priority) {
             }
             return err;
         }
-    } while ((inner_q = list_iterator_next(queue->list)) != NULL);
+    } while ((inner_q = list_iterator_next(queue->list, NULL)) != NULL);
     // node priority is less than all other queue priorities
     // create new queue and append it to the list
     return push_new_node(queue, node, list_idx);
 }
 
 queue_p_node_t *queue_p_dequeue(queue_p_t *queue) {
-    if (queue == NULL) {
-        errno = EINVAL;
-        return NULL;
-    } else if (queue_p_is_empty(queue)) {
+    if (queue == NULL || queue_p_is_empty(queue)) {
         return NULL;
     }
     queue_t *current_queue = list_peek_head(queue->list);
@@ -229,19 +227,18 @@ queue_p_node_t *queue_p_dequeue(queue_p_t *queue) {
 
 queue_p_node_t *queue_p_get(const queue_p_t *queue, size_t position) {
     if (queue == NULL || position >= queue->size) {
-        errno = EINVAL;
         return NULL;
     }
 
     list_iterator_reset(queue->list);
-    queue_t *inner_q = list_iterator_next(queue->list);
+    queue_t *inner_q = list_iterator_next(queue->list, NULL);
     do {
-        if (queue_size(inner_q) > position) {
+        if ((size_t)queue_size(inner_q) > position) {
             return queue_get(inner_q, position);
         } else {
             position -= queue_size(inner_q);
         }
-    } while ((inner_q = list_iterator_next(queue->list)) != NULL);
+    } while ((inner_q = list_iterator_next(queue->list, NULL)) != NULL);
     // should never reach this point
     return NULL;
 }
@@ -249,11 +246,10 @@ queue_p_node_t *queue_p_get(const queue_p_t *queue, size_t position) {
 queue_p_node_t *queue_p_get_priority(const queue_p_t *queue, size_t position,
                                      double priority) {
     if (queue == NULL) {
-        errno = EINVAL;
         return NULL;
     }
 
-    queue_t *current_queue = list_find_first(queue->list, &priority);
+    queue_t *current_queue = list_find_first(queue->list, &priority, NULL);
     if (current_queue == NULL) {
         return NULL;
     }
@@ -265,10 +261,7 @@ queue_p_node_t *queue_p_get_priority(const queue_p_t *queue, size_t position,
 }
 
 queue_p_node_t *queue_p_peek(const queue_p_t *queue) {
-    if (queue == NULL) {
-        errno = EINVAL;
-        return NULL;
-    } else if (queue_p_is_empty(queue)) {
+    if (queue == NULL || queue_p_is_empty(queue)) {
         return NULL;
     }
     queue_t *current_queue = list_peek_head(queue->list);
@@ -276,20 +269,17 @@ queue_p_node_t *queue_p_peek(const queue_p_t *queue) {
 }
 
 queue_p_node_t *queue_p_remove(queue_p_t *queue, void *item_to_remove) {
-    if (queue == NULL) {
-        errno = EINVAL;
-        return NULL;
-    } else if (queue_p_is_empty(queue)) {
+    if (queue == NULL || queue_p_is_empty(queue)) {
         return NULL;
     }
     list_iterator_reset(queue->list);
     queue_t *inner_q;
-    while ((inner_q = list_iterator_next(queue->list)) != NULL) {
-        queue_p_node_t *node = queue_remove(inner_q, item_to_remove);
+    while ((inner_q = list_iterator_next(queue->list, NULL)) != NULL) {
+        queue_p_node_t *node = queue_remove(inner_q, item_to_remove, NULL);
         if (node != NULL) {
             queue->size--;
             if (queue_is_empty(inner_q)) {
-                list_remove(queue->list, inner_q);
+                list_remove(queue->list, inner_q, NULL);
                 queue_destroy(&inner_q);
             }
             return node;
@@ -300,16 +290,13 @@ queue_p_node_t *queue_p_remove(queue_p_t *queue, void *item_to_remove) {
 
 queue_p_node_t *queue_p_find_first(const queue_p_t *queue,
                                    const void *value_to_find) {
-    if (queue == NULL) {
-        errno = EINVAL;
-        return NULL;
-    } else if (queue_p_is_empty(queue)) {
+    if (queue == NULL || queue_p_is_empty(queue)) {
         return NULL;
     }
     list_iterator_reset(queue->list);
     queue_t *inner_q;
-    while ((inner_q = list_iterator_next(queue->list)) != NULL) {
-        queue_p_node_t *node = queue_find_first(inner_q, value_to_find);
+    while ((inner_q = list_iterator_next(queue->list, NULL)) != NULL) {
+        queue_p_node_t *node = queue_find_first(inner_q, value_to_find, NULL);
         if (node != NULL) {
             return node;
         }

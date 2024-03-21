@@ -47,6 +47,18 @@ typedef int (*LOCAL_ACT_F)(list_node_t *node_data, void *addl_data);
 /* PRIVATE FUNCTIONS*/
 
 /**
+ * @brief Sets the error code.
+ *
+ * @param err The error code.
+ * @param value The value to set.
+ */
+static void set_err(int *err, int value) {
+    if (err != NULL) {
+        *err = value;
+    }
+}
+
+/**
  * @brief Create a new list node.
  *
  * @param data data to be stored in the node
@@ -74,6 +86,7 @@ static list_node_t *create_node(void *data, list_node_t *next,
  * @return int 0 on success, EINVAL if node is NULL
  */
 static int inc_pos(list_node_t *node, void *data) {
+    (void)(data);
     if (node == NULL) {
         return EINVAL;
     }
@@ -89,6 +102,7 @@ static int inc_pos(list_node_t *node, void *data) {
  * @return int 0 on success, EINVAL if node is NULL
  */
 static int dec_pos(list_node_t *node, void *data) {
+    (void)(data);
     if (node == NULL) {
         return EINVAL;
     }
@@ -229,19 +243,31 @@ static int local_foreach(list_node_t *head, size_t size, LOCAL_ACT_F action,
 
 /* PUBLIC FUNCTIONS*/
 
-list_t *list_new(FREE_F free_f, CMP_F cmp_f) {
-    list_t *list = malloc(sizeof(*list));
+list_t *list_new(FREE_F free_f, CMP_F cmp_f, int *err) {
+    list_t *list = calloc(1, sizeof(*list));
     if (list == NULL) {
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
-    list->size = 0;
-    list->head = NULL;
-    list->tail = NULL;
-    list->current = NULL;
     list->customfree = free_f;
     list->compare_function = cmp_f;
     return list;
+}
+
+int list_query(const list_t *list, int query, ssize_t *result) {
+    if (list == NULL || result == NULL) {
+        return EINVAL;
+    }
+    switch (query) {
+    case QUERY_SIZE:
+        *result = list->size;
+        return SUCCESS;
+    case QUERY_IS_EMPTY:
+        *result = list->size == 0;
+        return SUCCESS;
+    default:
+        return ENOTSUP;
+    }
 }
 
 int list_push_head(list_t *list, void *data) {
@@ -309,7 +335,6 @@ int list_insert(list_t *list, void *data, size_t position) {
 
 void *list_get(const list_t *list, size_t position) {
     if (list == NULL || position >= list->size) {
-        errno = EINVAL;
         return NULL;
     }
     list_node_t *current_node = list->head;
@@ -320,24 +345,15 @@ void *list_get(const list_t *list, size_t position) {
 }
 
 ssize_t list_size(const list_t *list) {
-    if (list == NULL) {
-        errno = EINVAL;
-        return INVALID;
-    }
-    return list->size;
+    return list == NULL ? INVALID : (ssize_t)list->size;
 }
 
 int list_is_empty(const list_t *list) {
-    if (list == NULL) {
-        errno = EINVAL;
-        return INVALID;
-    }
-    return list->size == 0;
+    return list == NULL ? INVALID : list->size == 0;
 }
 
 void *list_pop_head(list_t *list) {
     if (list == NULL) {
-        errno = EINVAL;
         return NULL;
     } else if (list->head == NULL) {
         return NULL;
@@ -361,7 +377,6 @@ void *list_pop_head(list_t *list) {
 
 void *list_pop_tail(list_t *list) {
     if (list == NULL) {
-        errno = EINVAL;
         return NULL;
     } else if (list->tail == NULL) {
         return NULL;
@@ -391,7 +406,6 @@ void *list_pop_tail(list_t *list) {
 
 void *list_peek_head(const list_t *list) {
     if (list == NULL) {
-        errno = EINVAL;
         return NULL;
     } else if (list->head == NULL) {
         return NULL;
@@ -401,7 +415,6 @@ void *list_peek_head(const list_t *list) {
 
 void *list_peek_tail(const list_t *list) {
     if (list == NULL) {
-        errno = EINVAL;
         return NULL;
     } else if (list->tail == NULL) {
         return NULL;
@@ -409,12 +422,12 @@ void *list_peek_tail(const list_t *list) {
     return list->tail->data;
 }
 
-void *list_remove(list_t *list, void *item_to_remove) {
+void *list_remove(list_t *list, void *item_to_remove, int *err) {
     if (list == NULL) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     } else if (list->compare_function == NULL) {
-        errno = ENOTSUP;
+        set_err(err, ENOTSUP);
         return NULL;
     } else if (list->size == 0) {
         return NULL;
@@ -480,12 +493,12 @@ int list_iterator_reset(list_t *list) {
     return SUCCESS;
 }
 
-void *list_iterator_next(list_t *list) {
+void *list_iterator_next(list_t *list, int *err) {
     if (list == NULL) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     } else if (list->current == NULL) {
-        errno = EOPNOTSUPP;
+        set_err(err, ENOTSUP);
         return NULL;
     }
     void *data = list->current->data;
@@ -498,12 +511,12 @@ void *list_iterator_next(list_t *list) {
     return data;
 }
 
-void *list_find_first(const list_t *list, const void *search_data) {
+void *list_find_first(const list_t *list, const void *search_data, int *err) {
     if (list == NULL) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     } else if (list->compare_function == NULL) {
-        errno = ENOTSUP;
+        set_err(err, ENOTSUP);
         return NULL;
     } else if (list->size == 0) {
         return NULL;
@@ -519,29 +532,29 @@ void *list_find_first(const list_t *list, const void *search_data) {
     return NULL;
 }
 
-list_t *list_find_all(const list_t *list, const void *search_data) {
+list_t *list_find_all(const list_t *list, const void *search_data, int *err) {
     if (list == NULL) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     } else if (list->compare_function == NULL) {
-        errno = ENOTSUP;
+        set_err(err, ENOTSUP);
         return NULL;
     } else if (list->size == 0) {
         return NULL;
     }
 
-    list_t *found_list = list_new(NULL, list->compare_function);
+    list_t *found_list = list_new(NULL, list->compare_function, NULL);
     if (found_list == NULL) {
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
     list_node_t *current_node = list->head;
     for (size_t i = 0; i < list->size; i++) {
         if (list->compare_function(search_data, current_node->data) == 0) {
-            int err = list_push_tail(found_list, current_node->data);
-            if (err != SUCCESS) {
+            int loc_err = list_push_tail(found_list, current_node->data);
+            if (loc_err != SUCCESS) {
                 list_delete(&found_list);
-                errno = err;
+                set_err(err, loc_err);
                 return NULL;
             }
         }

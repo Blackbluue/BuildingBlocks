@@ -5,9 +5,6 @@
 
 /* DATA */
 
-enum {
-    FOUND = 42,
-};
 #define SUCCESS 0  // no error
 #define INVALID -1 // invalid input
 
@@ -43,6 +40,17 @@ struct tree_t {
 
 /* PRIVATE FUNCTIONS*/
 
+/**
+ * @brief Sets the error code.
+ *
+ * @param err The error code.
+ * @param value The value to set.
+ */
+static void set_err(int *err, int value) {
+    if (err != NULL) {
+        *err = value;
+    }
+}
 /**
  * @brief Search for a node in the tree recursively.
  *
@@ -338,38 +346,36 @@ static void clear_nodes(struct node *node, FREE_F free_func) {
 
 /* PUBLIC FUNCTIONS */
 
-tree_t *tree_new(FREE_F free_func, CMP_F cmp_func) {
+tree_t *tree_new(FREE_F free_func, CMP_F cmp_func, int *err) {
     if (cmp_func == NULL) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     }
-    tree_t *tree = malloc(sizeof(*tree));
+    tree_t *tree = calloc(1, sizeof(*tree));
     if (tree == NULL) {
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
-    tree->iterator = NULL;
-    tree->root = NULL;
-    tree->size = 0;
     tree->free_func = free_func;
     tree->cmp_func = cmp_func;
     return tree;
 }
 
-int tree_is_empty(tree_t *tree) {
-    if (tree == NULL) {
-        errno = EINVAL;
-        return INVALID;
+int tree_query(tree_t *tree, int query, ssize_t *result) {
+    if (tree == NULL || result == NULL) {
+        return EINVAL;
     }
-    return tree->size == 0;
-}
-
-ssize_t tree_size(tree_t *tree) {
-    if (tree == NULL) {
-        errno = EINVAL;
-        return INVALID;
+    switch (query) {
+    case QUERY_SIZE:
+        *result = tree->size;
+        break;
+    case QUERY_IS_EMPTY:
+        *result = tree->size == 0;
+        break;
+    default:
+        return ENOTSUP;
     }
-    return tree->size;
+    return SUCCESS;
 }
 
 int tree_add(tree_t *tree, void *data) {
@@ -385,16 +391,15 @@ int tree_add(tree_t *tree, void *data) {
     return SUCCESS;
 }
 
-void *tree_remove(tree_t *tree, void *data) {
+int tree_remove(tree_t *tree, void *data, void **old) {
     if (tree == NULL) {
-        errno = EINVAL;
-        return NULL;
+        return EINVAL;
     } else if (tree->size == 0) {
-        return NULL;
+        return SUCCESS;
     }
     struct node **to_remove = tree_search(&tree->root, tree->cmp_func, data);
     if (*to_remove == NULL) {
-        return NULL;
+        return SUCCESS;
     }
 
     struct node *to_promote = NULL;
@@ -416,17 +421,19 @@ void *tree_remove(tree_t *tree, void *data) {
     }
 
     void *removed = (*to_remove)->data;
+    if (old != NULL) {
+        *old = removed;
+    }
     free(*to_remove);
 
     *to_remove = to_promote;
     balance_tree(to_remove);
     tree->size--;
-    return removed;
+    return SUCCESS;
 }
 
 ssize_t tree_remove_all(tree_t *tree, void *data) {
     if (tree == NULL) {
-        errno = EINVAL;
         return INVALID;
     } else if (tree->size == 0) {
         return 0;
@@ -436,7 +443,8 @@ ssize_t tree_remove_all(tree_t *tree, void *data) {
     // allowed
     struct node **node = tree_search(&tree->root, tree->cmp_func, data);
     while (*node != NULL) {
-        void *to_remove = tree_remove(tree, data);
+        void *to_remove = NULL;
+        tree_remove(tree, data, &to_remove);
         if (tree->free_func != NULL) {
             tree->free_func(to_remove);
         }
@@ -450,7 +458,6 @@ ssize_t tree_remove_all(tree_t *tree, void *data) {
 
 int tree_contains(tree_t *tree, void *data) {
     if (tree == NULL) {
-        errno = EINVAL;
         return INVALID;
     }
     return *tree_search(&tree->root, tree->cmp_func, data) != NULL;
@@ -458,25 +465,21 @@ int tree_contains(tree_t *tree, void *data) {
 
 void *tree_find_first(tree_t *tree, void *data) {
     if (tree == NULL) {
-        errno = EINVAL;
         return NULL;
     }
     struct node **node = tree_search(&tree->root, tree->cmp_func, data);
-    if (*node == NULL) {
-        return NULL;
-    }
-    return (*node)->data;
+    return *node == NULL ? NULL : (*node)->data;
 }
 
-tree_t *tree_find_all(tree_t *tree, void *data) {
+tree_t *tree_find_all(tree_t *tree, void *data, int *err) {
     if (tree == NULL) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     }
 
-    tree_t *found = tree_new(NULL, tree->cmp_func);
+    tree_t *found = tree_new(NULL, tree->cmp_func, NULL);
     if (found == NULL) {
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
 
@@ -487,16 +490,16 @@ tree_t *tree_find_all(tree_t *tree, void *data) {
     }
 
     // add the first node to the new tree
-    int results = tree_add(found, (*node)->data);
-    if (results != SUCCESS) {
+    int loc_err = tree_add(found, (*node)->data);
+    if (loc_err != SUCCESS) {
         tree_delete(&found);
-        errno = results;
+        set_err(err, loc_err);
         return NULL;
     }
-    results = tree_in_order(tree->root, find_each, found);
-    if (results != SUCCESS) {
+    loc_err = tree_in_order(tree->root, find_each, found);
+    if (loc_err != SUCCESS) {
         tree_delete(&found);
-        errno = results;
+        set_err(err, loc_err);
         return NULL;
     }
     return found;
@@ -504,9 +507,8 @@ tree_t *tree_find_all(tree_t *tree, void *data) {
 
 int tree_foreach(tree_t *tree, ACT_F act_func, void *addl_data) {
     if (tree == NULL || act_func == NULL) {
-        // set errno instead of returning EINVAL to differentiate between
+        // return -1 instead of returning EINVAL to differentiate between
         // tree_foreach() failing and act_func() failing
-        errno = EINVAL;
         return INVALID;
     }
     return tree_in_order(tree->root, act_func, addl_data);
@@ -515,12 +517,13 @@ int tree_foreach(tree_t *tree, ACT_F act_func, void *addl_data) {
 int tree_iterator_reset(tree_t *tree) {
     if (tree == NULL) {
         return EINVAL;
-    } else if (!tree_is_empty(tree)) {
+    } else if (tree->size > 0) {
         // build a new iterator
         queue_destroy(&tree->iterator);
-        tree->iterator = queue_init(tree->size, NULL, tree->cmp_func);
+        int err = SUCCESS;
+        tree->iterator = queue_init(tree->size, NULL, tree->cmp_func, &err);
         if (tree->iterator == NULL) {
-            return ENOMEM;
+            return err;
         }
         int results = tree_in_order(tree->root, build_iter, tree->iterator);
         if (results != SUCCESS) {
@@ -533,12 +536,9 @@ int tree_iterator_reset(tree_t *tree) {
 
 void *tree_iterator_next(tree_t *tree) {
     if (tree == NULL) {
-        errno = EINVAL;
         return NULL;
-    } else if (tree->iterator != NULL) {
-        return queue_dequeue(tree->iterator);
     }
-    return NULL;
+    return tree->iterator == NULL ? NULL : queue_dequeue(tree->iterator);
 }
 
 int tree_clear(tree_t *tree) {

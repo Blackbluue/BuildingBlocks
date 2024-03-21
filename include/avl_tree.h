@@ -1,5 +1,7 @@
 #ifndef AVL_TREE_H
 #define AVL_TREE_H
+
+#include "buildingblocks.h"
 #include <unistd.h>
 
 /* DATA */
@@ -48,36 +50,42 @@ typedef struct tree_t tree_t;
  * data being searched for and to order nodes. The cmp_func is required and
  * cannot be NULL.
  *
- * If memory allocation fails, then the function will return NULL and set errno
- * to ENOMEM. If cmp_func is NULL, then the function will return NULL and set
- * errno to EINVAL.
+ * Errors are stored in the optional *err pointer.
+ * Possible errors:
+ * - ENOMEM: Memory allocation failed.
+ * - EINVAL: The compare function or tree pointers are NULL.
  *
  * @param free_func A user-defined free function.
  * @param cmp_func A user-defined compare function.
- * @return tree_t* A pointer to the new tree.
+ * @param err A pointer to the error code.
+ * @return tree_t* A pointer to the tree or NULL on error.
  */
-tree_t *tree_new(FREE_F free_func, CMP_F cmp_func);
+tree_t *tree_new(FREE_F free_func, CMP_F cmp_func, int *err);
 
 /**
- * @brief Check if the tree is empty.
+ * @brief Query the tree.
  *
- * If tree is NULL, then the function will return -1 and set errno to EINVAL.
+ * The query command is used to get information about the tree. The result
+ * pointer is used to store the result of the query.
+ *
+ * Possible queries:
+ * - QUERY_SIZE: Get the number of nodes in the tree.
+ * - QUERY_IS_EMPTY: Check if the tree is empty.
+ *
+ * Possible results:
+ * - QUERY_SIZE: The number of nodes in the tree.
+ * - QUERY_IS_EMPTY: 0 if the tree is not empty, non-zero if the tree is empty.
+ *
+ * Possible errors:
+ * - EINVAL: The tree or result pointers are NULL.
+ * - ENOTSUP: The query command is invalid.
  *
  * @param tree A pointer to the tree.
- * @return int non-zero if the tree is empty, 0 if the tree is not empty, and -1
- * if the tree is NULL.
+ * @param query The query command.
+ * @param result A pointer to the result of the query.
+ * @return int 0 on success, non-zero on failure.
  */
-int tree_is_empty(tree_t *tree);
-
-/**
- * @brief Get the size of the tree.
- *
- * If tree is NULL, then the function will return -1 and set errno to EINVAL.
- *
- * @param tree A pointer to the tree.
- * @return ssize_t The size of the tree or -1 if the tree is NULL.
- */
-ssize_t tree_size(tree_t *tree);
+int tree_query(tree_t *tree, int query, ssize_t *result);
 
 /**
  * @brief Add a new node to the tree.
@@ -98,35 +106,32 @@ int tree_add(tree_t *tree, void *data);
  * @brief Remove a node from the tree.
  *
  * The data pointer is used to find the node to be removed; the tree's cmp_func
- * will be used in comparison. The data does not need to be the same pointer
- * that was added to the tree, but should be inside the tree according to the
- * cmp_func.
+ * will be used in comparison. If old is not NULL, then it will be used to
+ * store the removed data
  *
- * If tree is NULL, then the function will return NULL and set errno to EINVAL.
+ * Possible errors:
+ * - EINVAL: The tree is NULL.
  *
  * @param tree A pointer to the tree.
  * @param data A pointer to the data to be removed from the tree.
- * @return void* A pointer to the data that was removed from the tree or NULL if
- * the data was not found.
+ * @param old A pointer to the data that was removed from the tree.
+ * @return int 0 on success, non-zero on failure.
  */
-void *tree_remove(tree_t *tree, void *data);
+int tree_remove(tree_t *tree, void *data, void **old);
 
 /**
  * @brief Remove all nodes from the tree.
  *
  * The data pointer is used to find the nodes to be removed; the tree's
- * cmp_func will be used in comparison. The data does not need to be the same
- * pointer that was added to the tree, but should be inside the tree according
- * to the cmp_func. This function will free the data in the tree if the tree was
- * created with a free_func. If the user does not want the memory to be freed,
- * then tree_remove() should be used directly.
+ * cmp_func will be used in comparison. This function will free the data in the
+ * tree if the tree was created with a free_func. If the user does not want the
+ * memory to be freed, then tree_remove() should be used directly.
  *
- * If tree is NULL, then the function will return -1 and set errno to EINVAL.
+ * If tree is NULL, then the function will return -1.
  *
  * @param tree A pointer to the tree.
  * @param data A pointer to the data to be removed from the tree.
- * @return int The number of nodes removed from the tree or -1 if the tree is
- * NULL.
+ * @return int The number of nodes removed from the tree or -1 on error.
  */
 ssize_t tree_remove_all(tree_t *tree, void *data);
 
@@ -134,10 +139,9 @@ ssize_t tree_remove_all(tree_t *tree, void *data);
  * @brief Check if the tree contains a node with the given data.
  *
  * The data pointer is used to find the node; the tree's cmp_func will be used
- * in comparison. The data does not need to be the same pointer that was added
- * to the tree, but should be inside the tree according to the cmp_func.
+ * in comparison.
  *
- * If tree is NULL, then the function will return -1 and set errno to EINVAL.
+ * If tree is NULL, then the function will return -1.
  *
  * @param tree A pointer to the tree.
  * @param data A pointer to the data to be searched for in the tree.
@@ -150,15 +154,14 @@ int tree_contains(tree_t *tree, void *data);
  * @brief Find the first occurrence of a node with the given data.
  *
  * The data pointer is used to find the node; the tree's cmp_func will be used
- * in comparison. The data does not need to be the same pointer that was added
- * to the tree, but should be inside the tree according to the cmp_func.
+ * in comparison.
  *
- * If tree is NULL, then the function will return NULL and set errno to EINVAL.
+ * If tree is NULL, then the function will return NULL. Note that the function
+ * may also return NULL if the data is not found.
  *
  * @param tree A pointer to the tree.
  * @param data A pointer to the data to be searched for in the tree.
- * @return void* A pointer to the data found in the tree or NULL if the data was
- * not found or the tree is NULL.
+ * @return void* A pointer to the data found in the tree or NULL.
  */
 void *tree_find_first(tree_t *tree, void *data);
 
@@ -166,29 +169,28 @@ void *tree_find_first(tree_t *tree, void *data);
  * @brief Find all occurrences of nodes with the given data.
  *
  * The data pointer is used to find the nodes; the tree's cmp_func will be used
- * in comparison. The data does not need to be the same pointer that was added
- * to the tree, but should be inside the tree according to the cmp_func. If
- * no nodes are found, then the function will return an empty tree.
+ * in comparison. If no nodes are found, then the function will return an empty
+ * tree.
  *
  * The returned tree must be freed by the user by calling tree_delete(). The
  * tree will not free the data in the nodes when the tree is deleted or cleared.
  * The data in this tree is shared with the original tree; modifying one will
  * affect the other.
  *
- * If tree is NULL, then the function will return NULL and set errno to EINVAL.
- * If memory allocation fails, then the function will return NULL and set errno
- * to ENOMEM.
+ * Errors are stored in the optional *err pointer.
+ * Possible errors:
+ * - EINVAL: The tree or found return pointers are NULL.
+ * - ENOMEM: Memory allocation failed.
  *
  * @param tree A pointer to the tree.
  * @param data A pointer to the data to be searched for in the tree.
- * @return tree_t* A pointer to the tree containing the data found in the tree
- * or NULL if the tree is NULL.
+ * @param err A pointer to the error code.
+ * @return tree_t* A pointer to the new tree or NULL on error.
  */
-tree_t *tree_find_all(tree_t *tree, void *data);
+tree_t *tree_find_all(tree_t *tree, void *data, int *err);
 
 /**
- * @brief Perform a user-defined action on the data contained in all of the
- *        nodes in the tree.
+ * @brief Perform an action on all the data in the tree.
  *
  * The act_func is called on each node in the tree. The node data is
  * passed into the act_func as a void pointer. The addl_data pointer can
@@ -197,7 +199,7 @@ tree_t *tree_find_all(tree_t *tree, void *data);
  * act_func returns non-zero, then the foreach_call will stop and return
  * the status code.
  *
- * If tree is NULL, then the function will return -1 and set errno to EINVAL.
+ * If tree is NULL, then the function will return -1.
  *
  * @param tree A pointer to the tree.
  * @param act_func A pointer to the user-defined action function.
@@ -231,11 +233,10 @@ int tree_iterator_reset(tree_t *tree);
  * This function has undefined behavior if the tree is modified between calls
  * to tree_iterator_reset() and tree_iterator_next().
  *
- * If tree is NULL, then the function will return NULL and set errno to EINVAL.
+ * If tree is NULL, then the function will return NULL.
  *
  * @param tree A pointer to the tree.
- * @return void* A pointer to the data in the next node in the tree or NULL if
- * the end of the tree is reached or the tree is NULL.
+ * @return void* A pointer to the data in the next node in the tree or NULL.
  */
 void *tree_iterator_next(tree_t *tree);
 

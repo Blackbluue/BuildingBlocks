@@ -30,12 +30,16 @@ typedef struct queue_c_t queue_c_t;
  *
  * A capacity of 0 will create a queue with unlimited capacity.
  *
+ * Possible error values:
+ * - ENOMEM: malloc failed to allocate memory
+ *
  * @param capacity max number of nodes the queue will hold
  * @param customfree pointer to user defined free function
  * @note if the user passes in NULL, the queue will not free the data
+ * @param err pointer to error code
  * @returns pointer to allocated queue on success or NULL on failure
  */
-queue_c_t *queue_c_init(size_t capacity, FREE_F customfree);
+queue_c_t *queue_c_init(size_t capacity, FREE_F customfree, int *err);
 
 /**
  * @brief Check if queue is full.
@@ -362,18 +366,20 @@ int queue_c_enqueue(queue_c_t *queue, void *data);
  * threads waiting for the queue to not be full, and potentially the variable
  * for empty.
  *
- * If queue is NULL, NULL is returned and errno is set to EINVAL. If the queue
- * is destroyed while this function is waiting to lock, EINTR will be returned.
+ * Possible error values:
+ * - EINVAL: queue is NULL
+ * - EINTR: queue is destroyed while waiting to lock
  *
  * @param queue pointer to queue pointer to pop the node off of
+ * @param err pointer to error code
  * @return the 0 on success, NULL on failure
  */
-void *queue_c_dequeue(queue_c_t *queue);
+void *queue_c_dequeue(queue_c_t *queue, int *err);
 
 /**
  * @brief Get the data from the node at the front of the queue without popping.
  *
- * If queue is NULL, errno is set to EINVAL  and NULL is returned.
+ * If queue is NULL, NULL is returned.
  *
  * @param queue pointer to queue pointer to peek
  * @return the pointer to the head on success, NULL on error
@@ -407,11 +413,13 @@ int queue_c_clear(queue_c_t *queue);
  * this function will proceed with destroying the queue. It will then signal
  * other threads about the destruction.
  *
- * If queue is NULL, EINVAL is returned. If the queue is destroyed while this
- * function is waiting to lock, EINTR will be returned.
+ * Possible error values:
+ * - EINVAL: queue is NULL or destroyed before this function is called
+ * - EINTR: queue is destroyed while waiting to lock
  *
  * @param queue_c_addr pointer to address of queue to be destroyed
- * @return the 0 on success, EINVAL if queue is NULL
+ * @return the 0 on success, non-zero on error
  */
 int queue_c_destroy(queue_c_t **queue_addr);
+
 #endif /* QUEUE_CONCURRENT_H */
