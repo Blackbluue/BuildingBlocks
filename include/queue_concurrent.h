@@ -373,7 +373,7 @@ void *queue_c_dequeue(queue_c_t *queue);
 /**
  * @brief Get the data from the node at the front of the queue without popping.
  *
- * If queue is NULL, errno is set to EINVAL  and NULL is returned.
+ * If queue is NULL, NULL is returned.
  *
  * @param queue pointer to queue pointer to peek
  * @return the pointer to the head on success, NULL on error
@@ -407,11 +407,13 @@ int queue_c_clear(queue_c_t *queue);
  * this function will proceed with destroying the queue. It will then signal
  * other threads about the destruction.
  *
- * If queue is NULL, EINVAL is returned. If the queue is destroyed while this
- * function is waiting to lock, EINTR will be returned.
+ * Possible errno values:
+ * - EINVAL: queue is NULL or destroyed before this function is called
+ * - EINTR: queue is destroyed while waiting to lock
  *
  * @param queue_c_addr pointer to address of queue to be destroyed
- * @return the 0 on success, EINVAL if queue is NULL
+ * @return the 0 on success, non-zero on error
  */
 int queue_c_destroy(queue_c_t **queue_addr);
+
 #endif /* QUEUE_CONCURRENT_H */

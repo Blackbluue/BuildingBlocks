@@ -382,7 +382,6 @@ queue_c_t *queue_c_init(size_t capacity, FREE_F customfree) {
 
 int queue_c_is_full(queue_c_t *queue) {
     if (queue == NULL || queue->is_destroying) {
-        errno = EINVAL;
         return INVALID;
     } else if (queue_capacity(queue->queue) == QUEUE_UNLIMITED) {
         return 0;
@@ -430,7 +429,6 @@ int queue_c_timed_wait_for_not_full(queue_c_t *queue, time_t timeout) {
 
 int queue_c_is_empty(queue_c_t *queue) {
     if (queue == NULL || queue->is_destroying) {
-        errno = EINVAL;
         return INVALID;
     }
     return queue_is_empty(queue->queue);
@@ -512,7 +510,6 @@ int queue_c_unlock(queue_c_t *queue) {
 
 ssize_t queue_c_capacity(queue_c_t *queue) {
     if (queue == NULL || queue->is_destroying) {
-        errno = EINVAL;
         return INVALID;
     }
     return queue_capacity(queue->queue);
@@ -520,7 +517,6 @@ ssize_t queue_c_capacity(queue_c_t *queue) {
 
 ssize_t queue_c_size(queue_c_t *queue) {
     if (queue == NULL || queue->is_destroying) {
-        errno = EINVAL;
         return INVALID;
     }
     return queue_size(queue->queue);
@@ -586,7 +582,6 @@ void *queue_c_dequeue(queue_c_t *queue) {
 
 void *queue_c_peek(queue_c_t *queue) {
     if (queue == NULL || queue->is_destroying) {
-        errno = EINVAL;
         return NULL;
     }
     return queue_peek(queue->queue);
@@ -614,8 +609,7 @@ int queue_c_clear(queue_c_t *queue) {
 int queue_c_destroy(queue_c_t **queue_addr) {
     if (queue_addr == NULL || *queue_addr == NULL ||
         (*queue_addr)->is_destroying) {
-        errno = EINVAL;
-        return INVALID;
+        return EINVAL;
     }
     // deadlock error can be ignored, it was caused by one of the lock functions
     // check if destruction was called while waiting for lock
