@@ -1,5 +1,6 @@
 #ifndef WEIGHTED_GRAPH_H
 #define WEIGHTED_GRAPH_H
+
 #include "linked_list.h"
 #include <unistd.h>
 
@@ -59,12 +60,10 @@ weighted_graph_t *graph_create(CMP_F cmp, FREE_F free_f);
 /**
  * @brief Return the number of nodes in the graph.
  *
- * If graph is NULL, then the function will return -1 and set errno. Possible
- * error codes are:
- * - EINVAL: graph is NULL
+ * If graph is NULL, then the function will return -1
  *
  * @param graph pointer to a weighted graph
- * @return The number of nodes in the graph, or non-zero on error.
+ * @return The number of nodes in the graph, or -1 on error.
  */
 ssize_t graph_size(const weighted_graph_t *graph);
 
@@ -166,9 +165,7 @@ list_t *graph_find_path(weighted_graph_t *graph, const void *start,
 /**
  * @brief Check if the graph contains a node.
  *
- * If an error occurs, then the function will return -1 and errno is set.
- * Possible error codes are:
- * - EINVAL: graph or data are NULL
+ * If graph or data are NULL, then the function will return -1
  *
  * @param graph pointer to a weighted graph
  * @param data pointer to data to be searched for in the graph

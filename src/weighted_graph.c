@@ -37,6 +37,7 @@ struct weighted_graph_t {
     hash_table_t *distance_from_origin;
     struct queue_p_node_t *curr_item;
 };
+
 /* PRIVATE FUNCTIONS */
 
 /**
@@ -222,11 +223,7 @@ weighted_graph_t *graph_create(CMP_F cmp, FREE_F free_f) {
 }
 
 ssize_t graph_size(const weighted_graph_t *graph) {
-    if (graph == NULL) {
-        errno = EINVAL;
-        return FAILURE;
-    }
-    return list_size(graph->nodes);
+    return graph == NULL ? FAILURE : list_size(graph->nodes);
 }
 
 int graph_add_node(weighted_graph_t *graph, void *data) {
@@ -397,7 +394,6 @@ list_t *graph_find_path(weighted_graph_t *graph, const void *start,
 
 int graph_contains(const weighted_graph_t *graph, const void *data) {
     if (graph == NULL || data == NULL) {
-        errno = EINVAL;
         return FAILURE;
     }
     return list_find_first(graph->nodes, data, NULL) == NULL;
@@ -420,9 +416,10 @@ int graph_add_edge(weighted_graph_t *graph, void *src, void *dst,
 
     // check if the edge already exists, if so, update the weight
     if (from->edges == NULL) {
-        from->edges = list_new(free, edge_cmp, NULL);
+        int err;
+        from->edges = list_new(free, edge_cmp, &err);
         if (from->edges == NULL) {
-            return ENOMEM;
+            return err;
         }
     } else {
         struct edge *checker = list_find_first(from->edges, to, NULL);
@@ -437,9 +434,7 @@ int graph_add_edge(weighted_graph_t *graph, void *src, void *dst,
     if (new == NULL) {
         return ENOMEM;
     }
-    list_push_tail(from->edges, new);
-
-    return SUCCESS;
+    return list_push_tail(from->edges, new);
 }
 
 double graph_get_edge_weight(const weighted_graph_t *graph, const void *src,
