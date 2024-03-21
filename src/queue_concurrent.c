@@ -562,16 +562,16 @@ int queue_c_enqueue(queue_c_t *queue, void *data) {
     return SUCCESS;
 }
 
-void *queue_c_dequeue(queue_c_t *queue) {
+void *queue_c_dequeue(queue_c_t *queue, int *err) {
     if (queue == NULL || queue->is_destroying) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     }
 
     // deadlock error can be ignored, it was caused by one of the lock functions
     // check if destruction was called while waiting for lock
     if (lock_queue(queue) == EINTR) {
-        errno = EINTR;
+        set_err(err, EINTR);
         return NULL;
     } else if (queue_c_is_empty(queue)) {
         unlock_queue(queue);

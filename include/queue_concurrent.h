@@ -366,13 +366,15 @@ int queue_c_enqueue(queue_c_t *queue, void *data);
  * threads waiting for the queue to not be full, and potentially the variable
  * for empty.
  *
- * If queue is NULL, NULL is returned and errno is set to EINVAL. If the queue
- * is destroyed while this function is waiting to lock, EINTR will be returned.
+ * Possible errno values:
+ * - EINVAL: queue is NULL
+ * - EINTR: queue is destroyed while waiting to lock
  *
  * @param queue pointer to queue pointer to pop the node off of
+ * @param err pointer to error code
  * @return the 0 on success, NULL on failure
  */
-void *queue_c_dequeue(queue_c_t *queue);
+void *queue_c_dequeue(queue_c_t *queue, int *err);
 
 /**
  * @brief Get the data from the node at the front of the queue without popping.
