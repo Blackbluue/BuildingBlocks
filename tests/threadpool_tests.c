@@ -129,7 +129,7 @@ threadpool_t *setup_test(threadpool_attr_t **attr) {
                               SUCCESS);
     }
     fprintf(stderr, "\tsetup_test\n");
-    threadpool_t *pool = threadpool_create(*attr);
+    threadpool_t *pool = threadpool_create(*attr, NULL);
     CU_ASSERT_PTR_NOT_NULL_FATAL(pool);
     fprintf(stderr, "\tsetup_test done\n");
     return pool;

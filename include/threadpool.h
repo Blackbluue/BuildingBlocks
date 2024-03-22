@@ -56,14 +56,15 @@ enum {
  * The threadpool will be created with the given attributes. If attr is NULL,
  * the default attributes will be used.
  *
- * If an error occurs while allocating memory for the threadpool, NULL
- * will be returned and errno will be set to ENOMEM
+ * Possible error codes:
+ * ENOMEM - memory allocation failed
+ * EAGAIN - thread creation failed
  *
  * @param attr The threadpool attribute object.
- * @return threadpool_t* A pointer to the new threadpool.
- * @see DEFAULT_THREADS
+ * @param err Where to store the error code.
+ * @return threadpool_t* A pointer to the new threadpool, or NULL on failure.
  */
-threadpool_t *threadpool_create(threadpool_attr_t *attr);
+threadpool_t *threadpool_create(threadpool_attr_t *attr, int *err);
 
 /**
  * @brief Add a new task to the threadpool.

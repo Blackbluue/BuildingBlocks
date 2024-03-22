@@ -42,6 +42,18 @@ struct threadpool_t {
 /* PRIVATE FUNCTIONS */
 
 /**
+ * @brief Sets the error code.
+ *
+ * @param err The error code.
+ * @param value The value to set.
+ */
+static void set_err(int *err, int value) {
+    if (err != NULL) {
+        *err = value;
+    }
+}
+
+/**
  * @brief Check if a flag is set.
  *
  * @param flags The flag to check.
@@ -81,17 +93,19 @@ static void default_attr(threadpool_attr_t *attr) {
  * @brief Initialize the threadpool object.
  *
  * If attr is NULL, the threadpool will be created with the default attributes.
- * Otherwise, the threadpool will be created with the given attributes. If an
- * error occurs while allocating memory for the threadpool, NULL will be
- * returned.
+ * Otherwise, the threadpool will be created with the given attributes.
  *
+ * Possible errors:
+ * - ENOMEM: memory allocation failed
  *
  * @param attr pointer to threadpool_attr_t
- * @return threadpool_t* pointer to threadpool_t
+ * @param err pointer to error code
+ * @return threadpool_t* pointer to threadpool_t, NULL if error
  */
-static threadpool_t *init_pool(threadpool_attr_t *attr) {
+static threadpool_t *init_pool(threadpool_attr_t *attr, int *err) {
     threadpool_t *pool = malloc(sizeof(*pool));
     if (pool == NULL) {
+        set_err(err, ENOMEM);
         return NULL;
     }
 
@@ -127,7 +141,7 @@ static threadpool_t *init_pool(threadpool_attr_t *attr) {
     return pool;
 err:
     free_pool(pool);
-    errno = ENOMEM;
+    set_err(err, ENOMEM);
     return NULL;
 }
 
@@ -200,10 +214,9 @@ static void *thread_task(void *arg) {
 
 /* PUBLIC FUNCTIONS */
 
-threadpool_t *threadpool_create(threadpool_attr_t *attr) {
-    threadpool_t *pool = init_pool(attr);
+threadpool_t *threadpool_create(threadpool_attr_t *attr, int *err) {
+    threadpool_t *pool = init_pool(attr, err);
     if (pool == NULL) {
-        errno = ENOMEM;
         return NULL;
     }
 
@@ -214,7 +227,7 @@ threadpool_t *threadpool_create(threadpool_attr_t *attr) {
         int res = pthread_create(&pool->threads[i], NULL, thread_task, pool);
         if (res != SUCCESS) {
             threadpool_destroy(pool, SHUTDOWN_GRACEFUL);
-            errno = res;
+            set_err(err, res);
             return NULL;
         }
         pool->num_threads++;
