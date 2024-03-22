@@ -6,9 +6,8 @@
 
 /* DATA */
 
-enum {
-    SUCCESS = 0,
-};
+#define SUCCESS 0
+
 enum attr_flags {
     DEFAULT_FLAGS = 0,     // no flags
     CANCEL_TYPE = 1 << 0,  // true = asynchronous, false = deferred
@@ -123,7 +122,7 @@ static threadpool_t *init_pool(threadpool_attr_t *attr, int *err) {
     // initialize mutexes and condition variables
     pthread_rwlock_init(&pool->running_lock, NULL);
     pool->num_threads = 0;
-    pool->shutdown = 0;
+    pool->shutdown = NO_SHUTDOWN;
     pool->cancel_type = check_flag(pool->attr.flags, CANCEL_TYPE)
                             ? PTHREAD_CANCEL_ASYNCHRONOUS
                             : PTHREAD_CANCEL_DEFERRED;
@@ -186,7 +185,7 @@ static void *thread_task(void *arg) {
     pthread_setcanceltype(pool->cancel_type, &old_type);
     for (;;) {
         // wait for work queue to be not empty
-        while (queue_c_is_empty(pool->queue) && pool->shutdown == 0) {
+        while (queue_c_is_empty(pool->queue) && pool->shutdown == NO_SHUTDOWN) {
             queue_c_wait_for_not_empty(pool->queue);
         }
 

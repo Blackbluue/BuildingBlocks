@@ -5,15 +5,30 @@
 
 /* DATA */
 
-enum defaults_limits {
-    DEFAULT_THREADS = 4, // default number of threads
-    MAX_THREADS = 64,    // maximum number of threads
-    DEFAULT_QUEUE = 16,  // default queue size
-    DEFAULT_WAIT = 10,   // default wait time for blocking calls (in seconds)
-};
+#define DEFAULT_THREADS 4 // default number of threads
+#define MAX_THREADS 64    // maximum number of threads
+#define DEFAULT_QUEUE 16  // default queue size
+#define DEFAULT_WAIT 10   // default wait time for blocking calls (in seconds)
+
 enum shutdown_flags {
-    SHUTDOWN_GRACEFUL = 1, // wait for all tasks to finish and queue to empty
-    SHUTDOWN_FORCEFUL = 2, // cancel all threads immediately
+    NO_SHUTDOWN,       // do not shutdown the threadpool
+    SHUTDOWN_GRACEFUL, // wait for all tasks to finish and queue to empty
+    SHUTDOWN_FORCEFUL, // cancel all threads immediately
+};
+
+/* attribute flags */
+
+enum cancel_type_flags {
+    CANCEL_DEFERRED, // cancel threads at cancellation points
+    CANCEL_ASYNC,    // allow asynchronous cancellation
+};
+enum wait_type_flags {
+    TIMED_WAIT_DISABLED, // wait indefinitely when blocking
+    TIMED_WAIT_ENABLED,  // use timeout when blocking
+};
+enum block_on_add_flags {
+    BLOCK_ON_ADD_DISABLED, // do not block when adding to full queue
+    BLOCK_ON_ADD_ENABLED,  // block when adding to full queue
 };
 
 /**
@@ -32,21 +47,6 @@ typedef void (*ROUTINE)(void *arg, void *arg2);
 typedef struct threadpool_attr_t threadpool_attr_t;
 
 typedef struct threadpool_t threadpool_t;
-
-/* attribute flags */
-
-enum {
-    CANCEL_DEFERRED, // cancel threads at cancellation points
-    CANCEL_ASYNC,    // allow asynchronous cancellation
-};
-enum {
-    TIMED_WAIT_DISABLED, // wait indefinitely when blocking
-    TIMED_WAIT_ENABLED,  // use timeout when blocking
-};
-enum {
-    BLOCK_ON_ADD_DISABLED, // do not block when adding to full queue
-    BLOCK_ON_ADD_ENABLED,  // block when adding to full queue
-};
 
 /* FUNCTIONS */
 
