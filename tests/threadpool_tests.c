@@ -179,7 +179,7 @@ int start_tasks(threadpool_t *pool, int *done) {
         case SUCCESS:
             tasks++;
             break;
-        case EAGAIN:
+        // case EAGAIN:
         case ETIMEDOUT:
             // adding work failed in an expected way
             break;

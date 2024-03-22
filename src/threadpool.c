@@ -1,4 +1,5 @@
 #include "threadpool.h"
+#include "debug.h"
 #include "queue_concurrent.h"
 #include <errno.h>
 #include <pthread.h>
@@ -70,10 +71,12 @@ static inline int check_flag(int flags, int to_check) {
  * @param pool pointer to threadpool_t
  */
 static void free_pool(threadpool_t *pool) {
+    DEBUG_PRINT("\tFreeing threadpool\n");
     free(pool->threads);
     pthread_rwlock_destroy(&pool->running_lock);
     queue_c_destroy(&pool->queue);
     free(pool);
+    DEBUG_PRINT("\tThreadpool freed\n");
 }
 
 /**
@@ -82,10 +85,12 @@ static void free_pool(threadpool_t *pool) {
  * @param attr pointer to threadpool_attr_t
  */
 static void default_attr(threadpool_attr_t *attr) {
+    DEBUG_PRINT("\tSetting default attributes\n");
     attr->flags = DEFAULT_FLAGS;
     attr->max_threads = DEFAULT_THREADS;
     attr->max_q_size = DEFAULT_QUEUE;
     attr->default_wait = DEFAULT_WAIT;
+    DEBUG_PRINT("\tDefault attributes set\n");
 }
 
 /**
@@ -105,6 +110,7 @@ static threadpool_t *init_pool(threadpool_attr_t *attr, int *err) {
     threadpool_t *pool = malloc(sizeof(*pool));
     if (pool == NULL) {
         set_err(err, ENOMEM);
+        DEBUG_PRINT("\tFailed to allocate memory for threadpool\n");
         return NULL;
     }
 
@@ -113,6 +119,7 @@ static threadpool_t *init_pool(threadpool_attr_t *attr, int *err) {
     if (attr == NULL) {
         default_attr(&pool->attr);
     } else {
+        DEBUG_PRINT("\tUsing supplied attributes\n");
         pool->attr.flags = attr->flags;
         pool->attr.max_threads = attr->max_threads;
         pool->attr.max_q_size = attr->max_q_size;
@@ -130,13 +137,16 @@ static threadpool_t *init_pool(threadpool_attr_t *attr, int *err) {
     // initialize queue/threads
     pool->queue = queue_c_init(pool->attr.max_q_size, free, NULL);
     if (pool->queue == NULL) {
+        DEBUG_PRINT("\tFailed to initialize queue\n");
         goto err;
     }
     pool->threads = malloc(sizeof(*pool->threads) * pool->attr.max_threads);
     if (pool->threads == NULL) {
+        DEBUG_PRINT("\tFailed to allocate memory for threads\n");
         goto err;
     }
 
+    DEBUG_PRINT("\tThreadpool initialized\n");
     return pool;
 err:
     free_pool(pool);
@@ -157,6 +167,7 @@ int add_task(threadpool_t *pool, ROUTINE action, void *arg, void *arg2) {
     struct task_t *task = malloc(sizeof(*task));
     if (task == NULL) {
         queue_c_unlock(pool->queue);
+        DEBUG_PRINT("\tFailed to allocate memory for task\n");
         return ENOMEM;
     }
     task->action = action;
@@ -166,9 +177,11 @@ int add_task(threadpool_t *pool, ROUTINE action, void *arg, void *arg2) {
     if (res != SUCCESS) {
         queue_c_unlock(pool->queue);
         free(task);
+        DEBUG_PRINT("\tFailed to enqueue task\n");
         return res;
     }
     queue_c_unlock(pool->queue);
+    DEBUG_PRINT("\tTask added to queue\n");
     return SUCCESS;
 }
 
@@ -179,11 +192,14 @@ int add_task(threadpool_t *pool, ROUTINE action, void *arg, void *arg2) {
  * @return void* NULL
  */
 static void *thread_task(void *arg) {
+    DEBUG_PRINT("Thread task\n");
     threadpool_t *pool = arg;
     int old_type;
     // determine if the thread can be force cancelled
     pthread_setcanceltype(pool->cancel_type, &old_type);
+    DEBUG_PRINT("\tThread type set to %d\n", pool->cancel_type);
     for (;;) {
+        DEBUG_PRINT("\t..Waiting for work\n");
         // wait for work queue to be not empty
         while (queue_c_is_empty(pool->queue) && pool->shutdown == NO_SHUTDOWN) {
             queue_c_wait_for_not_empty(pool->queue);
@@ -194,9 +210,11 @@ static void *thread_task(void *arg) {
             (pool->shutdown == SHUTDOWN_GRACEFUL &&
              queue_c_is_empty(pool->queue))) {
             queue_c_unlock(pool->queue);
+            DEBUG_PRINT("\tThread shutting down\n");
             return NULL;
         }
 
+        DEBUG_PRINT("\t..Performing work\n");
         // perform work
         struct task_t *task = queue_c_dequeue(pool->queue, NULL);
         queue_c_unlock(pool->queue);
@@ -207,6 +225,7 @@ static void *thread_task(void *arg) {
         pthread_rwlock_rdlock(&pool->running_lock);
         action(action_arg, action_arg2);
         pthread_rwlock_unlock(&pool->running_lock);
+        DEBUG_PRINT("\tWork complete\n");
     }
     return NULL;
 }
@@ -214,6 +233,7 @@ static void *thread_task(void *arg) {
 /* PUBLIC FUNCTIONS */
 
 threadpool_t *threadpool_create(threadpool_attr_t *attr, int *err) {
+    DEBUG_PRINT("Creating threadpool\n");
     threadpool_t *pool = init_pool(attr, err);
     if (pool == NULL) {
         return NULL;
@@ -223,21 +243,27 @@ threadpool_t *threadpool_create(threadpool_attr_t *attr, int *err) {
     // TODO: add flag to allow threadpool creation to succeed if some threads
     // fail to start
     for (size_t i = 0; i < pool->attr.max_threads; i++) {
+        DEBUG_PRINT("\tCreating thread %zu\n", i);
         int res = pthread_create(&pool->threads[i], NULL, thread_task, pool);
         if (res != SUCCESS) {
             threadpool_destroy(pool, SHUTDOWN_GRACEFUL);
             set_err(err, res);
+            DEBUG_PRINT("\tFailed to create thread %zu\n", i);
             return NULL;
         }
+        DEBUG_PRINT("\tCreated thread %zu with id: %zu\n", i, pool->threads[i]);
         pool->num_threads++;
     }
 
+    DEBUG_PRINT("\tThreadpool created\n");
     return pool;
 }
 
 int threadpool_add_work(threadpool_t *pool, ROUTINE action, void *arg,
                         void *arg2) {
+    DEBUG_PRINT("Adding work to threadpool\n");
     if (pool == NULL || action == NULL) {
+        DEBUG_PRINT("\tInvalid arguments\n");
         return EINVAL;
     }
 
@@ -247,6 +273,7 @@ int threadpool_add_work(threadpool_t *pool, ROUTINE action, void *arg,
         return threadpool_timed_add_work(pool, action, arg, arg2,
                                          pool->attr.default_wait);
     } else if (check_flag(pool->attr.flags, BLOCK_ON_ADD)) {
+        DEBUG_PRINT("\t...Blocking on add\n");
         while (queue_c_is_full(pool->queue)) {
             queue_c_wait_for_not_full(pool->queue);
         }
@@ -254,37 +281,47 @@ int threadpool_add_work(threadpool_t *pool, ROUTINE action, void *arg,
         queue_c_lock(pool->queue);
         if (queue_c_is_full(pool->queue)) {
             queue_c_unlock(pool->queue);
+            DEBUG_PRINT("\tQueue is full\n");
             return EAGAIN;
         }
     }
 
+    DEBUG_PRINT("\tAdding task to queue\n");
     return add_task(pool, action, arg, arg2);
 }
 
 int threadpool_timed_add_work(threadpool_t *pool, ROUTINE action, void *arg,
                               void *arg2, time_t timeout) {
+    DEBUG_PRINT("Adding work to threadpool with timeout\n");
     if (pool == NULL || action == NULL || timeout <= 0) {
+        DEBUG_PRINT("\tInvalid arguments\n");
         return EINVAL;
     }
 
+    DEBUG_PRINT("\t...Blocking on add with timeout\n");
     while (queue_c_is_full(pool->queue)) {
         if (queue_c_timed_wait_for_not_full(pool->queue, timeout) ==
             ETIMEDOUT) {
+            DEBUG_PRINT("\tTimed out\n");
             return ETIMEDOUT;
         }
     }
 
+    DEBUG_PRINT("\tAdding task to queue\n");
     return add_task(pool, action, arg, arg2);
 }
 
 int threadpool_wait(threadpool_t *pool) {
+    DEBUG_PRINT("Waiting for threadpool\n");
     if (pool == NULL) {
+        DEBUG_PRINT("\tInvalid arguments\n");
         return EINVAL;
     }
     if (check_flag(pool->attr.flags, TIMED_WAIT)) {
         return threadpool_timed_wait(pool, pool->attr.default_wait);
     }
 
+    DEBUG_PRINT("\t...Waiting for queue to be empty\n");
     while (!queue_c_is_empty(pool->queue)) {
         queue_c_wait_for_empty(pool->queue);
     }
@@ -295,18 +332,23 @@ int threadpool_wait(threadpool_t *pool) {
     // all threads are idle
     pthread_rwlock_unlock(&pool->running_lock);
     queue_c_unlock(pool->queue);
+    DEBUG_PRINT("\tAll tasks complete\n");
     return SUCCESS;
 }
 
 int threadpool_timed_wait(threadpool_t *pool, time_t timeout) {
+    DEBUG_PRINT("Waiting for threadpool with timeout\n");
     if (pool == NULL || timeout <= 0) {
+        DEBUG_PRINT("\tInvalid arguments\n");
         return EINVAL;
     }
 
     struct timespec abstime = {time(NULL) + timeout, 0};
 
+    DEBUG_PRINT("\t...Waiting for queue to be empty with timeout\n");
     while (!queue_c_is_empty(pool->queue)) {
         if (queue_c_timed_wait_for_empty(pool->queue, timeout) == ETIMEDOUT) {
+            DEBUG_PRINT("\tTimed out\n");
             return ETIMEDOUT;
         }
     }
@@ -315,18 +357,22 @@ int threadpool_timed_wait(threadpool_t *pool, time_t timeout) {
     int res = pthread_rwlock_timedwrlock(&pool->running_lock, &abstime);
     if (res == ETIMEDOUT) {
         queue_c_unlock(pool->queue);
+        DEBUG_PRINT("\tTimed out\n");
         return ETIMEDOUT;
     }
 
     // all threads are idle
     pthread_rwlock_unlock(&pool->running_lock);
     queue_c_unlock(pool->queue);
+    DEBUG_PRINT("\tAll tasks complete\n");
     return SUCCESS;
 }
 
 int threadpool_destroy(threadpool_t *pool, int flag) {
+    DEBUG_PRINT("Destroying threadpool\n");
     if (pool == NULL ||
         (flag != SHUTDOWN_GRACEFUL && flag != SHUTDOWN_FORCEFUL)) {
+        DEBUG_PRINT("\tInvalid arguments\n");
         return EINVAL;
     }
     if (flag == SHUTDOWN_GRACEFUL) {
@@ -334,161 +380,213 @@ int threadpool_destroy(threadpool_t *pool, int flag) {
     }
     // wake up all threads
     pool->shutdown = flag;
+    DEBUG_PRINT("\tWaking threads\n");
     queue_c_cancel_wait(pool->queue);
     for (size_t i = 0; i < pool->num_threads; i++) {
         if (flag == SHUTDOWN_FORCEFUL) {
             // will be ignored if thread is already cancelled
+            DEBUG_PRINT("\tCancelling thread %zu\n", i);
             pthread_cancel(pool->threads[i]);
         }
+        DEBUG_PRINT("\tJoining thread %zu\n", i);
         pthread_join(pool->threads[i], NULL);
     }
     free_pool(pool);
+    DEBUG_PRINT("\tThreadpool destroyed\n");
     return SUCCESS;
 }
 
 threadpool_attr_t *threadpool_attr_init(void) {
+    DEBUG_PRINT("Initializing threadpool attributes\n");
     threadpool_attr_t *attr = malloc(sizeof(*attr));
     if (attr == NULL) {
+        DEBUG_PRINT("\tFailed to allocate memory for attributes\n");
         errno = ENOMEM;
         return NULL;
     }
     default_attr(attr);
+    DEBUG_PRINT("\tAttributes initialized\n");
     return attr;
 }
 
 int threadpool_attr_destroy(threadpool_attr_t *attr) {
+    DEBUG_PRINT("Destroying threadpool attributes\n");
     if (attr == NULL) {
+        DEBUG_PRINT("\tInvalid arguments\n");
         return EINVAL;
     }
     free(attr);
+    DEBUG_PRINT("\tAttributes destroyed\n");
     return SUCCESS;
 }
 
 int threadpool_attr_set_cancel_type(threadpool_attr_t *attr, int cancel_type) {
+    DEBUG_PRINT("Setting cancel type\n");
     if (attr == NULL) {
+        DEBUG_PRINT("\tInvalid arguments\n");
         return EINVAL;
     }
     switch (cancel_type) {
     case CANCEL_ASYNC:
         attr->flags |= CANCEL_TYPE;
+        DEBUG_PRINT("\tCancel type set to asynchronous\n");
         return SUCCESS;
     case CANCEL_DEFERRED:
         attr->flags &= ~CANCEL_TYPE;
+        DEBUG_PRINT("\tCancel type set to deferred\n");
         return SUCCESS;
     default:
+        DEBUG_PRINT("\tInvalid cancel type\n");
         return EINVAL;
     }
 }
 
 int threadpool_attr_get_cancel_type(threadpool_attr_t *attr, int *cancel_type) {
+    DEBUG_PRINT("Getting cancel type\n");
     if (attr == NULL || cancel_type == NULL) {
+        DEBUG_PRINT("\tInvalid arguments\n");
         return EINVAL;
     }
     *cancel_type =
         check_flag(attr->flags, CANCEL_TYPE) ? CANCEL_ASYNC : CANCEL_DEFERRED;
+    DEBUG_PRINT("\tCancel type: %d\n", *cancel_type);
     return SUCCESS;
 }
 
 int threadpool_attr_set_timed_wait(threadpool_attr_t *attr, int timed_wait) {
+    DEBUG_PRINT("Setting timed wait\n");
     if (attr == NULL) {
+        DEBUG_PRINT("\tInvalid arguments\n");
         return EINVAL;
     }
     switch (timed_wait) {
     case TIMED_WAIT_ENABLED:
         attr->flags |= TIMED_WAIT;
+        DEBUG_PRINT("\tTimed wait enabled\n");
         return SUCCESS;
     case TIMED_WAIT_DISABLED:
         attr->flags &= ~TIMED_WAIT;
+        DEBUG_PRINT("\tTimed wait disabled\n");
         return SUCCESS;
     default:
+        DEBUG_PRINT("\tInvalid timed wait\n");
         return EINVAL;
     }
 }
 
 int threadpool_attr_get_timed_wait(threadpool_attr_t *attr, int *timed_wait) {
+    DEBUG_PRINT("Getting timed wait\n");
     if (attr == NULL || timed_wait == NULL) {
+        DEBUG_PRINT("\tInvalid arguments\n");
         return EINVAL;
     }
     *timed_wait = check_flag(attr->flags, TIMED_WAIT) ? TIMED_WAIT_ENABLED
                                                       : TIMED_WAIT_DISABLED;
+    DEBUG_PRINT("\tTimed wait: %d\n", *timed_wait);
     return SUCCESS;
 }
 
 int threadpool_attr_set_timeout(threadpool_attr_t *attr, time_t timeout) {
+    DEBUG_PRINT("Setting timeout\n");
     if (attr == NULL || timeout <= 0) {
+        DEBUG_PRINT("\tInvalid arguments\n");
         return EINVAL;
     }
     attr->default_wait = timeout;
+    DEBUG_PRINT("\tTimeout set to %ld\n", timeout);
     return SUCCESS;
 }
 
 int threadpool_attr_get_timeout(threadpool_attr_t *attr, time_t *timeout) {
+    DEBUG_PRINT("Getting timeout\n");
     if (attr == NULL || timeout == NULL) {
+        DEBUG_PRINT("\tInvalid arguments\n");
         return EINVAL;
     }
     *timeout = attr->default_wait;
+    DEBUG_PRINT("\tTimeout: %ld\n", *timeout);
     return SUCCESS;
 }
 
 int threadpool_attr_set_block_on_add(threadpool_attr_t *attr,
                                      int block_on_add) {
+    DEBUG_PRINT("Setting block on add\n");
     if (attr == NULL) {
+        DEBUG_PRINT("\tInvalid arguments\n");
         return EINVAL;
     }
     switch (block_on_add) {
     case BLOCK_ON_ADD_ENABLED:
         attr->flags |= BLOCK_ON_ADD;
+        DEBUG_PRINT("\tBlocking on add enabled\n");
         return SUCCESS;
     case BLOCK_ON_ADD_DISABLED:
         attr->flags &= ~BLOCK_ON_ADD;
+        DEBUG_PRINT("\tBlocking on add disabled\n");
         return SUCCESS;
     default:
+        DEBUG_PRINT("\tInvalid block on add\n");
         return EINVAL;
     }
 }
 
 int threadpool_attr_get_block_on_add(threadpool_attr_t *attr,
                                      int *block_on_add) {
+    DEBUG_PRINT("Getting block on add\n");
     if (attr == NULL || block_on_add == NULL) {
+        DEBUG_PRINT("\tInvalid arguments\n");
         return EINVAL;
     }
     *block_on_add = check_flag(attr->flags, BLOCK_ON_ADD)
                         ? BLOCK_ON_ADD_ENABLED
                         : BLOCK_ON_ADD_DISABLED;
+    DEBUG_PRINT("\tBlock on add: %d\n", *block_on_add);
     return SUCCESS;
 }
 
 int threadpool_attr_set_thread_count(threadpool_attr_t *attr,
                                      size_t num_threads) {
+    DEBUG_PRINT("Setting thread count\n");
     if (attr == NULL || num_threads == 0 || num_threads > MAX_THREADS) {
+        DEBUG_PRINT("\tInvalid arguments\n");
         return EINVAL;
     }
     attr->max_threads = num_threads;
+    DEBUG_PRINT("\tThread count set to %zu\n", num_threads);
     return SUCCESS;
 }
 
 int threadpool_attr_get_thread_count(threadpool_attr_t *attr,
                                      size_t *num_threads) {
+    DEBUG_PRINT("Getting thread count\n");
     if (attr == NULL || num_threads == NULL) {
+        DEBUG_PRINT("\tInvalid arguments\n");
         return EINVAL;
     }
     *num_threads = attr->max_threads;
+    DEBUG_PRINT("\tThread count: %zu\n", *num_threads);
     return SUCCESS;
 }
 
 int threadpool_attr_set_queue_size(threadpool_attr_t *attr, size_t queue_size) {
+    DEBUG_PRINT("Setting queue size\n");
     if (attr == NULL || queue_size == 0) {
+        DEBUG_PRINT("\tInvalid arguments\n");
         return EINVAL;
     }
     attr->max_q_size = queue_size;
+    DEBUG_PRINT("\tQueue size set to %zu\n", queue_size);
     return SUCCESS;
 }
 
 int threadpool_attr_get_queue_size(threadpool_attr_t *attr,
                                    size_t *queue_size) {
+    DEBUG_PRINT("Getting queue size\n");
     if (attr == NULL || queue_size == NULL) {
+        DEBUG_PRINT("\tInvalid arguments\n");
         return EINVAL;
     }
     *queue_size = attr->max_q_size;
+    DEBUG_PRINT("\tQueue size: %zu\n", *queue_size);
     return SUCCESS;
 }
