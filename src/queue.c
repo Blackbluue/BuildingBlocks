@@ -5,10 +5,9 @@
 #include <stdlib.h>
 
 /*DATA */
-enum {
-    SUCCESS = 0,
-    INVALID = -1,
-};
+
+#define SUCCESS 0
+#define INVALID -1
 
 /**
  * @brief structure of a queue object
@@ -24,57 +23,58 @@ struct queue_t {
     bool support_lookup;
 };
 
+/* PRIVATE FUNCTIONS*/
+
+/**
+ * @brief Sets the error code.
+ *
+ * @param err The error code.
+ * @param value The value to set.
+ */
+static void set_err(int *err, int value) {
+    if (err != NULL) {
+        *err = value;
+    }
+}
+
 /* PUBLIC FUNCTIONS*/
-queue_t *queue_init(size_t capacity, FREE_F customfree, CMP_F compare) {
+
+queue_t *queue_init(size_t capacity, FREE_F customfree, CMP_F compare,
+                    int *err) {
     queue_t *queue = malloc(sizeof(*queue));
     if (queue == NULL) {
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
-    queue->q_data = list_new(customfree, compare);
+    queue->q_data = list_new(customfree, compare, err);
     if (queue->q_data == NULL) {
         free(queue);
-        errno = ENOMEM;
         return NULL;
     }
-    queue->support_lookup = compare != NULL;
     queue->capacity = capacity;
+    queue->support_lookup = compare != NULL;
     return queue;
 }
 
 int queue_is_full(const queue_t *queue) {
     if (queue == NULL) {
-        errno = EINVAL;
         return INVALID;
-    }
-    if (queue->capacity == QUEUE_UNLIMITED) {
+    } else if (queue->capacity == QUEUE_UNLIMITED) {
         return false;
     }
-    return list_size(queue->q_data) == queue->capacity;
+    return (size_t)list_size(queue->q_data) == queue->capacity;
 }
 
 int queue_is_empty(const queue_t *queue) {
-    if (queue == NULL) {
-        errno = EINVAL;
-        return INVALID;
-    }
-    return list_size(queue->q_data) == 0;
+    return queue == NULL ? INVALID : list_size(queue->q_data) == 0;
 }
 
 ssize_t queue_capacity(const queue_t *queue) {
-    if (queue == NULL) {
-        errno = EINVAL;
-        return INVALID;
-    }
-    return queue->capacity;
+    return queue == NULL ? INVALID : (ssize_t)queue->capacity;
 }
 
 ssize_t queue_size(const queue_t *queue) {
-    if (queue == NULL) {
-        errno = EINVAL;
-        return INVALID;
-    }
-    return list_size(queue->q_data);
+    return queue == NULL ? INVALID : list_size(queue->q_data);
 }
 
 int queue_enqueue(queue_t *queue, void *data) {
@@ -88,15 +88,13 @@ int queue_enqueue(queue_t *queue, void *data) {
 
 void *queue_dequeue(queue_t *queue) {
     if (queue == NULL) {
-        errno = EINVAL;
         return NULL;
     }
     return list_pop_head(queue->q_data);
 }
 
 void *queue_get(const queue_t *queue, size_t position) {
-    if (queue == NULL || position >= list_size(queue->q_data)) {
-        errno = EINVAL;
+    if (queue == NULL || position >= (size_t)list_size(queue->q_data)) {
         return NULL;
     }
     return list_get(queue->q_data, position);
@@ -104,32 +102,32 @@ void *queue_get(const queue_t *queue, size_t position) {
 
 void *queue_peek(const queue_t *queue) {
     if (queue == NULL) {
-        errno = EINVAL;
         return NULL;
     }
     return list_peek_head(queue->q_data);
 }
 
-void *queue_remove(queue_t *queue, void *item_to_remove) {
+void *queue_remove(queue_t *queue, void *item_to_remove, int *err) {
     if (queue == NULL) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     } else if (queue->support_lookup == false) {
-        errno = ENOTSUP;
+        set_err(err, ENOTSUP);
         return NULL;
     }
-    return list_remove(queue->q_data, item_to_remove);
+    return list_remove(queue->q_data, item_to_remove, err);
 }
 
-void *queue_find_first(const queue_t *queue, const void *value_to_find) {
+void *queue_find_first(const queue_t *queue, const void *value_to_find,
+                       int *err) {
     if (queue == NULL) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     } else if (queue->support_lookup == false) {
-        errno = ENOTSUP;
+        set_err(err, ENOTSUP);
         return NULL;
     }
-    return list_find_first(queue->q_data, value_to_find);
+    return list_find_first(queue->q_data, value_to_find, err);
 }
 
 int queue_clear(queue_t *queue) {

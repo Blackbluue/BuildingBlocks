@@ -115,7 +115,7 @@ static threadpool_t *init_pool(threadpool_attr_t *attr) {
                             : PTHREAD_CANCEL_DEFERRED;
 
     // initialize queue/threads
-    pool->queue = queue_c_init(pool->attr.max_q_size, free);
+    pool->queue = queue_c_init(pool->attr.max_q_size, free, NULL);
     if (pool->queue == NULL) {
         goto err;
     }
@@ -185,7 +185,7 @@ static void *thread_task(void *arg) {
         }
 
         // perform work
-        struct task_t *task = queue_c_dequeue(pool->queue);
+        struct task_t *task = queue_c_dequeue(pool->queue, NULL);
         queue_c_unlock(pool->queue);
         ROUTINE action = task->action;
         void *action_arg = task->arg;

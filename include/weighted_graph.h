@@ -1,5 +1,6 @@
 #ifndef WEIGHTED_GRAPH_H
 #define WEIGHTED_GRAPH_H
+
 #include "linked_list.h"
 #include <unistd.h>
 
@@ -45,26 +46,24 @@ typedef struct weighted_graph_t weighted_graph_t;
  *
  * If free_f is NULL, then data stored in the queue will not be free'd.
  *
- * On error, the function will return NULL and set errno. Possible error codes
- * are:
+ * On error, the function will return NULL. Possible error codes are:
  * - EINVAL: compare function is NULL
  * - ENOMEM: memory allocation failed
  *
  * @param compare pointer to user defined compare function
  * @param free_f pointer to a function to free queue data
+ * @param err pointer to an integer to store the error code
  * @return A pointer to a weighted graph.
  */
-weighted_graph_t *graph_create(CMP_F cmp, FREE_F free_f);
+weighted_graph_t *graph_create(CMP_F cmp, FREE_F free_f, int *err);
 
 /**
  * @brief Return the number of nodes in the graph.
  *
- * If graph is NULL, then the function will return -1 and set errno. Possible
- * error codes are:
- * - EINVAL: graph is NULL
+ * If graph is NULL, then the function will return -1
  *
  * @param graph pointer to a weighted graph
- * @return The number of nodes in the graph, or non-zero on error.
+ * @return The number of nodes in the graph, or -1 on error.
  */
 ssize_t graph_size(const weighted_graph_t *graph);
 
@@ -96,9 +95,10 @@ int graph_add_node(weighted_graph_t *graph, void *data);
  *
  * @param graph pointer to a weighted graph
  * @param data pointer to data to be removed from the graph
+ * @param err pointer to an integer to store the error code
  * @return the removed item on success, NULL on failure
  */
-void *graph_remove_node(weighted_graph_t *graph, void *data);
+void *graph_remove_node(weighted_graph_t *graph, void *data, int *err);
 
 /**
  * @brief Iterate over all nodes in the graph.
@@ -149,7 +149,7 @@ int graph_iterate_neighbors(weighted_graph_t *graph, void *center, ACT_F func,
  * within the list will affect the graph. Sorting/lookup is provided via the
  * compare function given to the graph.
  *
- * If an error occurs, then the function will return NULL and set errno.
+ * If an error occurs, then the function will return NULL.
  * Possible error codes are:
  * - EINVAL: graph, start, or end are NULL
  * - ENOENT: start or end are not in the graph
@@ -158,17 +158,16 @@ int graph_iterate_neighbors(weighted_graph_t *graph, void *center, ACT_F func,
  * @param graph pointer to a weighted graph
  * @param start pointer to the start node
  * @param end pointer to the end node
+ * @param err pointer to an integer to store the error code
  * @return list_t* a list of nodes representing the shortest path, NULL on error
  */
 list_t *graph_find_path(weighted_graph_t *graph, const void *start,
-                        const void *end);
+                        const void *end, int *err);
 
 /**
  * @brief Check if the graph contains a node.
  *
- * If an error occurs, then the function will return -1 and errno is set.
- * Possible error codes are:
- * - EINVAL: graph or data are NULL
+ * If graph or data are NULL, then the function will return -1
  *
  * @param graph pointer to a weighted graph
  * @param data pointer to data to be searched for in the graph
@@ -202,7 +201,7 @@ int graph_add_edge(weighted_graph_t *graph, void *src, void *dst,
  *
  * Return the weight of the edge between the 2 given nodes in the graph.
  *
- * If an error occurs, then the function will return NAN and errno is set.
+ * If an error occurs, then the function will return NAN.
  * Possible error codes are:
  * - EINVAL: graph, src, or dst are NULL
  * - ENOENT: src or dst are not in the graph, or src not pointing to dst
@@ -210,10 +209,11 @@ int graph_add_edge(weighted_graph_t *graph, void *src, void *dst,
  * @param graph pointer to a weighted graph
  * @param src pointer to the source node
  * @param dst pointer to the destination node
+ * @param err pointer to an integer to store the error code
  * @return the weight of the edge, NAN on error
  */
 double graph_get_edge_weight(const weighted_graph_t *graph, const void *src,
-                             const void *dst);
+                             const void *dst, int *err);
 
 /**
  * @brief Remove an edge from the graph.
@@ -245,9 +245,11 @@ int graph_remove_edge(weighted_graph_t *graph, const void *src,
  *
  * @param graph pointer to a weighted graph
  * @param src pointer to the node
+ * @param err pointer to an integer to store the error code
  * @return ssize_t the out degree of the node, -1 on error
  */
-ssize_t graph_out_degree_size(const weighted_graph_t *graph, const void *src);
+ssize_t graph_out_degree_size(const weighted_graph_t *graph, const void *src,
+                              int *err);
 
 /**
  * @brief Get the in degree of a node.
@@ -261,9 +263,11 @@ ssize_t graph_out_degree_size(const weighted_graph_t *graph, const void *src);
  *
  * @param graph pointer to a weighted graph
  * @param dst pointer to the node
+ * @param err pointer to an integer to store the error code
  * @return ssize_t the in degree of the node, -1 on error
  */
-ssize_t graph_in_degree_size(const weighted_graph_t *graph, const void *dst);
+ssize_t graph_in_degree_size(const weighted_graph_t *graph, const void *dst,
+                             int *err);
 
 /**
  * @brief Destroy the graph.

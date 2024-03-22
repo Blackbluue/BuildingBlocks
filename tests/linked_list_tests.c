@@ -6,469 +6,393 @@
 
 // The integer all node data[5] pointers point to
 int data[] = {1, 2, 3, 4, 5};
-enum {
-    SIZE = sizeof(data) / sizeof(*data),
-};
+
+#define SIZE sizeof(data) / sizeof(*data)
+#define INVALID_LIST NULL
+#define SUCCESS 0
+
 // The list to be used by all the tests
 list_t *list = NULL;
+list_t *empty = NULL;
+list_t *no_cmp = NULL;
+
+int value_to_remove;
 
 int test_compare_node(const void *value_to_find, const void *node_data) {
-    int *value_to_find_int = (int *)value_to_find;
-    int *node_data_int = (int *)node_data;
-    if (*node_data_int > *value_to_find_int) {
+    int value_to_find_int = *(int *)value_to_find;
+    int node_data_int = *(int *)node_data;
+    if (node_data_int > value_to_find_int) {
         return -1;
-    } else if (*node_data_int < *value_to_find_int) {
+    } else if (node_data_int < value_to_find_int) {
         return 1;
     } else {
         return 0;
     }
 }
 
+/**
+ * @brief This function is used to modify the data in the list
+ *
+ * Set the data to the remainder of the data and 2
+ *
+ * @param data The data to be modified
+ * @param addl_data unused
+ * @return int 0 if the function exited successfully
+ */
 int make_mod(void **data, void *addl_data) {
-    **(int **)data = (*(*(int **)data) % 2);
-    return 0;
+    (void)addl_data;
+    int number = **(int **)data;
+    **(int **)data = number % 2;
+    return SUCCESS;
 }
 
-void custom_free(void *mem_addr) {}
+void custom_free(void *mem_addr) { (void)mem_addr; }
 
 int init_suite1(void) { return 0; }
 
 int clean_suite1(void) { return 0; }
 
 void test_list_new() {
-    // Verify list was created correctly with no arguments supplied
-    list = list_new(NULL, NULL);
-    CU_ASSERT_PTR_NOT_NULL_FATAL(list); // Function exited correctly
-    list_delete(&list);
-    // NOLINTNEXTLINE
-
-    // Verify list was created correctly with all arguments supplied
-    list = list_new(custom_free, test_compare_node);
-    CU_ASSERT_PTR_NOT_NULL_FATAL(list); // Function exited correctly
-    // NOLINTNEXTLINE
-    CU_ASSERT(0 == list_size(list)); // list size is correct
+    // Verify lists were created correctly
+    no_cmp = list_new(NULL, NULL, NULL);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(no_cmp); // Function exited correctly
+    empty = list_new(NULL, test_compare_node, NULL);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(empty); // Function exited correctly
+    list = list_new(custom_free, test_compare_node, NULL);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(list);    // Function exited correctly
+    CU_ASSERT_EQUAL(list_size(no_cmp), 0); // list size is correct
+    CU_ASSERT_EQUAL(list_size(empty), 0);  // list size is correct
+    CU_ASSERT_EQUAL(list_size(list), 0);   // list size is correct
 }
 
 void test_list_push_tail() {
-    int exit_code = 1;
-    int i = 0;
-    list_t *invalid_list = NULL;
-
     // Should catch if push is called on an invalid list
-    CU_ASSERT_FATAL(NULL != list);
-    CU_ASSERT(0 != list_push_tail(invalid_list, &data[0]));
+    CU_ASSERT_EQUAL(list_push_tail(INVALID_LIST, &data[0]), EINVAL);
 
-    while (i < 5) {
+    CU_ASSERT_PTR_NOT_NULL_FATAL(list);
+    int exit_code = 1;
+    for (size_t i = 0; i < SIZE; i++) {
         exit_code = list_push_tail(list, &data[i]);
-        if (0 != exit_code) {
+        if (exit_code != SUCCESS) {
             break;
         }
         // New node was pushed and points to the correct data
-        CU_ASSERT(data[i] == *(int *)(list_peek_tail(list)));
-        i++;
+        CU_ASSERT_EQUAL(*(int *)(list_peek_tail(list)), data[i]);
     }
 
     // Function exited correctly
-    CU_ASSERT(0 == exit_code);
+    CU_ASSERT_EQUAL(exit_code, SUCCESS);
     // list size is correct
-    // NOLINTNEXTLINE
-    CU_ASSERT(5 == list_size(list));
+    CU_ASSERT_EQUAL(list_size(list), SIZE);
 }
 
-// void test_list_is_circular() {
-//     CU_ASSERT_FATAL(NULL != list);
-//     // NOLINTNEXTLINE
-//     CU_ASSERT(list->tail->next == list->head);
-// }
-
 void test_list_pop_head() {
-    int i = 0;
-    list_t *invalid_list = NULL;
-    int *node_data = NULL;
-
-    CU_ASSERT_FATAL(NULL != list);
     // Should catch if pop is called on an invalid list
-    CU_ASSERT(NULL == list_pop_head(invalid_list));
+    CU_ASSERT_PTR_NULL(list_pop_head(INVALID_LIST));
 
+    CU_ASSERT_PTR_NOT_NULL_FATAL(list);
     // Pop all nodes
-    while (i < 5) {
-        node_data = list_pop_head(list);
-        CU_ASSERT_FATAL(NULL != node_data);
-        // NOLINTNEXTLINE
-        CU_ASSERT(data[i] == *node_data);
-        i++;
+    ssize_t cur_size = list_size(list);
+    for (ssize_t i = 0; i < cur_size; i++) {
+        int *node_data = list_pop_head(list);
+        CU_ASSERT_PTR_NOT_NULL_FATAL(node_data);
+        CU_ASSERT_EQUAL(*node_data, data[i]);
     }
-    // NOLINTNEXTLINE
-    CU_ASSERT(0 == list_size(list));
+    CU_ASSERT_EQUAL(list_size(list), 0);
     // Function should return NULL if pop is called on an empty list
-    CU_ASSERT(NULL == list_pop_head(list));
+    CU_ASSERT_PTR_NULL(list_pop_head(list));
 }
 
 void test_list_push_head() {
-    int exit_code = 1;
-    int i = 0;
-    list_t *invalid_list = NULL;
-
     // Should catch if push is called on an invalid list
-    CU_ASSERT_FATAL(NULL != list);
-    exit_code = list_push_head(invalid_list, &data[i]);
-    CU_ASSERT(0 != exit_code);
+    CU_ASSERT_EQUAL(list_push_head(INVALID_LIST, &data[0]), EINVAL);
 
-    // Push 5 nodes
-    while (i < 5) {
+    // Push SIZE nodes
+    CU_ASSERT_PTR_NOT_NULL_FATAL(list);
+    int exit_code = 1;
+    for (size_t i = 0; i < SIZE; i++) {
         exit_code = list_push_head(list, &data[i]);
+        if (exit_code != SUCCESS) {
+            break;
+        }
         // New node was pushed and points to the correct data
-        // NOLINTNEXTLINE
-        CU_ASSERT(data[i] == *(int *)(list_peek_head(list)));
-
-        i++;
+        CU_ASSERT_EQUAL(*(int *)(list_peek_head(list)), data[i]);
     }
 
     // Function exited correctly
-    CU_ASSERT(0 == exit_code);
+    CU_ASSERT_EQUAL(exit_code, SUCCESS);
     // list size is correct
-    // NOLINTNEXTLINE
-    CU_ASSERT(5 == list_size(list));
+    CU_ASSERT_EQUAL(list_size(list), SIZE);
 }
 
 void test_list_sort() {
-    int exit_code = 1;
-    list_t *invalid_list = NULL;
-    int *node_data = NULL;
-    int i = 0;
-
     // Should catch if sort is called on an invalid list
-    exit_code = list_sort(invalid_list);
-    CU_ASSERT(0 != exit_code);
+    CU_ASSERT_EQUAL(list_sort(INVALID_LIST), EINVAL);
+    CU_ASSERT_EQUAL(list_sort(no_cmp), ENOTSUP);
 
-    exit_code = list_sort(list);
     // Ensure function exited successfully
-    CU_ASSERT(0 == exit_code);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(list);
+    CU_ASSERT_EQUAL(list_sort(list), SUCCESS);
 
     // Verify list should now be reversed
-    while (i < 5) {
-        node_data = list_pop_head(list);
-        CU_ASSERT_FATAL(NULL != node_data);
+    ssize_t cur_size = list_size(list);
+    for (ssize_t i = 0; i < cur_size; i++) {
+        int *node_data = list_pop_head(list);
+        CU_ASSERT_PTR_NOT_NULL_FATAL(node_data);
         // Correct value should be successfully popped from head
-        // NOLINTNEXTLINE
-        CU_ASSERT(data[i] == *node_data);
-        i++;
+        CU_ASSERT_EQUAL(*node_data, data[i]);
     }
 
     // Return the list to its original state for following tests
-    i = 0;
-    while (i < 5) {
+    for (ssize_t i = 0; i < cur_size; i++) {
         list_push_head(list, &data[i]);
-        i++;
     }
 }
 
 void test_list_pop_tail() {
-    // int exit_code = 0;
-    int i = 0;
-    list_t *invalid_list = NULL;
-    int *node_data = NULL;
-
-    CU_ASSERT_FATAL(NULL != list);
     // Should catch if pop is called on an invalid list
-    node_data = list_pop_tail(invalid_list);
-    CU_ASSERT(NULL == node_data);
+    CU_ASSERT_PTR_NULL(list_pop_tail(INVALID_LIST));
 
     // Pop all nodes
-    while (i < 5) {
-        node_data = list_pop_tail(list);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(list);
+    ssize_t cur_size = list_size(list);
+    for (ssize_t i = 0; i < cur_size; i++) {
+        int *node_data = list_pop_tail(list);
         // Correct value should be successfully popped into value_from_node
-        CU_ASSERT_FATAL(NULL != node_data);
-        // NOLINTNEXTLINE
-        CU_ASSERT(data[i] == *node_data);
-        i++;
+        CU_ASSERT_PTR_NOT_NULL_FATAL(node_data);
+        CU_ASSERT_EQUAL(*node_data, data[i]);
     }
 
-    CU_ASSERT(0 == list_size(list));
+    CU_ASSERT_EQUAL(list_size(list), 0);
 
     // Function should return null if pop is called on an empty list
-    node_data = list_pop_head(list);
-    CU_ASSERT(NULL == node_data);
+    CU_ASSERT_PTR_NULL(list_pop_tail(list));
 }
 
 void test_list_peek_head() {
-    list_t *invalid_list = NULL;
-    int *node_data = NULL;
-    int i = 0;
-
-    CU_ASSERT_FATAL(NULL != list);
     // Should catch if function is called on an invalid list
-    node_data = list_peek_head(invalid_list);
-    CU_ASSERT(NULL == node_data);
+    CU_ASSERT_PTR_NULL(list_peek_head(INVALID_LIST));
 
     // Function should not be able to peek on an empty list
-    node_data = list_peek_head(list);
-    CU_ASSERT(NULL == node_data);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(list);
+    CU_ASSERT_PTR_NULL(list_peek_head(list));
 
     // Push the nodes tail into list
-    while (i < 5) {
+    for (size_t i = 0; i < SIZE; i++) {
         list_push_tail(list, &data[i]);
-        i++;
     }
 
-    node_data = list_peek_head(list);
-
+    ssize_t cur_size = list_size(list);
+    int *node_data = list_peek_head(list);
     // Function should have exited successfully
-    CU_ASSERT_FATAL(NULL != node_data);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(node_data);
     // Correct value should have been peeked from head node
-    CU_ASSERT(data[0] == *node_data);
+    CU_ASSERT_EQUAL(*node_data, data[0]);
     // Size shouldn't have changed
-    // NOLINTNEXTLINE
-    CU_ASSERT(5 == list_size(list));
+    CU_ASSERT_EQUAL(list_size(list), cur_size);
 }
 
 void test_list_iterator() {
-    list_t *invalid_list = NULL;
-
     // Should catch if function is called on an invalid list
-    CU_ASSERT(0 != list_iterator_reset(invalid_list));
-    CU_ASSERT(NULL == list_iterator_next(invalid_list));
+    CU_ASSERT_EQUAL(list_iterator_reset(INVALID_LIST), EINVAL);
+    int err = SUCCESS;
+    CU_ASSERT_PTR_NULL(list_iterator_next(INVALID_LIST, &err));
+    CU_ASSERT_EQUAL(err, EINVAL);
 
-    CU_ASSERT_FATAL(NULL != list);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(list);
+    ssize_t cur_size = list_size(list);
     // Confirm iterator is iterating correctly
-    CU_ASSERT(0 == list_iterator_reset(list));
-    for (size_t i = 0; i < list_size(list); i++) {
-        CU_ASSERT(&data[i] == list_iterator_next(list));
+    CU_ASSERT_EQUAL(list_iterator_reset(list), SUCCESS);
+    for (ssize_t i = 0; i < cur_size; i++) {
+        CU_ASSERT_PTR_EQUAL(list_iterator_next(list, NULL), &data[i]);
     }
-    CU_ASSERT(NULL == list_iterator_next(list));
+    CU_ASSERT_PTR_NULL(list_iterator_next(list, NULL));
 
     // Confirm iterator is resetting correctly
-    CU_ASSERT(0 == list_iterator_reset(list));
-    CU_ASSERT(&data[0] == list_iterator_next(list));
+    CU_ASSERT_EQUAL(list_iterator_reset(list), SUCCESS);
+    CU_ASSERT_PTR_EQUAL(list_iterator_next(list, NULL), &data[0]);
 
     // Size shouldn't have changed
-    // NOLINTNEXTLINE
-    CU_ASSERT(SIZE == list_size(list));
+    CU_ASSERT_EQUAL(list_size(list), cur_size);
 }
 
 void test_list_remove() {
-    int value_to_remove = 4;
-    int *removed_value;
-    list_t *invalid_list = NULL;
-
-    CU_ASSERT_FATAL(NULL != list);
     // Should catch if remove is called on an invalid list
-    removed_value = list_remove(invalid_list, (void *)&value_to_remove);
-    CU_ASSERT(NULL == removed_value);
+    int err = SUCCESS;
+    CU_ASSERT_PTR_NULL(list_remove(INVALID_LIST, NULL, &err));
+    CU_ASSERT_EQUAL(err, EINVAL);
+    err = SUCCESS;
+    CU_ASSERT_PTR_NULL(list_remove(no_cmp, NULL, &err));
+    CU_ASSERT_EQUAL(err, ENOTSUP);
 
-    removed_value = list_remove(list, (void *)&value_to_remove);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(list);
+    value_to_remove = data[SIZE - 2];
+    ssize_t cur_size = list_size(list);
+    int *removed_value = list_remove(list, &value_to_remove, NULL);
     // Function should have exited successfully
-    CU_ASSERT(value_to_remove == *removed_value);
+    CU_ASSERT_EQUAL(*removed_value, value_to_remove);
     // Size should reflect the removal of the node
-    // NOLINTNEXTLINE
-    CU_ASSERT(4 == list_size(list));
+    CU_ASSERT_EQUAL(list_size(list), cur_size - 1);
 
     // The node containing the removed value should no longer be in the list
-    removed_value = list_remove(list, (void *)&value_to_remove);
-    CU_ASSERT(NULL == removed_value);
+    CU_ASSERT_PTR_NULL(list_remove(list, &value_to_remove, NULL));
 }
 
 void test_list_find_first() {
-    int value_to_find = 4;
-    list_t *invalid_list = NULL;
-    int *node_data = NULL;
-
-    CU_ASSERT_FATAL(NULL != list);
     // Should catch if function is called on an invalid list
-    node_data = list_find_first(invalid_list, (void *)&value_to_find);
-    CU_ASSERT(NULL == node_data);
+    int err = SUCCESS;
+    CU_ASSERT_PTR_NULL(list_find_first(INVALID_LIST, NULL, &err));
+    CU_ASSERT_EQUAL(err, EINVAL);
+    err = SUCCESS;
+    CU_ASSERT_PTR_NULL(list_find_first(no_cmp, NULL, &err));
+    CU_ASSERT_EQUAL(err, ENOTSUP);
 
     // Should not be able to find the value removed in the previous test
-    node_data = list_find_first(list, (void *)&value_to_find);
-    CU_ASSERT(NULL == node_data);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(list);
+    CU_ASSERT_PTR_NULL(list_find_first(list, &value_to_remove, NULL));
 
     // Change the value we are looking for to one that is still in the list
-    value_to_find--;
-    node_data = list_find_first(list, (void *)&value_to_find);
-
+    value_to_remove = data[SIZE - 1];
+    int *node_data = list_find_first(list, &value_to_remove, NULL);
     // Ensure function exited successfully
-    CU_ASSERT_FATAL(NULL != node_data);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(node_data);
     // Ensure the value found was the one that was searched for
-    // NOLINTNEXTLINE
-    CU_ASSERT(value_to_find == *node_data);
+    CU_ASSERT_EQUAL(*node_data, value_to_remove);
 }
 
 void test_list_foreach_call() {
-    int exit_code = 1;
-    list_t *invalid_list = NULL;
-
-    CU_ASSERT_FATAL(NULL != list);
     // Should catch if function is called on an invalid list
-    exit_code = list_foreach_call(invalid_list, make_mod, NULL);
-    CU_ASSERT(0 != exit_code);
-
-    exit_code = list_foreach_call(list, make_mod, NULL);
+    CU_ASSERT_EQUAL(list_foreach_call(INVALID_LIST, make_mod, NULL), EINVAL);
 
     // Ensure function exited correctly
-    CU_ASSERT(0 == exit_code);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(list);
+    CU_ASSERT_EQUAL(list_foreach_call(list, make_mod, NULL), SUCCESS);
 
     // Ensure the user defined action was done to the list nodes
-    // NOLINTNEXTLINE
-    CU_ASSERT(1 == *(int *)list_get(list, 0) && 0 == *(int *)list_get(list, 1));
+    CU_ASSERT_EQUAL(*(int *)list_get(list, 0), 1);
+    CU_ASSERT_EQUAL(*(int *)list_get(list, 1), 0);
 }
 
 void test_list_find_all() {
-    int value_to_find = 1;
-    list_t *test_list = NULL;
-    list_t *result_list = NULL;
-    unsigned int i = 0;
-
-    CU_ASSERT_FATAL(NULL != list);
     // Should catch if function is called on an invalid list
-    result_list = list_find_all(test_list, (void *)&value_to_find);
-    CU_ASSERT(NULL == result_list);
-
-    // create empty list
-    test_list = list_new((FREE_F)custom_free, (CMP_F)test_compare_node);
+    int err = SUCCESS;
+    CU_ASSERT_PTR_NULL(list_find_all(INVALID_LIST, NULL, &err));
+    CU_ASSERT_EQUAL(err, EINVAL);
+    err = SUCCESS;
+    CU_ASSERT_PTR_NULL(list_find_all(no_cmp, NULL, &err));
+    CU_ASSERT_EQUAL(err, ENOTSUP);
 
     // Should catch if function is called on an empty list
-    result_list = list_find_all(test_list, (void *)&value_to_find);
-    CU_ASSERT(NULL == result_list);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(empty);
+    int value_to_find = 1;
+    CU_ASSERT_PTR_NULL(list_find_all(empty, &value_to_find, NULL));
 
-    result_list = list_find_all(list, (void *)&value_to_find);
-
+    CU_ASSERT_PTR_NOT_NULL_FATAL(list);
+    list_t *result_list = list_find_all(list, &value_to_find, NULL);
     // Ensure function exited successfully
-    CU_ASSERT_FATAL(NULL != result_list);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(result_list);
     // Verify that each node of the resulting list is the correct value
-    // NOLINTNEXTLINE
-    while (i < list_size(result_list)) {
-        CU_ASSERT(value_to_find == *(int *)list_get(result_list, i));
-        i++;
+    for (ssize_t i = 0; i < list_size(result_list); i++) {
+        int *num = list_get(result_list, i);
+        CU_ASSERT_PTR_NOT_NULL_FATAL(num);
+        CU_ASSERT_EQUAL(*num, value_to_find);
     }
 
     // Verify that the correct number of occurrences were found
-    // NOLINTNEXTLINE
-    CU_ASSERT(3 == list_size(result_list));
-
-    list_delete(&test_list);
+    CU_ASSERT_EQUAL(list_size(result_list), 3);
     list_delete(&result_list);
 }
 
 void test_list_get() {
     size_t position = 2;
-    list_t *invalid_list = NULL;
-    int *node = NULL;
 
-    CU_ASSERT_FATAL(NULL != list);
     // Should catch if get is called on an invalid list
-    node = list_get(invalid_list, position);
-    CU_ASSERT(NULL == node);
+    CU_ASSERT_PTR_NULL(list_get(INVALID_LIST, position));
 
     // Should catch if get is called on an empty list
-    invalid_list = list_new((FREE_F)custom_free, (CMP_F)test_compare_node);
-    CU_ASSERT_FATAL(NULL != invalid_list);
-    node = list_get(invalid_list, position);
-    CU_ASSERT(NULL == node);
-    list_delete(&invalid_list);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(empty);
+    CU_ASSERT_PTR_NULL(list_get(empty, position));
 
-    node = list_get(list, position);
-
+    CU_ASSERT_PTR_NOT_NULL_FATAL(list);
+    ssize_t cur_size = list_size(list);
+    int *node = list_get(list, position);
     // Function should have exited successfully
-    CU_ASSERT_FATAL(NULL != node);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(node);
     // Correct value should have been peeked from head node
-    // NOLINTNEXTLINE
-    CU_ASSERT(data[position] == *node);
+    CU_ASSERT_EQUAL(*node, data[position]);
     // Size shouldn't have changed
-    CU_ASSERT(4 == list_size(list));
+    CU_ASSERT_EQUAL(list_size(list), cur_size);
 }
 
 void test_list_insert() {
-    int exit_code = 1;
     int value_to_insert = 9;
     size_t position = 2;
-    list_t *invalid_list = NULL;
 
-    CU_ASSERT_FATAL(NULL != list);
     // Should catch if insert is called on an invalid list
-    exit_code = list_insert(invalid_list, (void *)&value_to_insert, position);
-    CU_ASSERT(0 != exit_code);
+    CU_ASSERT_EQUAL(list_insert(INVALID_LIST, &value_to_insert, position),
+                    EINVAL);
 
-    exit_code = list_insert(list, (void *)&value_to_insert, position);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(list);
+    ssize_t cur_size = list_size(list);
     // Function should have exited successfully
-    CU_ASSERT(0 == exit_code);
+    CU_ASSERT_EQUAL(list_insert(list, &value_to_insert, position), SUCCESS);
     // Size should reflect the insertion of the node
-    // NOLINTNEXTLINE
-    CU_ASSERT(5 == list_size(list));
+    CU_ASSERT_EQUAL(list_size(list), cur_size + 1);
 
     // The node containing the inserted value should now be in the list
-    // NOLINTNEXTLINE
     int *node_data = list_get(list, position);
-    CU_ASSERT(value_to_insert == *node_data);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(node_data);
+    CU_ASSERT_EQUAL(*node_data, value_to_insert);
 }
 
 void test_list_clear() {
-    int exit_code = 1;
-    list_t *invalid_list = NULL;
-
-    CU_ASSERT_FATAL(NULL != list);
     // Should catch if clear is called on an invalid list
-    exit_code = list_clear(invalid_list);
-    CU_ASSERT(0 != exit_code);
+    CU_ASSERT_EQUAL(list_clear(INVALID_LIST), EINVAL);
 
-    exit_code = list_clear(list);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(list);
     // list should now be empty
-    // NOLINTNEXTLINE
-    CU_ASSERT(0 == list_size(list))
-    // NOLINTNEXTLINE
-    CU_ASSERT(NULL == list_peek_head(list));
-
-    // Function should have exited successfully
-    CU_ASSERT(0 == exit_code);
+    CU_ASSERT_PTR_NOT_NULL(list_peek_head(list));
+    CU_ASSERT_EQUAL(list_clear(list), SUCCESS)
+    CU_ASSERT_PTR_NULL(list_peek_head(list));
 }
 
 void test_list_peek_tail() {
-    list_t *invalid_list = NULL;
-    int *node_data = NULL;
-    int i = 0;
-
-    CU_ASSERT_FATAL(NULL != list);
     // Should catch if pop is called on an invalid list
-    node_data = list_peek_tail(invalid_list);
-    CU_ASSERT(NULL == node_data);
+    CU_ASSERT_PTR_NULL(list_peek_tail(INVALID_LIST));
 
     // Function should not be able to peek on an empty list
-    node_data = list_peek_tail(list);
-    CU_ASSERT(NULL == node_data);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(list);
+    CU_ASSERT_PTR_NULL(list_peek_tail(list));
 
     // Push the nodes tail into list
-    while (i < 5) {
+    for (size_t i = 0; i < SIZE; i++) {
         list_push_tail(list, &data[i]);
-        i++;
     }
 
-    node_data = list_peek_tail(list);
-
+    int *node_data = list_peek_tail(list);
     // Function should have exited successfully
-    CU_ASSERT_FATAL(NULL != node_data);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(node_data);
     // Correct value should have been peeked from head node
-    // NOLINTNEXTLINE
-    CU_ASSERT(data[4] == *node_data);
+    CU_ASSERT_EQUAL(*node_data, data[SIZE - 1]);
     // Size shouldn't have changed
-    CU_ASSERT(5 == list_size(list));
+    CU_ASSERT_EQUAL(list_size(list), SIZE);
 }
 
 void test_list_delete() {
-    int exit_code = 1;
-    list_t *invalid_list = NULL;
-
-    CU_ASSERT_FATAL(NULL != list);
     // Should catch if delete is called on an invalid list
-    exit_code = list_delete(&invalid_list);
-    CU_ASSERT(0 != exit_code);
+    CU_ASSERT_EQUAL(list_delete(INVALID_LIST), EINVAL);
 
     // Function should have exited successfully
-    exit_code = list_delete(&list);
-    CU_ASSERT(0 == exit_code);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(list);
+    CU_ASSERT_EQUAL(list_delete(&list), SUCCESS);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(empty);
+    CU_ASSERT_EQUAL(list_delete(&empty), SUCCESS);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(no_cmp);
+    CU_ASSERT_EQUAL(list_delete(&no_cmp), SUCCESS);
 
     // Should catch if delete is called on the list that has already been
     // deleted
-    exit_code = list_delete(&list);
-    CU_ASSERT(0 != exit_code);
+    CU_ASSERT_EQUAL(list_delete(&list), EINVAL);
 }
 
 int main(void) {

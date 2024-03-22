@@ -26,10 +26,8 @@
 
 /* DATA */
 
-enum {
-    SUCCESS = 0,
-    INVALID = -1,
-};
+#define SUCCESS 0
+#define INVALID -1
 
 typedef int (*PREDICATE)(queue_c_t *queue);
 
@@ -92,7 +90,20 @@ struct queue_c_t {
     bool is_destroying;
     bool cancel_wait;
 };
+
 /* PRIVATE FUNCTIONS */
+
+/**
+ * @brief Sets the error code.
+ *
+ * @param err The error code.
+ * @param value The value to set.
+ */
+static void set_err(int *err, int value) {
+    if (err != NULL) {
+        *err = value;
+    }
+}
 
 /**
  * @brief Initialize thread constructs.
@@ -100,6 +111,9 @@ struct queue_c_t {
  * @param queue pointer to queue object
  */
 static void init_thread_constructs(queue_c_t *queue) {
+    if (queue == NULL) {
+        return;
+    }
     pthread_mutexattr_t attr;
     pthread_mutexattr_init(&attr);
     // to allow wait functions to lock the queue
@@ -131,6 +145,9 @@ static void init_thread_constructs(queue_c_t *queue) {
  * @param queue pointer to queue object
  */
 static void destroy_thread_constructs(queue_c_t *queue) {
+    if (queue == NULL) {
+        return;
+    }
     // wait for all threads to finish working with the lock
     while (queue->waiting_for_lock > 0) {
         pthread_cond_wait(&queue->lock_free, &queue->lock);
@@ -152,6 +169,9 @@ static void destroy_thread_constructs(queue_c_t *queue) {
  * @param queue pointer to queue object
  */
 static void wake_all_threads(struct deferred_signals_t *signals) {
+    if (signals == NULL) {
+        return;
+    }
     pthread_cond_broadcast(&signals->cond_is_empty);
     pthread_cond_broadcast(&signals->cond_is_full);
     pthread_cond_broadcast(&signals->cond_not_empty);
@@ -166,6 +186,9 @@ static void wake_all_threads(struct deferred_signals_t *signals) {
  * @param queue pointer to queue object
  */
 static void unlock_queue(queue_c_t *queue) {
+    if (queue == NULL) {
+        return;
+    }
     if (!queue->manually_locked ||
         (queue->manually_locked && queue->is_destroying)) {
         // this thread was the last to decrement the waiting counter. If counter
@@ -189,6 +212,9 @@ static void unlock_queue(queue_c_t *queue) {
  * @return int 0 if success, error code otherwise
  */
 static int lock_queue(queue_c_t *queue) {
+    if (queue == NULL || queue->is_destroying) {
+        return EINVAL;
+    }
     ATOMIC_INC(queue->waiting_for_lock, queue->counter_lock);
     int err = pthread_mutex_lock(&queue->lock);
     ATOMIC_DEC(queue->waiting_for_lock, queue->counter_lock);
@@ -210,6 +236,9 @@ static int lock_queue(queue_c_t *queue) {
  * @param queue pointer to queue object
  */
 static void send_signals(queue_c_t *queue) {
+    if (queue == NULL) {
+        return;
+    }
     if (!(queue->manually_locked &&
           pthread_equal(queue->locked_by, pthread_self()))) {
         if (queue->signals.is_empty) {
@@ -237,6 +266,9 @@ static void send_signals(queue_c_t *queue) {
  * @param queue pointer to queue object
  */
 static void manual_lock(queue_c_t *queue) {
+    if (queue == NULL) {
+        return;
+    }
     queue->manually_locked = true;
     queue->locked_by = pthread_self();
 }
@@ -252,6 +284,9 @@ static int not_empty(queue_c_t *queue) { return !queue_c_is_empty(queue); }
  * @return int 1 if should keep waiting, 0 otherwise
  */
 static int keep_waiting(queue_c_t *queue) {
+    if (queue == NULL) {
+        return 0; // nothing to wait on, so stop waiting
+    }
     return !queue->cancel_wait && !queue->is_destroying;
 }
 
@@ -264,7 +299,7 @@ static int keep_waiting(queue_c_t *queue) {
  * @return int 0 if success, error code otherwise
  */
 static int wait_for(queue_c_t *queue, pthread_cond_t *cond, PREDICATE pred) {
-    if (queue == NULL || queue->is_destroying) {
+    if (queue == NULL || queue->is_destroying || cond == NULL || pred == NULL) {
         return EINVAL;
     }
     int err = lock_queue(queue);
@@ -303,7 +338,8 @@ static int timed_wait_for(queue_c_t *queue, pthread_cond_t *cond,
                           PREDICATE pred, time_t timeout) {
     if (timeout == 0) {
         return wait_for(queue, cond, pred);
-    } else if (queue == NULL || queue->is_destroying || timeout < 0) {
+    } else if (queue == NULL || queue->is_destroying || cond == NULL ||
+               pred == NULL || timeout < 0) {
         return EINVAL;
     }
     struct timespec abs_timeout = {time(NULL) + timeout, 0};
@@ -334,20 +370,19 @@ static int timed_wait_for(queue_c_t *queue, pthread_cond_t *cond,
     manual_lock(queue);
     return SUCCESS;
 }
+
 /* PUBLIC FUNCTIONS */
 
-queue_c_t *queue_c_init(size_t capacity, FREE_F customfree) {
+queue_c_t *queue_c_init(size_t capacity, FREE_F customfree, int *err) {
     queue_c_t *queue_c = malloc(sizeof(*queue_c));
     if (queue_c == NULL) {
-        errno = ENOMEM;
+        set_err(err, ENOMEM);
         return NULL;
     }
 
-    queue_c->queue = queue_init(capacity, customfree, NULL);
+    queue_c->queue = queue_init(capacity, customfree, NULL, err);
     if (queue_c->queue == NULL) {
-        int err = errno;
         free(queue_c);
-        errno = err;
         return NULL;
     }
 
@@ -357,7 +392,6 @@ queue_c_t *queue_c_init(size_t capacity, FREE_F customfree) {
 
 int queue_c_is_full(queue_c_t *queue) {
     if (queue == NULL || queue->is_destroying) {
-        errno = EINVAL;
         return INVALID;
     } else if (queue_capacity(queue->queue) == QUEUE_UNLIMITED) {
         return 0;
@@ -366,14 +400,18 @@ int queue_c_is_full(queue_c_t *queue) {
 }
 
 int queue_c_wait_for_full(queue_c_t *queue) {
-    if (queue_capacity(queue->queue) == QUEUE_UNLIMITED) {
+    if (queue == NULL || queue->is_destroying) {
+        return EINVAL;
+    } else if (queue_capacity(queue->queue) == QUEUE_UNLIMITED) {
         return ENOTSUP;
     }
     return wait_for(queue, &queue->signals.cond_is_full, queue_c_is_full);
 }
 
 int queue_c_timed_wait_for_full(queue_c_t *queue, time_t timeout) {
-    if (queue_capacity(queue->queue) == QUEUE_UNLIMITED) {
+    if (queue == NULL || queue->is_destroying) {
+        return EINVAL;
+    } else if (queue_capacity(queue->queue) == QUEUE_UNLIMITED) {
         return ENOTSUP;
     }
     return timed_wait_for(queue, &queue->signals.cond_is_full, queue_c_is_full,
@@ -381,14 +419,18 @@ int queue_c_timed_wait_for_full(queue_c_t *queue, time_t timeout) {
 }
 
 int queue_c_wait_for_not_full(queue_c_t *queue) {
-    if (queue_capacity(queue->queue) == QUEUE_UNLIMITED) {
+    if (queue == NULL || queue->is_destroying) {
+        return EINVAL;
+    } else if (queue_capacity(queue->queue) == QUEUE_UNLIMITED) {
         return ENOTSUP;
     }
     return wait_for(queue, &queue->signals.cond_not_full, not_full);
 }
 
 int queue_c_timed_wait_for_not_full(queue_c_t *queue, time_t timeout) {
-    if (queue_capacity(queue->queue) == QUEUE_UNLIMITED) {
+    if (queue == NULL || queue->is_destroying) {
+        return EINVAL;
+    } else if (queue_capacity(queue->queue) == QUEUE_UNLIMITED) {
         return ENOTSUP;
     }
     return timed_wait_for(queue, &queue->signals.cond_not_full, not_full,
@@ -397,28 +439,43 @@ int queue_c_timed_wait_for_not_full(queue_c_t *queue, time_t timeout) {
 
 int queue_c_is_empty(queue_c_t *queue) {
     if (queue == NULL || queue->is_destroying) {
-        errno = EINVAL;
         return INVALID;
     }
     return queue_is_empty(queue->queue);
 }
 
 int queue_c_wait_for_empty(queue_c_t *queue) {
-    return wait_for(queue, &queue->signals.cond_is_empty, queue_c_is_empty);
+    if (queue == NULL || queue->is_destroying) {
+        return EINVAL;
+    } else {
+        return wait_for(queue, &queue->signals.cond_is_empty, queue_c_is_empty);
+    }
 }
 
 int queue_c_timed_wait_for_empty(queue_c_t *queue, time_t timeout) {
-    return timed_wait_for(queue, &queue->signals.cond_is_empty,
-                          queue_c_is_empty, timeout);
+    if (queue == NULL || queue->is_destroying) {
+        return EINVAL;
+    } else {
+        return timed_wait_for(queue, &queue->signals.cond_is_empty,
+                              queue_c_is_empty, timeout);
+    }
 }
 
 int queue_c_wait_for_not_empty(queue_c_t *queue) {
-    return wait_for(queue, &queue->signals.cond_not_empty, not_empty);
+    if (queue == NULL || queue->is_destroying) {
+        return EINVAL;
+    } else {
+        return wait_for(queue, &queue->signals.cond_not_empty, not_empty);
+    }
 }
 
 int queue_c_timed_wait_for_not_empty(queue_c_t *queue, time_t timeout) {
-    return timed_wait_for(queue, &queue->signals.cond_not_empty, not_empty,
-                          timeout);
+    if (queue == NULL || queue->is_destroying) {
+        return EINVAL;
+    } else {
+        return timed_wait_for(queue, &queue->signals.cond_not_empty, not_empty,
+                              timeout);
+    }
 }
 
 int queue_c_cancel_wait(queue_c_t *queue) {
@@ -463,7 +520,6 @@ int queue_c_unlock(queue_c_t *queue) {
 
 ssize_t queue_c_capacity(queue_c_t *queue) {
     if (queue == NULL || queue->is_destroying) {
-        errno = EINVAL;
         return INVALID;
     }
     return queue_capacity(queue->queue);
@@ -471,7 +527,6 @@ ssize_t queue_c_capacity(queue_c_t *queue) {
 
 ssize_t queue_c_size(queue_c_t *queue) {
     if (queue == NULL || queue->is_destroying) {
-        errno = EINVAL;
         return INVALID;
     }
     return queue_size(queue->queue);
@@ -507,16 +562,16 @@ int queue_c_enqueue(queue_c_t *queue, void *data) {
     return SUCCESS;
 }
 
-void *queue_c_dequeue(queue_c_t *queue) {
+void *queue_c_dequeue(queue_c_t *queue, int *err) {
     if (queue == NULL || queue->is_destroying) {
-        errno = EINVAL;
+        set_err(err, EINVAL);
         return NULL;
     }
 
     // deadlock error can be ignored, it was caused by one of the lock functions
     // check if destruction was called while waiting for lock
     if (lock_queue(queue) == EINTR) {
-        errno = EINTR;
+        set_err(err, EINTR);
         return NULL;
     } else if (queue_c_is_empty(queue)) {
         unlock_queue(queue);
@@ -537,7 +592,6 @@ void *queue_c_dequeue(queue_c_t *queue) {
 
 void *queue_c_peek(queue_c_t *queue) {
     if (queue == NULL || queue->is_destroying) {
-        errno = EINVAL;
         return NULL;
     }
     return queue_peek(queue->queue);
@@ -565,8 +619,7 @@ int queue_c_clear(queue_c_t *queue) {
 int queue_c_destroy(queue_c_t **queue_addr) {
     if (queue_addr == NULL || *queue_addr == NULL ||
         (*queue_addr)->is_destroying) {
-        errno = EINVAL;
-        return INVALID;
+        return EINVAL;
     }
     // deadlock error can be ignored, it was caused by one of the lock functions
     // check if destruction was called while waiting for lock

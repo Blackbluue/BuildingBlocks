@@ -1,6 +1,7 @@
 #ifndef ARRAY_LIST_H
 #define ARRAY_LIST_H
 
+#include "buildingblocks.h"
 #include <unistd.h>
 
 /* DATA */
@@ -51,17 +52,22 @@ typedef struct arr_list_t arr_list_t;
  * compare function will not be available. If any of these functions are called,
  * then they will result in an ENOTSUP error.
  *
- * In case of an error, this function will return NULL. If a memory allocation
- * error occurs, errno will be set to ENOMEM. If the size or nmemb values are
- * zero, errno will be set to EINVAL.
+ * In case of an error, this function will return NULL and set the error
+ * pointer if given. The error pointer may be NULL, in which case the error
+ * will not be stored.
+ * Possible errors:
+ * - ENOMEM: Memory allocation error
+ * - EINVAL: Invalid size or nmemb value
  *
  * @param free_f pointer to the free function to be used with that list
  * @param cmp_f pointer to the compare function to be used with that list
  * @param nmemb number of elements to allocate for the list
  * @param size size of each element in the list
+ * @param err where to store the error code
  * @returns pointer to allocated list on success or NULL on failure
  */
-arr_list_t *arr_list_new(FREE_F free_f, CMP_F cmp_f, size_t nmemb, size_t size);
+arr_list_t *arr_list_new(FREE_F free_f, CMP_F cmp_f, size_t nmemb, size_t size,
+                         int *err);
 
 /**
  * @brief Wrap an array in a list.
@@ -72,7 +78,7 @@ arr_list_t *arr_list_new(FREE_F free_f, CMP_F cmp_f, size_t nmemb, size_t size);
  * is deleted when arr_list_delete is called on the list object (i.e. the list
  * object is deleted). The array must either be pointing to NULL or be
  * initialized. If arr is pointing to NULL, then the list will allocate
- * memory for the array and store it as the address pointed to by arr. If the
+ * memory for the array and store it at the address pointed to by arr. If the
  * array is initialized, then the list will use the array as is. If arr itself
  * is NULL, then the behavior is identical to arr_list_new; the user will have
  * no way of accessing the array that the list is using. If the array is
@@ -90,39 +96,53 @@ arr_list_t *arr_list_new(FREE_F free_f, CMP_F cmp_f, size_t nmemb, size_t size);
  * compare function will not be available. If any of these functions are called,
  * then they will result in an ENOTSUP error.
  *
- * In case of an error, this function will return NULL. If a memory allocation
- * error occurs, errno will be set to ENOMEM. If the size value is zero, errno
- * will be set to EINVAL.
+ * In case of an error, this function will return NULL and set the error
+ * pointer if given. The error pointer may be NULL, in which case the error
+ * will not be stored.
+ * Possible errors:
+ * - ENOMEM: Memory allocation error
+ * - EINVAL: Invalid size or nmemb value
  *
  * @param free_f pointer to the free function to be used with that list
  * @param cmp_f pointer to the compare function to be used with that list
  * @param nmemb current capacity of the wrapped array
  * @param size size of each element in the wrapped array
  * @param arr pointer to the array to be wrapped
+ * @param err where to store the error code
  * @returns pointer to allocated list on success or NULL on failure
  */
 arr_list_t *arr_list_wrap(FREE_F free_f, CMP_F cmp_f, size_t nmemb, size_t size,
-                          void **arr);
+                          void **arr, int *err);
 
 /**
- * @brief Get the number of items in the list.
+ * @brief Query the array.
  *
- * If the list is NULL, then -1 is returned.
+ * The query command is used to get information about the array. The result
+ * pointer is used to store the result of the query.
  *
- * @param list pointer to list object to be checked
- * @return ssize_t size of the list, -1 on failure
+ * Possible queries:
+ * - QUERY_SIZE: Get the number of nodes in the array.
+ * - QUERY_CAPACITY: Get the capacity of the array.
+ * - QUERY_IS_EMPTY: Check if the array is empty.
+ * - QUERY_IS_FULL: Check if the array is full.
+ *
+ * Possible results:
+ * - QUERY_SIZE: The number of nodes in the array.
+ * - QUERY_CAPACITY: The capacity of the array.
+ * - QUERY_IS_EMPTY: 0 if the array is not empty, non-zero if the array is
+ * - QUERY_IS_FULL: 0 if the array is not full, non-zero if the array is full
+ * empty.
+ *
+ * Possible errors:
+ * - EINVAL: The array or result pointers are NULL.
+ * - ENOTSUP: The query command is invalid.
+ *
+ * @param list A pointer to the array.
+ * @param query The query command.
+ * @param result A pointer to the result of the query.
+ * @return int 0 on success, non-zero on failure.
  */
-ssize_t arr_list_size(const arr_list_t *list);
-
-/**
- * @brief Get the capacity of the list.
- *
- * If the list is NULL, then -1 is returned.
- *
- * @param list pointer to list object to be checked
- * @return ssize_t size of the list, -1 on failure
- */
-ssize_t arr_list_capacity(const arr_list_t *list);
+int arr_list_query(const arr_list_t *list, int query, ssize_t *result);
 
 /**
  * @brief Resize the list to the new capacity.
@@ -152,24 +172,6 @@ int arr_list_resize(arr_list_t *list, size_t new_capacity);
  * @return 0 on success, non-zero on failure
  */
 int arr_list_trim(arr_list_t *list);
-
-/**
- * @brief Check if the list is empty.
- *
- * @param list pointer to list object to be checked
- * @returns 0 if list is not empty, negative if list is NULL, non-zero if list
- * is empty
- */
-int arr_list_is_empty(const arr_list_t *list);
-
-/**
- * @brief Check if the list is full.
- *
- * @param list pointer to list object to be checked
- * @returns 0 if list is not full, negative if list is NULL, non-zero if list is
- * full
- */
-int arr_list_is_full(const arr_list_t *list);
 
 /**
  * @brief Insert a new item into the list at a specific position.
@@ -210,9 +212,8 @@ int arr_list_set(arr_list_t *list, void *data, size_t position, void *old);
  * @brief Get the item at a specific position in the list.
  *
  * If the list is NULL or position is outside the range of the list, NULL is
- * returned and errno is set to EINVAL. Note that if the list allows NULL
- * values, then it is up to the user to differentiate between a NULL value in
- * the list and an error.
+ * returned. Note that if the list allows NULL values, then it is up to the user
+ * to differentiate between a NULL value in the list and an error.
  *
  * @param list list to get the node from
  * @param position position in the list to get the node from
@@ -224,32 +225,29 @@ void *arr_list_get(const arr_list_t *list, size_t position);
  * @brief Remove an item from the list at the given index.
  *
  * This will remove the item at the given position; all other elements after
- * will be shifted forward. Memory is allocated for the removed item and
- * returned.
+ * will be shifted forward. The removed item will be stored in the old pointer.
  *
- * In the event of error, NULL is returned and errno is set accordingly. If the
- * list is NULL or position is outside the range of the list, errno is set to
- * EINVAL. If a memory allocation error occurs, errno is set to ENOMEM. Note
- * that if the list allows NULL values, then it is up to the user to
- * differentiate between a NULL value in the list and an error.
+ * In the event of error, an appropriate error code is returned.
+ * Possible errors:
+ * - EINVAL: list is NULL or position is outside the range of the list
  *
  * @param list list to remove the node from
  * @param position position in the list to remove
- * @return the removed item in the list on success, NULL on failure
+ * @param old where to store the removed item
+ * @return 0 on success, non-zero on failure
  */
-void *arr_list_pop(arr_list_t *list, size_t position);
+int arr_list_pop(arr_list_t *list, size_t position, void *old);
 
 /**
  * @brief Search for an item and remove it from the list.
  *
  * If the item is found, it is removed from the list. If the list allows
- * duplicates, then only the first item found will be removed. If the list
- * was altered as a result of this call (i.e the item was found and removed),
- * then true is returned. If the item was not found, then false is returned.
+ * duplicates, then only the first item found will be removed.
  *
- * In the event of error, negative is returned and errno is set accordingly. If
- * this list does not support comparisons, it is set to ENOTSUP. If the list is
- * NULL, it is set to EINVAL.
+ * In the event of error, an appropriate error code is returned.
+ * Possible errors:
+ * - EINVAL: list is NULL
+ * - ENOTSUP: list does not support comparisons
  *
  * @param list list to remove the item from
  * @param item_to_remove the data object to be searched for
@@ -289,10 +287,13 @@ int arr_list_iterator_reset(arr_list_t *list);
 /**
  * @brief Get the next item in the list.
  *
- * If the iterator is at the end of the list, then NULL will be returned and
- * errno will be set to ENOTSUP. If the list is NULL, then NULL will be returned
- * and errno will be set to EINVAL. This function will have undefined behavior
- * if the list is modified while the iterator is in use.
+ * If the list is NULL, or the iterator is at the end of the list, then NULL
+ * will be returned. Note that this function may also return NULL if the next
+ * item in the list is NULL. This is not an error, and the user should check
+ * the list size before calling this function.
+ *
+ * This function will have undefined behavior if the list is modified while the
+ * iterator is in use.
  *
  * @param list list to iterate through
  * @return the next item on success, or NULL

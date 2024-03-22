@@ -3,10 +3,9 @@
 #include <stdlib.h>
 
 /* DATA */
-enum {
-    SUCCESS = 0,
-    INVALID = -1,
-};
+
+#define SUCCESS 0
+#define INVALID -1
 
 /**
  * @brief structure of a stack object
@@ -25,6 +24,7 @@ typedef struct stack_t {
 } stack_t;
 
 /* PUBLIC FUNCTIONS */
+
 stack_t *stack_init(size_t capacity, FREE_F customfree) {
     if (capacity == 0) {
         return NULL;

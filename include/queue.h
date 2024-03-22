@@ -5,9 +5,7 @@
 
 /* DATA */
 
-enum {
-    QUEUE_UNLIMITED, // unlimited capacity queue
-};
+#define QUEUE_UNLIMITED 0 // unlimited capacity queue
 
 /**
  * @brief A pointer to a user-defined free function.  This is used to free
@@ -44,18 +42,19 @@ typedef struct queue_t queue_t;
  * queue will use the compare function in look up operations. If NULL is given,
  * these operations will not be supported.
  *
- * If an error occurs, NULL will be returned and errno will be set.
+ * If an error occurs, NULL will be returned.
  * Possible error codes are:
- * - EINVAL: compare function is NULL
  * - ENOMEM: memory allocation failed
  *
  * @param capacity max number of nodes the queue will hold
  * @param customfree pointer to user defined free function
  * @note if the user passes in NULL, the queue will not free the data
  * @param compare pointer to user defined compare function
+ * @param err pointer to integer to store error code
  * @returns pointer to allocated queue on success or NULL on failure
  */
-queue_t *queue_init(size_t capacity, FREE_F customfree, CMP_F compare);
+queue_t *queue_init(size_t capacity, FREE_F customfree, CMP_F compare,
+                    int *err);
 
 /**
  * @brief Check if queue is full.
@@ -63,9 +62,7 @@ queue_t *queue_init(size_t capacity, FREE_F customfree, CMP_F compare);
  * If the queue's capacity is 0 (unlimited), this function will always return
  * false.
  *
- * If an error occurs, -1 will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: queue is NULL
+ * If queue is NULL, -1 will be returned.
  *
  * @param queue pointer queue object
  * @return 0 if queue is not full, positive if full, -1 on error.
@@ -75,9 +72,7 @@ int queue_is_full(const queue_t *queue);
 /**
  * @brief Check if queue is empty.
  *
- * If an error occurs, -1 will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: queue is NULL
+ * If queue is NULL, -1 will be returned.
  *
  * @param queue pointer queue object
  * @return 0 if queue is not empty, positive if empty, -1 on error.
@@ -89,9 +84,7 @@ int queue_is_empty(const queue_t *queue);
  *
  * A queue with 0 capacity is considered to have unlimited capacity.
  *
- * If an error occurs, -1 will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: queue is NULL
+ * If queue is NULL, -1 will be returned.
  *
  * @param queue pointer to queue to get capacity of
  * @return the capacity of the queue, -1 on error.
@@ -101,9 +94,7 @@ ssize_t queue_capacity(const queue_t *queue);
 /**
  * @brief Get the current size of the queue.
  *
- * If an error occurs, -1 will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: queue is NULL
+ * If queue is NULL, -1 will be returned.
  *
  * @param queue pointer to queue to get size of
  * @return the number of elements in the queue, -1 on error.
@@ -113,7 +104,7 @@ ssize_t queue_size(const queue_t *queue);
 /**
  * @brief Push a new node into the queue.
  *
- * If an error occurs, non-zero will be returned and errno will be set.
+ * If an error occurs, non-zero will be returned.
  * Possible error codes are:
  * - EINVAL: queue is NULL
  * - EOVERFLOW: queue is full
@@ -128,9 +119,7 @@ int queue_enqueue(queue_t *queue, void *data);
 /**
  * @brief Pop the front node out of the queue.
  *
- * If an error occurs, NULL will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: queue is NULL
+ * If queue is NULL, NULL will be returned.
  *
  * @param queue pointer to queue pointer to pop the node off of
  * @return the 0 on success, NULL on error.
@@ -140,9 +129,7 @@ void *queue_dequeue(queue_t *queue);
 /**
  * @brief Get the data from the node at a specific position in the queue.
  *
- * If an error occurs, NULL will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: queue is NULL
+ * If queue is NULL, NULL will be returned.
  *
  * @param queue pointer to queue pointer to get the node from
  * @param position position in the queue to get the node from
@@ -153,9 +140,7 @@ void *queue_get(const queue_t *queue, size_t position);
 /**
  * @brief Get the data from the node at the front of the queue without popping.
  *
- * If an error occurs, NULL will be returned and errno will be set.
- * Possible error codes are:
- * - EINVAL: queue is NULL
+ * If queue is NULL, NULL will be returned.
  *
  * @param queue pointer to queue pointer to peek
  * @return the pointer to the head on success, NULL on error.
@@ -165,7 +150,7 @@ void *queue_peek(const queue_t *queue);
 /**
  * @brief Remove the first occurrence of a value in the queue.
  *
- * If an error occurs, NULL will be returned and errno will be set.
+ * If an error occurs, NULL will be returned.
  * Possible error codes are:
  * - EINVAL: queue is NULL
  * - ENOTSUP: queue does not support lookup operations
@@ -174,12 +159,12 @@ void *queue_peek(const queue_t *queue);
  * @param item_to_remove pointer to value to remove
  * @return pointer to the removed value, NULL if not found or on error
  */
-void *queue_remove(queue_t *queue, void *item_to_remove);
+void *queue_remove(queue_t *queue, void *item_to_remove, int *err);
 
 /**
  * @brief Find the first occurrence of a value in the queue.
  *
- * If an error occurs, NULL will be returned and errno will be set.
+ * If an error occurs, NULL will be returned.
  * Possible error codes are:
  * - EINVAL: queue is NULL
  * - ENOTSUP: queue does not support lookup operations
@@ -189,7 +174,8 @@ void *queue_remove(queue_t *queue, void *item_to_remove);
  * @return pointer to the first occurrence of the value in the queue, NULL if
  *         not found or queue is NULL
  */
-void *queue_find_first(const queue_t *queue, const void *value_to_find);
+void *queue_find_first(const queue_t *queue, const void *value_to_find,
+                       int *err);
 
 /**
  * @brief Clear all nodes out of a queue.
