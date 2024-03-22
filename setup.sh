@@ -1,10 +1,14 @@
 #!/bin/bash
 
+set -eu -o pipefail
+
 CMAKE_ARGS=""
 MAKE_ARGS=""
 POST_CMD=""
 
-if [[ $1 == "help" ]]; then
+if [[ $# -eq 0 ]]; then # default
+    BUIILD_TYPE="Debug"
+elif [[ $1 == "help" ]]; then
     echo -e "Usage: $0 [release|debug|rwdi|min|clean|analyze|test|install|help]\n"
     echo "  release: build in release mode"
     echo "  debug:   build in debug mode"
@@ -21,34 +25,40 @@ elif [[ $1 == "clean" ]]; then
     touch build/.gitkeep
     exit 0
 elif [[ $1 == "release" ]]; then
-    CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release"
+    BUIILD_TYPE="Release"
 elif [[ $1 == "debug" ]]; then
-    CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Debug"
+    BUIILD_TYPE="Debug"
 elif [[ $1 == "rwdi" ]]; then
-    CMAKE_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+    BUIILD_TYPE="RelWithDebInfo"
 elif [[ $1 == "min" ]]; then
-    CMAKE_ARGS="-DCMAKE_BUILD_TYPE=MinSizeRel"
+    BUIILD_TYPE="MinSizeRel"
 elif [[ $1 == "analyze" ]]; then
-    CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Debug"
+    BUIILD_TYPE="Debug"
     CMAKE_ARGS="-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
-    POST_CMD="analyze-build --cdb build/compile_commands.json"
+
+    POST_CMD=$(find / -name "analyze-build" 2>/dev/null || echo "")
+    if [[ -z $POST_CMD ]]; then
+        POST_CMD="echo -e \nuse 'analyze-build --cdb build/compile_commands.json' to run analyze-build manually"
+    else
+        POST_CMD+=" --cdb build/compile_commands.json"
+    fi
 elif [[ $1 == "test" ]]; then
-    CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Debug"
-    CMAKE_ARGS+=" -DBUILD_TESTING=ON"
+    BUIILD_TYPE="Debug"
+    CMAKE_ARGS="-DBUILD_TESTING=ON"
     MAKE_ARGS="CTEST_OUTPUT_ON_FAILURE=1 all test"
 elif [[ $1 == "install" ]]; then
-    CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release"
+    BUIILD_TYPE="Release"
     MAKE_ARGS="install"
-elif [[ -z $1 ]]; then # default
-    CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Debug"
-elif [[ -n $1 ]]; then # unknown
+else # unknown
     echo "Unknown command: $1"
     exit 1
 fi
+
+CMAKE_ARGS="-DCMAKE_BUILD_TYPE=${BUIILD_TYPE} ${CMAKE_ARGS}"
 
 mkdir -p build
 cd build
 cmake ${CMAKE_ARGS} ..
 make -j$(nproc) ${MAKE_ARGS}
 cd ..
-# ${POST_CMD}
+${POST_CMD}
