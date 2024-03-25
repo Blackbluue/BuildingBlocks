@@ -1,54 +1,68 @@
 #!/bin/bash
 
+set -eu -o pipefail
+
 CMAKE_ARGS=""
-MAKE_ARGS=""
+SOURCE_DIR="."
+BUILD_DIR="build/"
+INSTALL_DIR="~/.local"
+BUILD_ARGS=""
 POST_CMD=""
 
-if [[ $1 == "help" ]]; then
-    echo -e "Usage: $0 [release|debug|rwdi|min|clean|analyze|test|install|help]\n"
-    echo "  release: build in release mode"
-    echo "  debug:   build in debug mode"
-    echo "  rwdi:    build in RelWithDebInfo mode"
-    echo "  min:     build in MinSizeRel mode"
-    echo "  clean:   clean build directory"
-    echo "  analyze: build in debug mode and run analyze-build"
-    echo "  test:    build in debug mode and run tests"
-    echo "  install: build and install"
-    echo "  help:    show this message"
+if [[ $# -eq 0 ]]; then # default
+    BUIILD_TYPE="Debug"
+elif [[ $1 == "help" ]]; then
+    echo -e "Usage: $0 [release|debug|rwdi|min|clean|analyze|test|install|uninstall|help]\n"
+    echo "  release:    build in release mode"
+    echo "  debug:      build in debug mode"
+    echo "  rwdi:       build in RelWithDebInfo mode"
+    echo "  min:        build in MinSizeRel mode"
+    echo "  clean:      clean build directory"
+    echo "  analyze:    build in debug mode and run analyze-build"
+    echo "  test:       build in debug mode and run tests"
+    echo "  install:    build and install"
+    echo "  uninstall:  uninstall"
+    echo "  help:       show this message"
     exit 0
 elif [[ $1 == "clean" ]]; then
     rm -rf build/*
     touch build/.gitkeep
     exit 0
 elif [[ $1 == "release" ]]; then
-    CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release"
+    BUIILD_TYPE="Release"
 elif [[ $1 == "debug" ]]; then
-    CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Debug"
+    BUIILD_TYPE="Debug"
 elif [[ $1 == "rwdi" ]]; then
-    CMAKE_ARGS="-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+    BUIILD_TYPE="RelWithDebInfo"
 elif [[ $1 == "min" ]]; then
-    CMAKE_ARGS="-DCMAKE_BUILD_TYPE=MinSizeRel"
+    BUIILD_TYPE="MinSizeRel"
 elif [[ $1 == "analyze" ]]; then
-    CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Debug"
+    BUIILD_TYPE="Debug"
     CMAKE_ARGS="-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
-    POST_CMD="analyze-build --cdb build/compile_commands.json"
+
+    ANALYZE_BIN=$(find / -name "analyze-build" 2>/dev/null || echo "")
+    if [[ -z $ANALYZE_BIN ]]; then
+        POST_CMD="echo -e \nuse 'analyze-build --cdb build/compile_commands.json' to run analyze-build manually"
+    else
+        POST_CMD="${ANALYZE_BIN} --cdb build/compile_commands.json"
+    fi
 elif [[ $1 == "test" ]]; then
-    CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Debug"
-    CMAKE_ARGS+=" -DBUILD_TESTING=ON"
-    MAKE_ARGS="CTEST_OUTPUT_ON_FAILURE=1 all test"
+    BUIILD_TYPE="Debug"
+    CMAKE_ARGS="-DBUILD_TESTING=ON"
+    BUILD_ARGS="-t all test -- CTEST_OUTPUT_ON_FAILURE=1"
 elif [[ $1 == "install" ]]; then
-    CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release"
-    MAKE_ARGS="install"
-elif [[ -z $1 ]]; then # default
-    CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Debug"
-elif [[ -n $1 ]]; then # unknown
+    BUIILD_TYPE="Release"
+    BUILD_ARGS="-t install -- DESTDIR=${INSTALL_DIR}"
+elif [[ $1 == "uninstall" ]]; then
+    BUIILD_TYPE="Release"
+    BUILD_ARGS="-t uninstall -- DESTDIR=${INSTALL_DIR}"
+else # unknown
     echo "Unknown command: $1"
     exit 1
 fi
 
-mkdir -p build
-cd build
-cmake ${CMAKE_ARGS} ..
-make -j$(nproc) ${MAKE_ARGS}
-cd ..
-# ${POST_CMD}
+CMAKE_ARGS="-DCMAKE_BUILD_TYPE=${BUIILD_TYPE} ${CMAKE_ARGS}"
+
+cmake ${CMAKE_ARGS} -S ${SOURCE_DIR} -B ${BUILD_DIR}
+cmake --build ${BUILD_DIR} -j $(nproc) ${BUILD_ARGS}
+${POST_CMD}
