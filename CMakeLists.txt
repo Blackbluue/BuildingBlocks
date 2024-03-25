@@ -31,8 +31,19 @@ project(
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_library(${PROJECT_NAME} SHARED ${CMAKE_CURRENT_SOURCE_DIR}/src/buildingblocks.c)
-install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION /usr/local/lib)
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/ DESTINATION /usr/local/include/${PROJECT_NAME})
+install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION /lib)
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/ DESTINATION /include/${PROJECT_NAME})
+
+# uninstall target
+if(NOT TARGET uninstall)
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+        IMMEDIATE @ONLY)
+
+    add_custom_target(uninstall
+        COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
+endif()
 
 
 ### DATA STRUCTURES ###

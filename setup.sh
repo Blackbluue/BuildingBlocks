@@ -12,16 +12,17 @@ POST_CMD=""
 if [[ $# -eq 0 ]]; then # default
     BUIILD_TYPE="Debug"
 elif [[ $1 == "help" ]]; then
-    echo -e "Usage: $0 [release|debug|rwdi|min|clean|analyze|test|install|help]\n"
-    echo "  release: build in release mode"
-    echo "  debug:   build in debug mode"
-    echo "  rwdi:    build in RelWithDebInfo mode"
-    echo "  min:     build in MinSizeRel mode"
-    echo "  clean:   clean build directory"
-    echo "  analyze: build in debug mode and run analyze-build"
-    echo "  test:    build in debug mode and run tests"
-    echo "  install: build and install"
-    echo "  help:    show this message"
+    echo -e "Usage: $0 [release|debug|rwdi|min|clean|analyze|test|install|uninstall|help]\n"
+    echo "  release:    build in release mode"
+    echo "  debug:      build in debug mode"
+    echo "  rwdi:       build in RelWithDebInfo mode"
+    echo "  min:        build in MinSizeRel mode"
+    echo "  clean:      clean build directory"
+    echo "  analyze:    build in debug mode and run analyze-build"
+    echo "  test:       build in debug mode and run tests"
+    echo "  install:    build and install"
+    echo "  uninstall:  uninstall"
+    echo "  help:       show this message"
     exit 0
 elif [[ $1 == "clean" ]]; then
     rm -rf build/*
@@ -48,10 +49,13 @@ elif [[ $1 == "analyze" ]]; then
 elif [[ $1 == "test" ]]; then
     BUIILD_TYPE="Debug"
     CMAKE_ARGS="-DBUILD_TESTING=ON"
-    BUILD_ARGS+="-t all test -- CTEST_OUTPUT_ON_FAILURE=1"
+    BUILD_ARGS="-t all test -- CTEST_OUTPUT_ON_FAILURE=1"
 elif [[ $1 == "install" ]]; then
     BUIILD_TYPE="Release"
-    BUILD_ARGS+="-t install -- DESTDIR=${INSTALL_DIR}"
+    BUILD_ARGS="-t install -- DESTDIR=${INSTALL_DIR}"
+elif [[ $1 == "uninstall" ]]; then
+    BUIILD_TYPE="Release"
+    BUILD_ARGS="-t uninstall -- DESTDIR=${INSTALL_DIR}"
 else # unknown
     echo "Unknown command: $1"
     exit 1
