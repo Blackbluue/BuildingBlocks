@@ -26,18 +26,6 @@ struct queue_t {
 
 /* PRIVATE FUNCTIONS*/
 
-/**
- * @brief Sets the error code.
- *
- * @param err The error code.
- * @param value The value to set.
- */
-static void set_err(int *err, int value) {
-    if (err != NULL) {
-        *err = value;
-    }
-}
-
 /* PUBLIC FUNCTIONS*/
 
 queue_t *queue_init(size_t capacity, FREE_F customfree, CMP_F compare,

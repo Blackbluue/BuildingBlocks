@@ -42,17 +42,6 @@ struct tree_t {
 /* PRIVATE FUNCTIONS*/
 
 /**
- * @brief Sets the error code.
- *
- * @param err The error code.
- * @param value The value to set.
- */
-static void set_err(int *err, int value) {
-    if (err != NULL) {
-        *err = value;
-    }
-}
-/**
  * @brief Search for a node in the tree recursively.
  *
  * If the node is not found, the function returns a pointer to the node where

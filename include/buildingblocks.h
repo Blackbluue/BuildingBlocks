@@ -21,4 +21,12 @@ enum query_cmds {
 #define DEBUG_PRINT(fmt, ...) /* Don't do anything in release builds */
 #endif
 
+/**
+ * @brief Sets the error code.
+ *
+ * @param err The error code.
+ * @param value The value to set.
+ */
+void set_err(int *err, int value);
+
 #endif /* BUILDINGBLOCKS_H */

@@ -48,18 +48,6 @@ typedef int (*LOCAL_ACT_F)(list_node_t *node_data, void *addl_data);
 /* PRIVATE FUNCTIONS*/
 
 /**
- * @brief Sets the error code.
- *
- * @param err The error code.
- * @param value The value to set.
- */
-static void set_err(int *err, int value) {
-    if (err != NULL) {
-        *err = value;
-    }
-}
-
-/**
  * @brief Create a new list node.
  *
  * @param data data to be stored in the node
