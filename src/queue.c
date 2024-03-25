@@ -1,4 +1,5 @@
 #include "queue.h"
+#include "buildingblocks.h"
 #include "linked_list.h"
 #include <errno.h>
 #include <stdbool.h>

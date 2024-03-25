@@ -1,5 +1,6 @@
 #define _DEFAULT_SOURCE
 #include "array_list.h"
+#include "buildingblocks.h"
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>

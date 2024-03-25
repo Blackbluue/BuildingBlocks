@@ -1,4 +1,5 @@
 #include "avl_tree.h"
+#include "buildingblocks.h"
 #include "queue.h"
 #include <errno.h>
 #include <stdlib.h>

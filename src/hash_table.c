@@ -1,4 +1,5 @@
 #include "hash_table.h"
+#include "buildingblocks.h"
 #include "linked_list.h"
 #include <errno.h>
 #include <stdint.h>
