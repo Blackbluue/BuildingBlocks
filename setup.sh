@@ -51,7 +51,7 @@ elif [[ $1 == "test" ]]; then
     BUILD_ARGS+="-t all test -- CTEST_OUTPUT_ON_FAILURE=1"
 elif [[ $1 == "install" ]]; then
     BUIILD_TYPE="Release"
-    BUILD_ARGS+="-t install"
+    BUILD_ARGS+="-t install -- DESTDIR=${INSTALL_DIR}"
 else # unknown
     echo "Unknown command: $1"
     exit 1
