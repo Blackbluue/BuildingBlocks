@@ -3,7 +3,10 @@
 set -eu -o pipefail
 
 CMAKE_ARGS=""
-MAKE_ARGS=""
+SOURCE_DIR="."
+BUILD_DIR="build/"
+INSTALL_DIR="/usr/local"
+BUILD_ARGS=""
 POST_CMD=""
 
 if [[ $# -eq 0 ]]; then # default
@@ -36,19 +39,19 @@ elif [[ $1 == "analyze" ]]; then
     BUIILD_TYPE="Debug"
     CMAKE_ARGS="-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
 
-    POST_CMD=$(find / -name "analyze-build" 2>/dev/null || echo "")
-    if [[ -z $POST_CMD ]]; then
+    ANALYZE_BIN=$(find / -name "analyze-build" 2>/dev/null || echo "")
+    if [[ -z $ANALYZE_BIN ]]; then
         POST_CMD="echo -e \nuse 'analyze-build --cdb build/compile_commands.json' to run analyze-build manually"
     else
-        POST_CMD+=" --cdb build/compile_commands.json"
+        POST_CMD="${ANALYZE_BIN} --cdb build/compile_commands.json"
     fi
 elif [[ $1 == "test" ]]; then
     BUIILD_TYPE="Debug"
     CMAKE_ARGS="-DBUILD_TESTING=ON"
-    MAKE_ARGS="CTEST_OUTPUT_ON_FAILURE=1 all test"
+    BUILD_ARGS+="-t all test -- CTEST_OUTPUT_ON_FAILURE=1"
 elif [[ $1 == "install" ]]; then
     BUIILD_TYPE="Release"
-    MAKE_ARGS="install"
+    BUILD_ARGS+="-t install"
 else # unknown
     echo "Unknown command: $1"
     exit 1
@@ -56,9 +59,6 @@ fi
 
 CMAKE_ARGS="-DCMAKE_BUILD_TYPE=${BUIILD_TYPE} ${CMAKE_ARGS}"
 
-mkdir -p build
-cd build
-cmake ${CMAKE_ARGS} ..
-make -j$(nproc) ${MAKE_ARGS}
-cd ..
+cmake ${CMAKE_ARGS} -S ${SOURCE_DIR} -B ${BUILD_DIR}
+cmake --build ${BUILD_DIR} -j $(nproc) ${BUILD_ARGS}
 ${POST_CMD}
