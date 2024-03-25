@@ -5,7 +5,7 @@ set -eu -o pipefail
 CMAKE_ARGS=""
 SOURCE_DIR="."
 BUILD_DIR="build/"
-INSTALL_DIR="/usr/local"
+INSTALL_DIR="~/.local"
 BUILD_ARGS=""
 POST_CMD=""
 
