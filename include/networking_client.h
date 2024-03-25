@@ -1,0 +1,4 @@
+#ifndef NETWORKING_CLIENT_H
+#define NETWORKING_CLIENT_H
+
+#endif /* NETWORKING_CLIENT_H */

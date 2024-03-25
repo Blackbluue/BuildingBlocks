@@ -18,7 +18,7 @@ endif()
 
 project(
     BuildingBlocks
-    VERSION 0.1.0
+    VERSION 0.1.2
     LANGUAGES "C"
     DESCRIPTION "A collection of data structures and algorithms"
 )
@@ -88,6 +88,16 @@ add_library(weighted_graph OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/weighted_graph
 target_link_libraries(weighted_graph queue_p queue linked_list hash_table)
 target_link_libraries(${PROJECT_NAME} weighted_graph)
 
+add_library(networking_utils OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_utils.c)
+target_link_libraries(${PROJECT_NAME} networking_utils)
+
+add_library(networking_client OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_client.c)
+target_link_libraries(networking_client networking_utils)
+target_link_libraries(${PROJECT_NAME} networking_client)
+
+add_library(networking_server OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_server.c)
+target_link_libraries(networking_server networking_utils)
+target_link_libraries(${PROJECT_NAME} networking_server)
 
 ### TESTS ###
 
