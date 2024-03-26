@@ -79,6 +79,7 @@ set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/weighted_graph.c)
 ### INSTALL TARGETS ###
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/private_include)
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
 install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION /lib)
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/ DESTINATION /include/${PROJECT_NAME})
