@@ -1,5 +1,6 @@
 #ifndef QUEUE_CONCURRENT_H
 #define QUEUE_CONCURRENT_H
+
 #include <time.h>
 #include <unistd.h>
 

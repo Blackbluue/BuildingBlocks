@@ -1,4 +1,5 @@
 #include "queue.h"
+#include "buildingblocks.h"
 #include "linked_list.h"
 #include <errno.h>
 #include <stdbool.h>
@@ -24,18 +25,6 @@ struct queue_t {
 };
 
 /* PRIVATE FUNCTIONS*/
-
-/**
- * @brief Sets the error code.
- *
- * @param err The error code.
- * @param value The value to set.
- */
-static void set_err(int *err, int value) {
-    if (err != NULL) {
-        *err = value;
-    }
-}
 
 /* PUBLIC FUNCTIONS*/
 
