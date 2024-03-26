@@ -1,4 +1,5 @@
 #include "queue_p.h"
+#include "buildingblocks.h"
 #include "linked_list.h"
 #include "queue.h"
 #include <errno.h>
@@ -28,18 +29,6 @@ struct queue_p_t {
 };
 
 /* PRIVATE FUNCTIONS */
-
-/**
- * @brief Sets the error code.
- *
- * @param err The error code.
- * @param value The value to set.
- */
-static void set_err(int *err, int value) {
-    if (err != NULL) {
-        *err = value;
-    }
-}
 
 /**
  * @brief Compare priorities to find the correct queue.

@@ -1,4 +1,5 @@
 #include "array_list.h"
+#include "buildingblocks.h"
 #include <CUnit/Basic.h>
 #include <CUnit/CUnit.h>
 #include <stdbool.h>

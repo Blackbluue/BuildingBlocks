@@ -1,4 +1,5 @@
 #include "avl_tree.h"
+#include "buildingblocks.h"
 #include <CUnit/Basic.h>
 #include <CUnit/CUnit.h>
 #include <errno.h>

@@ -1,5 +1,6 @@
 #define _DEFAULT_SOURCE
 #include "array_list.h"
+#include "buildingblocks.h"
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -34,18 +35,6 @@ struct arr_list_t {
 };
 
 /* PRIVATE FUNCTIONS */
-
-/**
- * @brief Sets the error code.
- *
- * @param err The error code.
- * @param value The value to set.
- */
-static void set_err(int *err, int value) {
-    if (err != NULL) {
-        *err = value;
-    }
-}
 
 /**
  * @brief Adjusts the size of the array.
