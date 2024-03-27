@@ -75,6 +75,9 @@ add_library(weighted_graph OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/weighted_graph
 target_link_libraries(weighted_graph buildingblocks queue_p queue linked_list hash_table)
 set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/weighted_graph.c)
 
+add_library(serialization OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/serialization.c)
+target_link_libraries(serialization buildingblocks)
+set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/serialization.c)
 
 ### INSTALL TARGETS ###
 
