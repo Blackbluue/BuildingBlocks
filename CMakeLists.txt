@@ -79,6 +79,18 @@ add_library(serialization OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/serialization.c
 target_link_libraries(serialization buildingblocks)
 set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/serialization.c)
 
+add_library(networking_utils OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_utils.c)
+target_link_libraries(networking_utils buildingblocks)
+set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_utils.c)
+
+add_library(networking_client OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_client.c)
+target_link_libraries(networking_client buildingblocks networking_utils)
+set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_client.c)
+
+add_library(networking_server OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_server.c)
+target_link_libraries(networking_server buildingblocks networking_utils)
+set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_server.c)
+
 ### INSTALL TARGETS ###
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -98,17 +110,6 @@ if(NOT TARGET uninstall)
         COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
 endif()
 
-
-add_library(networking_utils OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_utils.c)
-target_link_libraries(${PROJECT_NAME} networking_utils)
-
-add_library(networking_client OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_client.c)
-target_link_libraries(networking_client networking_utils)
-target_link_libraries(${PROJECT_NAME} networking_client)
-
-add_library(networking_server OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_server.c)
-target_link_libraries(networking_server networking_utils)
-target_link_libraries(${PROJECT_NAME} networking_server)
 
 ### TESTS ###
 
