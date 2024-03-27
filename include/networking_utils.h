@@ -16,6 +16,30 @@
  */
 typedef union networking_attr_t networking_attr_t;
 
+/**
+ * @brief Packet header.
+ *
+ * @param header_len - the length of the header
+ * @param data_len - the length of the data
+ * @param data_type - the user defined data type flag
+ */
+struct pkt_hdr {
+    uint32_t header_len; // length of the header
+    uint32_t data_len;   // length of the data
+    uint32_t data_type;  // user defined data type flag
+};
+
+/**
+ * @brief Packet.
+ *
+ * @param hdr - the packet header
+ * @param data - the packet data
+ */
+struct packet {
+    struct pkt_hdr *hdr; // packet header
+    void *data;          // packet data
+};
+
 /* FUNCTIONS */
 
 /**
@@ -129,5 +153,14 @@ int network_attr_get_max_connections(const networking_attr_t *attr,
  */
 int network_attr_set_max_connections(networking_attr_t *attr,
                                      size_t max_connections);
+
+/**
+ * @brief Free a packet.
+ *
+ * Frees the memory allocated for the packet.
+ *
+ * @param pkt - the packet to free
+ */
+void free_packet(struct packet *pkt);
 
 #endif /* NETWORKING_UTILS_H */

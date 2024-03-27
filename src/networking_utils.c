@@ -1,6 +1,6 @@
 #include "networking_utils.h"
 #include <netdb.h>
-#include <unistd.h>
+#include <stdlib.h>
 
 /* DATA */
 
@@ -96,4 +96,12 @@ int network_attr_set_max_connections(networking_attr_t *attr,
         ((struct inner_network_attr *)attr)->max_connections = max_connections;
     }
     return SUCCESS;
+}
+
+void free_packet(struct packet *pkt) {
+    if (pkt != NULL) {
+        free(pkt->hdr);
+        free(pkt->data);
+        free(pkt);
+    }
 }
