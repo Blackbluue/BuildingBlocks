@@ -4,6 +4,9 @@
 #include <errno.h>
 #include <netdb.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/un.h>
+
 /* DATA */
 
 #define SUCCESS 0
@@ -19,7 +22,7 @@ struct server {
 
 server_t *create_inet_server(const char *port, const networking_attr_t *attr,
                              int *err, int *err_type) {
-    server_t *server = malloc(sizeof(server_t));
+    server_t *server = malloc(sizeof(*server));
     if (server == NULL) {
         set_err(err, errno);
         set_err(err_type, SYS);
@@ -92,5 +95,48 @@ error:
     server = NULL;
 cleanup: // if jumped directly here, function succeeded
     freeaddrinfo(result);
+    return server;
+}
+
+server_t *create_unix_server(const char *path, const networking_attr_t *attr,
+                             int *err) {
+    server_t *server = malloc(sizeof(*server));
+    if (server == NULL) {
+        set_err(err, errno);
+        return NULL;
+    }
+    // TODO: verify attr is configured correctly
+    int socktype;
+    size_t connections;
+    network_attr_get_socktype(attr, &socktype);
+    network_attr_get_max_connections(attr, &connections);
+
+    int sock = socket(AF_UNIX, socktype, 0);
+    if (sock == FAILURE) {
+        goto error;
+    }
+
+    struct sockaddr_un addr = {
+        .sun_family = AF_UNIX,
+    };
+    strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
+
+    if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) == FAILURE) {
+        goto error;
+    }
+
+    if (socktype == SOCK_STREAM || socktype == SOCK_SEQPACKET) {
+        if (listen(sock, connections) == FAILURE) {
+            goto error;
+        }
+    }
+    goto cleanup;
+
+error:
+    set_err(err, errno);
+    free(server);
+    server = NULL;
+    close(sock); // ignores EBADF error if sock is still -1
+cleanup:         // if jumped directly here, function succeeded
     return server;
 }
