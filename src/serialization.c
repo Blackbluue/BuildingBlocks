@@ -25,3 +25,16 @@ int read_exact(int fd, void *buff, size_t read_sz) {
     } while (total_len < read_sz);
     return SUCCESS;
 }
+
+int write_all(int fd, const void *buf, size_t len) {
+    ssize_t bytes_written;
+    uint8_t *buf_ptr = (uint8_t *)buf;
+    while (len > 0) {
+        if ((bytes_written = write(fd, buf_ptr, len)) < 0) {
+            return errno;
+        }
+        buf_ptr += bytes_written;
+        len -= bytes_written;
+    }
+    return SUCCESS;
+}
