@@ -60,4 +60,12 @@ server_t *create_inet_server(const char *port, const networking_attr_t *attr,
 server_t *create_unix_server(const char *path, const networking_attr_t *attr,
                              int *err);
 
+/**
+ * @brief Destroy a server.
+ *
+ * @param server - the server to destroy
+ * @return int - 0 on success, -1 on failure
+ */
+int destroy_server(server_t *server);
+
 #endif /* NETWORKING_SERVER_H */

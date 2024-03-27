@@ -140,3 +140,12 @@ error:
 cleanup:         // if jumped directly here, function succeeded
     return server;
 }
+
+int destroy_server(server_t *server) {
+    if (server != NULL) {
+        // TODO: check if server is still running
+        close(server->sock);
+        free(server);
+    }
+    return SUCCESS;
+}
