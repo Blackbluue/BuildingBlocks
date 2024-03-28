@@ -2,10 +2,13 @@
 #include "networking_server.h"
 #include "buildingblocks.h"
 #include <errno.h>
+#include <fcntl.h>
 #include <netdb.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/un.h>
+#include <unistd.h>
 
 /* DATA */
 
@@ -148,4 +151,55 @@ int destroy_server(server_t *server) {
         free(server);
     }
     return SUCCESS;
+}
+
+int run_service(server_t *server, service_f service) {
+    int err = SUCCESS;
+    bool keep_running = true;
+    while (keep_running) {
+        struct sockaddr_in addr;
+        socklen_t addrlen = sizeof(addr);
+        int client_sock =
+            accept(server->sock, (struct sockaddr *)&addr, &addrlen);
+        if (client_sock == FAILURE) {
+            if (errno != EINTR) {
+                err = errno;
+            }
+            break;
+        }
+        if (fcntl(client_sock, F_SETFL, O_NONBLOCK)) {
+            err = errno;
+            close(client_sock);
+            continue;
+        }
+
+        bool handle_client = true;
+        while (handle_client) {
+            struct packet *pkt = recv_pkt_data(client_sock, TO_INFINITE, &err);
+            if (pkt == NULL) {
+                handle_client = false; // drop the client
+                switch (err) {
+                case EWOULDBLOCK:         // no data available
+                case ENODATA:             // client disconnected
+                case ETIMEDOUT:           // client timed out
+                case EINVAL:              // invalid packet
+                    continue;             // don't close the server
+                case EINTR:               // signal interrupt
+                    err = SUCCESS;        // no error
+                default:                  // other errors
+                    keep_running = false; // close the server
+                    continue;
+                }
+            }
+
+            err = service(pkt, &addr, addrlen, client_sock);
+            if (err != SUCCESS) {
+                keep_running = false;
+                handle_client = false;
+            }
+            free_packet(pkt);
+        }
+        close(client_sock);
+    }
+    return err;
 }
