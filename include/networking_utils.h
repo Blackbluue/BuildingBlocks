@@ -8,6 +8,7 @@
 /* DATA */
 
 #define MAX_CONNECTIONS 1 // maximum number of pending connections
+#define TO_INFINITE -1    // infinite timeout for recv_all_data
 
 /**
  * @brief Attributes for creating a server.
@@ -200,5 +201,29 @@ int write_pkt_data(int fd, void *data, size_t len, uint32_t data_type);
  * @return struct packet* - pointer to the packet on success, NULL on failure
  */
 struct packet *read_pkt(int fd, int *err);
+
+/**
+ * @brief Receive packet data from a socket.
+ *
+ * Receives packet data from the given socket and returns a pointer to a packet
+ * struct containing the header and data. The other end must use write_pkt_data
+ * to send the data, or the read will fail.
+ *
+ * The only difference between this function and read_pkt is that this function
+ * will block waiting on available data, with an optional timeout.
+ *
+ * Possible errors:
+ *      ETIMEDOUT: The operation timed out.
+ *      ENODATA: The socket has reached the end of the file early.
+ *      EINVAL: Invalid value in reported header length
+ *      ENOMEM: Out of memory.
+ * See poll(2), read(2) for more details.
+ *
+ * @param sock - the socket
+ * @param timeout - the timeout in milliseconds
+ * @param err - the error code
+ * @return struct packet* - pointer to the packet on success, NULL on failure
+ */
+struct packet *recv_pkt_data(int sock, int timeout, int *err);
 
 #endif /* NETWORKING_UTILS_H */

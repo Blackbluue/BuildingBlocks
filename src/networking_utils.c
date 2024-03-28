@@ -3,6 +3,7 @@
 #include "serialization.h"
 #include <errno.h>
 #include <netdb.h>
+#include <poll.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -185,4 +186,18 @@ struct packet *read_pkt(int fd, int *err) {
         return NULL;
     }
     return pkt;
+}
+
+struct packet *recv_pkt_data(int sock, int timeout, int *err) {
+    struct pollfd pfd = {.fd = sock, .events = POLLIN};
+    int loc_err = poll(&pfd, 1, timeout);
+    if (loc_err <= 0) {
+        // 0 on timeout, negative on poll error
+        set_err(err, loc_err == 0 ? ETIMEDOUT : errno);
+        return NULL;
+    } else if (pfd.revents & POLLIN) {
+        return read_pkt(sock, err);
+    } else {
+        return NULL; // error in revents, usually means other end closed
+    }
 }
