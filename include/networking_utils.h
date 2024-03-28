@@ -2,8 +2,8 @@
 #define NETWORKING_UTILS_H
 
 #include "networking_types.h"
+#include <arpa/inet.h>
 #include <stdint.h>
-#include <unistd.h>
 
 /* DATA */
 
@@ -40,6 +40,9 @@ struct packet {
     struct pkt_hdr *hdr; // packet header
     void *data;          // packet data
 };
+
+typedef int (*service_f)(struct packet *pkt, struct sockaddr_in *addr,
+                         socklen_t addrlen, int client_sock);
 
 /* FUNCTIONS */
 
