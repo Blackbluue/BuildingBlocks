@@ -1,6 +1,8 @@
 #include "networking_utils.h"
+#include "serialization.h"
 #include <netdb.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* DATA */
 
@@ -104,4 +106,18 @@ void free_packet(struct packet *pkt) {
         free(pkt->data);
         free(pkt);
     }
+}
+
+int write_pkt_data(int fd, void *data, size_t len, uint32_t data_type) {
+    struct pkt_hdr hdr;
+    memset(&hdr, 0, sizeof(hdr));
+    hdr.header_len = htonl(sizeof(hdr));
+    hdr.data_len = htonl(len);
+    hdr.data_type = htonl(data_type);
+
+    int err = write_all(fd, &hdr, sizeof(hdr));
+    if (err != SUCCESS) {
+        return err;
+    }
+    return write_all(fd, data, len);
 }

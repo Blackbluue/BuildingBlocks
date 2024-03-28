@@ -163,4 +163,23 @@ int network_attr_set_max_connections(networking_attr_t *attr,
  */
 void free_packet(struct packet *pkt);
 
+/**
+ * @brief Write packet data to a file descriptor.
+ *
+ * The data will be sent in a packet with a header containing the length of the
+ * serialized data. recv_pkt_data or read_pkt should be used to read the data
+ * in the proper format. The data_type flag is used to specify the type of the
+ * data. The data_type flag is not checked here and should be checked by the
+ * application.
+ *
+ * Possible errors are the same as write(2).
+ *
+ * @param fd - the file descriptor
+ * @param data - the data to write
+ * @param len - the length of the data
+ * @param data_type - flag for the type of the data
+ * @return int - 0 on success, non-zero on failure
+ */
+int write_pkt_data(int fd, void *data, size_t len, uint32_t data_type);
+
 #endif /* NETWORKING_UTILS_H */
