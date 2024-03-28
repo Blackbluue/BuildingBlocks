@@ -31,30 +31,40 @@ typedef struct server server_t;
 server_t *init_server(int *err);
 
 /**
- * @brief Create an Inet server socket.
+ * @brief Open an Inet server socket.
  *
- * Creates an Inet server with the given attributes. The socket will be bound to
- * all interfaces. If the socket type is SOCK_STREAM or SOCK_SEQPACKET, the
- * socket will be set to listen for incoming connections.
+ * Creates an Inet socket with the given attributes and stores it in the server
+ * with the given name. The socket will be bound to all interfaces. If the
+ * socket type is SOCK_STREAM or SOCK_SEQPACKET, the socket will be set to
+ * listen for incoming connections.
  *
+ * NOTE: Until multiple services are supported, the name will be ignored and
+ * calling this function multiple times will overwrite the previous service.
+ *
+ * Errors are separated into different types. The error type will be stored in
+ * optional err_type argument, while the error itself will always be returned.
  * Possible errors:
  * - SOCK: socket error
  *      See socket(2)for more details.
  * - GAI: getaddrinfo error
  *      See getaddrinfo(3)for more details.
  * - SYS: system error
+ *      EINVAL: server, name, or port is NULL
  *      ENOMEM: Insufficient memory is available.
  * - BIND: bind error
  *      See bind(2)for more details.
  * - LISTEN: listen error
  *      See listen(2)for more details.
  *
- * @param attr - the attributes for the server
+ * @param server - the server to store the socket
+ * @param name - the identifier of the service
  * @param port - the port number
- * @return server_t* - the server on success, NULL on failure
+ * @param attr - the attributes for the server
+ * @param err_type - the error code type
+ * @return int - 0 on success, non-zero on failure
  */
-server_t *create_inet_server(const char *port, const networking_attr_t *attr,
-                             int *err, int *err_type);
+int open_inet_socket(server_t *server, const char *name, const char *port,
+                     const networking_attr_t *attr, int *err_type);
 
 /**
  * @brief Create a Unix domain server.

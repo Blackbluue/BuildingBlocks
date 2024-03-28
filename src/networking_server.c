@@ -34,15 +34,21 @@ server_t *init_server(int *err) {
     return server;
 }
 
-server_t *create_inet_server(const char *port, const networking_attr_t *attr,
-                             int *err, int *err_type) {
-    server_t *server = malloc(sizeof(*server));
-    if (server == NULL) {
-        set_err(err, errno);
+int open_inet_socket(server_t *server, const char *name, const char *port,
+                     const networking_attr_t *attr, int *err_type) {
+    if (server == NULL || port == NULL || name == NULL) {
         set_err(err_type, SYS);
-        return NULL;
+        return EINVAL;
     }
-    // TODO: verify attr is configured correctly
+    // until multithread support is added, only one service can be registered
+    close(server->sock); // ignore EBADF error if sock is still -1
+    server->sock = FAILURE;
+    char *loc_name = strdup(name);
+    if (loc_name == NULL) {
+        set_err(err_type, SYS);
+        return ENOMEM;
+    }
+    // TODO: verify attr is configured correctly, or use default attr on NULL
     int socktype;
     int family;
     size_t connections;
@@ -58,13 +64,12 @@ server_t *create_inet_server(const char *port, const networking_attr_t *attr,
     };
 
     struct addrinfo *result = NULL;
-    int loc_err = getaddrinfo(NULL, port, &hints, &result);
-    if (loc_err != SUCCESS) {
-        if (loc_err == EAI_SYSTEM) {
-            set_err(err, errno);
+    int err = getaddrinfo(NULL, port, &hints, &result);
+    if (err != SUCCESS) {
+        if (err == EAI_SYSTEM) {
+            err = errno;
             set_err(err_type, SYS);
         } else {
-            set_err(err, loc_err);
             set_err(err_type, GAI);
         }
         goto error;
@@ -74,10 +79,9 @@ server_t *create_inet_server(const char *port, const networking_attr_t *attr,
          res_ptr = res_ptr->ai_next) {
         server->sock = socket(res_ptr->ai_family, res_ptr->ai_socktype,
                               res_ptr->ai_protocol);
-        if (server->sock == FAILURE) {
-            // error caught at the end of the loop
-            set_err(err, errno);
-            set_err(err_type, SYS);
+        if (server->sock == FAILURE) { // error caught at the end of the loop
+            err = errno;
+            set_err(err_type, SOCK);
             continue;
         }
 
@@ -88,28 +92,33 @@ server_t *create_inet_server(const char *port, const networking_attr_t *attr,
             SUCCESS) {
             if (res_ptr->ai_socktype == SOCK_STREAM ||
                 res_ptr->ai_socktype == SOCK_SEQPACKET) {
-                if (listen(server->sock, connections) == FAILURE) {
-                    // error caught at the end of the loop
-                    set_err(err, errno);
-                    set_err(err_type, SYS);
+                if (listen(server->sock, connections) == SUCCESS) {
+                    err = SUCCESS; // success, exit loop
+                    goto cleanup;
+                } else { // error caught at the end of the loop
+                    err = errno;
+                    set_err(err_type, LISTEN);
                     close(server->sock);
                     continue;
                 }
+            } else {           // don't attempt to listen
+                err = SUCCESS; // success, exit loop
+                goto cleanup;
             }
-            goto cleanup;
+        } else { // error caught at the end of the loop
+            err = errno;
+            set_err(err_type, BIND);
+            close(server->sock);
         }
-        // error caught at the end of the loop
-        set_err(err, errno);
-        set_err(err_type, SYS);
-        close(server->sock);
     }
     // only get here if no address worked
 error:
-    free(server);
-    server = NULL;
-cleanup: // if jumped directly here, function succeeded
+    free(loc_name);
+    loc_name = NULL;
+cleanup:
+    server->name = loc_name;
     freeaddrinfo(result);
-    return server;
+    return err;
 }
 
 server_t *create_unix_server(const char *path, const networking_attr_t *attr,
