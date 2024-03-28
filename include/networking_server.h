@@ -15,6 +15,21 @@ enum err_type {
 
 typedef struct server server_t;
 
+/* FUNCTIONS */
+
+/**
+ * @brief Initialize a server.
+ *
+ * Creates the server object, which can be used to run multiple services.
+ *
+ * Possible errors:
+ * - ENOMEM: Insufficient memory is available.
+ *
+ * @param err - the error code
+ * @return server_t* - the server on success, NULL on failure
+ */
+server_t *init_server(int *err);
+
 /**
  * @brief Create an Inet server socket.
  *

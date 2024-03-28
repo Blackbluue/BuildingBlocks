@@ -16,12 +16,23 @@
 #define FAILURE -1
 
 struct server {
+    char *name;
     int sock;
 };
 
 /* PRIVATE FUNCTIONS */
 
 /* PUBLIC FUNCTIONS */
+
+server_t *init_server(int *err) {
+    server_t *server = calloc(1, sizeof(*server));
+    if (server == NULL) {
+        set_err(err, errno);
+        return NULL;
+    }
+    server->sock = FAILURE;
+    return server;
+}
 
 server_t *create_inet_server(const char *port, const networking_attr_t *attr,
                              int *err, int *err_type) {
@@ -147,6 +158,7 @@ cleanup:         // if jumped directly here, function succeeded
 int destroy_server(server_t *server) {
     if (server != NULL) {
         // TODO: check if server is still running
+        free(server->name);
         close(server->sock);
         free(server);
     }
