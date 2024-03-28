@@ -182,4 +182,23 @@ void free_packet(struct packet *pkt);
  */
 int write_pkt_data(int fd, void *data, size_t len, uint32_t data_type);
 
+/**
+ * @brief Receive packet data from a file descriptor.
+ *
+ * Receives packet data from the given file descriptor and returns a pointer to
+ * a packet struct containing the header and data. The other end must use
+ * write_pkt_data to send the data, or the read will fail.
+ *
+ * Possible errors:
+ *      ENODATA: The socket has reached the end of the file early.
+ *      EINVAL: Invalid value in reported header length
+ *      ENOMEM: Out of memory.
+ * See read(2) for more details.
+ *
+ * @param fd - the file descriptor
+ * @param err - the error code
+ * @return struct packet* - pointer to the packet on success, NULL on failure
+ */
+struct packet *read_pkt(int fd, int *err);
+
 #endif /* NETWORKING_UTILS_H */
