@@ -31,6 +31,14 @@ typedef struct server server_t;
 server_t *init_server(int *err);
 
 /**
+ * @brief Destroy a server.
+ *
+ * @param server - the server to destroy
+ * @return int - 0 on success, -1 on failure
+ */
+int destroy_server(server_t *server);
+
+/**
  * @brief Open an Inet server socket.
  *
  * Creates an Inet socket with the given attributes and stores it in the server
@@ -89,13 +97,5 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
  */
 int open_unix_socket(server_t *server, const char *name, const char *path,
                      const networking_attr_t *attr);
-
-/**
- * @brief Destroy a server.
- *
- * @param server - the server to destroy
- * @return int - 0 on success, -1 on failure
- */
-int destroy_server(server_t *server);
 
 #endif /* NETWORKING_SERVER_H */

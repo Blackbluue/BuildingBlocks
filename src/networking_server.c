@@ -85,6 +85,16 @@ server_t *init_server(int *err) {
     return server;
 }
 
+int destroy_server(server_t *server) {
+    if (server != NULL) {
+        // TODO: check if server is still running
+        free(server->name);
+        close(server->sock);
+        free(server);
+    }
+    return SUCCESS;
+}
+
 int open_inet_socket(server_t *server, const char *name, const char *port,
                      const networking_attr_t *attr, int *err_type) {
     if (server == NULL || port == NULL || name == NULL) {
@@ -192,16 +202,6 @@ error:
 cleanup: // if jumped directly here, function succeeded
     server->name = loc_name;
     return err;
-}
-
-int destroy_server(server_t *server) {
-    if (server != NULL) {
-        // TODO: check if server is still running
-        free(server->name);
-        close(server->sock);
-        free(server);
-    }
-    return SUCCESS;
 }
 
 int run_service(server_t *server, service_f service) {
