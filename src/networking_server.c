@@ -22,6 +22,57 @@ struct server {
 
 /* PRIVATE FUNCTIONS */
 
+/**
+ * @brief Create an inet socket object
+ *
+ * @param result - the result of getaddrinfo
+ * @param connections - the maximum number of connections
+ * @param sock - the socket to be created
+ * @param err_type - the type of error that occurred
+ * @return int - 0 on success, non-zero on failure
+ */
+static int create_socket(struct addrinfo *result, int connections, int *sock,
+                         int *err_type) {
+    int err = FAILURE;
+    for (struct addrinfo *res_ptr = result; res_ptr != NULL;
+         res_ptr = res_ptr->ai_next) {
+        *sock = socket(res_ptr->ai_family, res_ptr->ai_socktype,
+                       res_ptr->ai_protocol);
+        if (*sock == FAILURE) { // error caught at the end of the loop
+            err = errno;
+            set_err(err_type, SOCK);
+            continue;
+        }
+
+        int optval = 1;
+        setsockopt(*sock, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+        if (bind(*sock, res_ptr->ai_addr, res_ptr->ai_addrlen) == SUCCESS) {
+            if (res_ptr->ai_socktype == SOCK_STREAM ||
+                res_ptr->ai_socktype == SOCK_SEQPACKET) {
+                if (listen(*sock, connections) == SUCCESS) {
+                    err = SUCCESS; // success, exit loop
+                    break;
+                } else { // error caught at the end of the loop
+                    err = errno;
+                    set_err(err_type, LISTEN);
+                    close(*sock);
+                    *sock = FAILURE;
+                    continue;
+                }
+            } else {           // don't attempt to listen
+                err = SUCCESS; // success, exit loop
+                break;
+            }
+        } else { // error caught at the end of the loop
+            err = errno;
+            set_err(err_type, BIND);
+            close(*sock);
+            *sock = FAILURE;
+        }
+    }
+    return err;
+}
+
 /* PUBLIC FUNCTIONS */
 
 server_t *init_server(int *err) {
@@ -40,7 +91,7 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
         set_err(err_type, SYS);
         return EINVAL;
     }
-    // until multithread support is added, only one service can be registered
+    // until multithread support is added, only one socket can be opened
     close(server->sock); // ignore EBADF error if sock is still -1
     server->sock = FAILURE;
     char *loc_name = strdup(name);
@@ -75,41 +126,9 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
         goto error;
     }
 
-    for (struct addrinfo *res_ptr = result; res_ptr != NULL;
-         res_ptr = res_ptr->ai_next) {
-        server->sock = socket(res_ptr->ai_family, res_ptr->ai_socktype,
-                              res_ptr->ai_protocol);
-        if (server->sock == FAILURE) { // error caught at the end of the loop
-            err = errno;
-            set_err(err_type, SOCK);
-            continue;
-        }
-
-        int optval = 1;
-        setsockopt(server->sock, SOL_SOCKET, SO_REUSEADDR, &optval,
-                   sizeof(optval));
-        if (bind(server->sock, res_ptr->ai_addr, res_ptr->ai_addrlen) ==
-            SUCCESS) {
-            if (res_ptr->ai_socktype == SOCK_STREAM ||
-                res_ptr->ai_socktype == SOCK_SEQPACKET) {
-                if (listen(server->sock, connections) == SUCCESS) {
-                    err = SUCCESS; // success, exit loop
-                    goto cleanup;
-                } else { // error caught at the end of the loop
-                    err = errno;
-                    set_err(err_type, LISTEN);
-                    close(server->sock);
-                    continue;
-                }
-            } else {           // don't attempt to listen
-                err = SUCCESS; // success, exit loop
-                goto cleanup;
-            }
-        } else { // error caught at the end of the loop
-            err = errno;
-            set_err(err_type, BIND);
-            close(server->sock);
-        }
+    err = create_socket(result, connections, &server->sock, err_type);
+    if (err == SUCCESS) {
+        goto cleanup;
     }
     // only get here if no address worked
 error:
