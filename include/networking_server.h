@@ -25,16 +25,16 @@ typedef struct server server_t;
  * Possible errors:
  * - ENOMEM: Insufficient memory is available.
  *
- * @param err - the error code
- * @return server_t* - the server on success, NULL on failure
+ * @param err - The error code.
+ * @return server_t* - the server on success, NULL on failure.
  */
 server_t *init_server(int *err);
 
 /**
  * @brief Destroy a server.
  *
- * @param server - the server to destroy
- * @return int - 0 on success, -1 on failure
+ * @param server - The server to destroy.
+ * @return int - 0 on success, -1 on failure.
  */
 int destroy_server(server_t *server);
 
@@ -64,12 +64,12 @@ int destroy_server(server_t *server);
  * @note Until multiple services are supported, the name will be ignored and
  * calling this function multiple times will overwrite the previous service.
  *
- * @param server - the server to store the socket
- * @param name - the identifier of the service
- * @param port - the port number
- * @param attr - the attributes for the server
- * @param err_type - the error code type
- * @return int - 0 on success, non-zero on failure
+ * @param server - The server to store the socket.
+ * @param name - The identifier of the service.
+ * @param port - The port number.
+ * @param attr - The attributes for the server.
+ * @param err_type - The error code type.
+ * @return int - 0 on success, non-zero on failure.
  */
 int open_inet_socket(server_t *server, const char *name, const char *port,
                      const networking_attr_t *attr, int *err_type);
@@ -89,11 +89,11 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
  * @note Until multiple services are supported, the name will be ignored and
  * calling this function multiple times will overwrite the previous service.
  *
- * @param server - the server to store the socket
- * @param name - the identifier of the service
- * @param path - the unix domain path
- * @param attr - the attributes for the server
- * @return int - 0 on success, non-zero on failure
+ * @param server - the server to store the socket.
+ * @param name - the identifier of the service.
+ * @param path - the unix domain path.
+ * @param attr - the attributes for the server.
+ * @return int - 0 on success, non-zero on failure.
  */
 int open_unix_socket(server_t *server, const char *name, const char *path,
                      const networking_attr_t *attr);
@@ -110,13 +110,32 @@ int open_unix_socket(server_t *server, const char *name, const char *path,
  *
  * @note The flags are currently unused and ignored.
  *
- * @param server - the server to register the service with
- * @param name - the name of the service
- * @param service - the service function
- * @param flags - flags for the service
- * @return int - 0 on success, non-zero on failure
+ * @param server - the server to register the service with.
+ * @param name - the name of the service.
+ * @param service - the service function.
+ * @param flags - flags for the service.
+ * @return int - 0 on success, non-zero on failure.
  */
 int register_service(server_t *server, const char *name, service_f service,
                      int flags);
+
+/**
+ * @brief Run a service.
+ *
+ * Runs the service with the given name. The service must be registered with
+ * the server before running. The function will block while accepting incoming
+ * connections and running the designated service; it will return when it
+ * encounters a network error or when the service returns an error.
+ *
+ * Possible errors:
+ * - EINVAL: server or name is NULL.
+ * - ENOENT: The service with the given name does not exist.
+ * See accept(2) and the service function for more error details.
+ *
+ * @param server The server to run the service on.
+ * @param name The name of the service to run.
+ * @return int - 0 on success, non-zero on failure.
+ */
+int run_service(server_t *server, const char *name);
 
 #endif /* NETWORKING_SERVER_H */

@@ -218,7 +218,13 @@ int register_service(server_t *server, const char *name, service_f service,
     return SUCCESS;
 }
 
-int run_service(server_t *server, service_f service) {
+int run_service(server_t *server, const char *name) {
+    if (server == NULL || name == NULL) {
+        return EINVAL;
+    } else if (strncmp(server->name, name, strlen(server->name)) != 0) {
+        return ENOENT;
+    }
+
     int err = SUCCESS;
     bool keep_running = true;
     while (keep_running) {
@@ -232,11 +238,7 @@ int run_service(server_t *server, service_f service) {
             }
             break;
         }
-        if (fcntl(client_sock, F_SETFL, O_NONBLOCK)) {
-            err = errno;
-            close(client_sock);
-            continue;
-        }
+        fcntl(client_sock, F_SETFL, O_NONBLOCK);
 
         bool handle_client = true;
         while (handle_client) {
@@ -257,7 +259,7 @@ int run_service(server_t *server, service_f service) {
                 }
             }
 
-            err = service(pkt, &addr, addrlen, client_sock);
+            err = server->service(pkt, &addr, addrlen, client_sock);
             if (err != SUCCESS) {
                 keep_running = false;
                 handle_client = false;
