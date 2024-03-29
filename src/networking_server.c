@@ -99,6 +99,8 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
         set_err(err_type, SYS);
         return ENOMEM;
     }
+    free(server->name);
+    server->name = NULL;
     // TODO: verify attr is configured correctly, or use default attr on NULL
     int socktype;
     int family;
