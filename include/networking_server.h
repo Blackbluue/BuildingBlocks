@@ -67,23 +67,28 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
                      const networking_attr_t *attr, int *err_type);
 
 /**
- * @brief Create a Unix domain server.
+ * @brief Open a Unix domain server socket.
  *
- * Creates a Unix domain server with the given attributes. The socket
+ * Creates a Unix domain server socket with the given attributes. The socket
  * will be bound to all interfaces. If the socket type is SOCK_STREAM or
  * SOCK_SEQPACKET, the socket will be set to listen for incoming connections.
  *
- * Possible errors:
- * - ENOMEM: Insufficient memory is available.
- * See socket(2), bind(2) and listen(2) for more details.
+ * NOTE: Until multiple services are supported, the name will be ignored and
+ * calling this function multiple times will overwrite the previous service.
  *
+ * Possible errors:
+ * - EINVAL: server, name, or path is NULL
+ * - ENOMEM: Insufficient memory is available.
+ * See socket(2), bind(2) and listen(2) for more error details.
+ *
+ * @param server - the server to store the socket
+ * @param name - the identifier of the service
  * @param path - the unix domain path
  * @param attr - the attributes for the server
- * @param err - the error code
- * @return server_t* - the server on success, NULL on failure
+ * @return int - 0 on success, non-zero on failure
  */
-server_t *create_unix_server(const char *path, const networking_attr_t *attr,
-                             int *err);
+int open_unix_socket(server_t *server, const char *name, const char *path,
+                     const networking_attr_t *attr);
 
 /**
  * @brief Destroy a server.

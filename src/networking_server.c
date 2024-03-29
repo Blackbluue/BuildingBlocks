@@ -142,21 +142,28 @@ cleanup:
     return err;
 }
 
-server_t *create_unix_server(const char *path, const networking_attr_t *attr,
-                             int *err) {
-    server_t *server = malloc(sizeof(*server));
-    if (server == NULL) {
-        set_err(err, errno);
-        return NULL;
+int open_unix_socket(server_t *server, const char *name, const char *path,
+                     const networking_attr_t *attr) {
+    if (server == NULL || name == NULL || path == NULL) {
+        return EINVAL;
     }
+    // until multithread support is added, only one socket can be opened
+    close(server->sock); // ignore EBADF error if sock is still -1
+    char *loc_name = strdup(name);
+    if (loc_name == NULL) {
+        return ENOMEM;
+    }
+    free(server->name);
+    server->name = NULL;
     // TODO: verify attr is configured correctly
     int socktype;
     size_t connections;
     network_attr_get_socktype(attr, &socktype);
     network_attr_get_max_connections(attr, &connections);
 
-    int sock = socket(AF_UNIX, socktype, 0);
-    if (sock == FAILURE) {
+    int err = SUCCESS;
+    server->sock = socket(AF_UNIX, socktype, 0);
+    if (server->sock == FAILURE) {
         goto error;
     }
 
@@ -165,24 +172,26 @@ server_t *create_unix_server(const char *path, const networking_attr_t *attr,
     };
     strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
 
-    if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) == FAILURE) {
+    if (bind(server->sock, (struct sockaddr *)&addr, sizeof(addr)) == FAILURE) {
         goto error;
     }
 
     if (socktype == SOCK_STREAM || socktype == SOCK_SEQPACKET) {
-        if (listen(sock, connections) == FAILURE) {
+        if (listen(server->sock, connections) == FAILURE) {
             goto error;
         }
     }
     goto cleanup;
 
 error:
-    set_err(err, errno);
-    free(server);
-    server = NULL;
-    close(sock); // ignores EBADF error if sock is still -1
-cleanup:         // if jumped directly here, function succeeded
-    return server;
+    err = errno;
+    close(server->sock); // ignores EBADF error if sock is still -1
+    server->sock = FAILURE;
+    free(loc_name);
+    loc_name = NULL;
+cleanup: // if jumped directly here, function succeeded
+    server->name = loc_name;
+    return err;
 }
 
 int destroy_server(server_t *server) {
