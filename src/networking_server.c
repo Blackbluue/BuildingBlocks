@@ -17,6 +17,8 @@
 
 struct server {
     char *name;
+    int flags;
+    service_f service;
     int sock;
 };
 
@@ -202,6 +204,18 @@ error:
 cleanup: // if jumped directly here, function succeeded
     server->name = loc_name;
     return err;
+}
+
+int register_service(server_t *server, const char *name, service_f service,
+                     int flags) {
+    if (server == NULL || name == NULL || service == NULL) {
+        return EINVAL;
+    } else if (strncmp(server->name, name, strlen(server->name)) != 0) {
+        return ENOENT;
+    }
+    server->service = service;
+    server->flags = flags;
+    return SUCCESS;
 }
 
 int run_service(server_t *server, service_f service) {

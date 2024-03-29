@@ -46,9 +46,6 @@ int destroy_server(server_t *server);
  * socket type is SOCK_STREAM or SOCK_SEQPACKET, the socket will be set to
  * listen for incoming connections.
  *
- * NOTE: Until multiple services are supported, the name will be ignored and
- * calling this function multiple times will overwrite the previous service.
- *
  * Errors are separated into different types. The error type will be stored in
  * optional err_type argument, while the error itself will always be returned.
  * Possible errors:
@@ -63,6 +60,9 @@ int destroy_server(server_t *server);
  *      See bind(2)for more details.
  * - LISTEN: listen error
  *      See listen(2)for more details.
+ *
+ * @note Until multiple services are supported, the name will be ignored and
+ * calling this function multiple times will overwrite the previous service.
  *
  * @param server - the server to store the socket
  * @param name - the identifier of the service
@@ -81,13 +81,13 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
  * will be bound to all interfaces. If the socket type is SOCK_STREAM or
  * SOCK_SEQPACKET, the socket will be set to listen for incoming connections.
  *
- * NOTE: Until multiple services are supported, the name will be ignored and
- * calling this function multiple times will overwrite the previous service.
- *
  * Possible errors:
  * - EINVAL: server, name, or path is NULL
  * - ENOMEM: Insufficient memory is available.
  * See socket(2), bind(2) and listen(2) for more error details.
+ *
+ * @note Until multiple services are supported, the name will be ignored and
+ * calling this function multiple times will overwrite the previous service.
  *
  * @param server - the server to store the socket
  * @param name - the identifier of the service
@@ -97,5 +97,26 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
  */
 int open_unix_socket(server_t *server, const char *name, const char *path,
                      const networking_attr_t *attr);
+
+/**
+ * @brief Register a service with the server.
+ *
+ * Registers a service with the server at the given name. A socket with the
+ * given name must be opened before registering a service.
+ *
+ * Possible errors:
+ * - EINVAL: server, name, or service is NULL
+ * - ENOENT: The socket with the given name does not exist
+ *
+ * @note The flags are currently unused and ignored.
+ *
+ * @param server - the server to register the service with
+ * @param name - the name of the service
+ * @param service - the service function
+ * @param flags - flags for the service
+ * @return int - 0 on success, non-zero on failure
+ */
+int register_service(server_t *server, const char *name, service_f service,
+                     int flags);
 
 #endif /* NETWORKING_SERVER_H */
