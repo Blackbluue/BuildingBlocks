@@ -143,7 +143,7 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
     struct addrinfo hints = {
         .ai_family = family,
         .ai_socktype = socktype,
-        .ai_flags = AI_PASSIVE | AI_ADDRCONFIG | AI_V4MAPPED,
+        .ai_flags = AI_PASSIVE | AI_V4MAPPED,
         .ai_protocol = 0,
     };
 
