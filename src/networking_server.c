@@ -25,22 +25,6 @@ struct server {
 /* PRIVATE FUNCTIONS */
 
 /**
- * @brief Use default values for server attributes.
- *
- * @param socktype Socket type.
- * @param family Socket family.
- * @param connections Number of maximum connections.
- */
-static void default_attr(int *socktype, int *family, size_t *connections) {
-    // should probably rename set_err to be more generic
-    set_err(socktype, SOCK_STREAM);
-    set_err(family, AF_INET);
-    if (connections != NULL) {
-        *connections = 1;
-    }
-}
-
-/**
  * @brief Create an inet socket object
  *
  * @param result - the result of getaddrinfo
@@ -129,17 +113,20 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
     }
     free(server->name);
     server->name = NULL;
-    // TODO: verify attr is configured correctly, or use default attr on NULL
+
+    if (attr == NULL) {
+        // use default values
+        networking_attr_t def_attr;
+        attr = &def_attr;
+        init_attr((networking_attr_t *)attr);
+    }
     int socktype;
     int family;
     size_t connections;
-    if (attr != NULL) {
-        network_attr_get_socktype(attr, &socktype);
-        network_attr_get_family(attr, &family);
-        network_attr_get_max_connections(attr, &connections);
-    } else {
-        default_attr(&socktype, &family, &connections);
-    }
+    network_attr_get_socktype(attr, &socktype);
+    network_attr_get_family(attr, &family);
+    network_attr_get_max_connections(attr, &connections);
+
     struct addrinfo hints = {
         .ai_family = family,
         .ai_socktype = socktype,
@@ -186,15 +173,18 @@ int open_unix_socket(server_t *server, const char *name, const char *path,
     }
     free(server->name);
     server->name = NULL;
-    // TODO: verify attr is configured correctly
+
+    if (attr == NULL) {
+        // use default values
+        networking_attr_t def_attr;
+        attr = &def_attr;
+        init_attr((networking_attr_t *)attr);
+    }
     int socktype;
     size_t connections;
-    if (attr != NULL) {
-        network_attr_get_socktype(attr, &socktype);
-        network_attr_get_max_connections(attr, &connections);
-    } else {
-        default_attr(&socktype, NULL, &connections);
-    }
+    network_attr_get_socktype(attr, &socktype);
+    network_attr_get_max_connections(attr, &connections);
+
     int err = SUCCESS;
     server->sock = socket(AF_UNIX, socktype, 0);
     if (server->sock == FAILURE) {

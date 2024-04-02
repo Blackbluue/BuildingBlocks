@@ -15,7 +15,13 @@
 
 int get_server_sock(const char *host, const char *port,
                     const networking_attr_t *attr, int *err, int *err_type) {
-    // TODO: verify attr is configured correctly
+
+    if (attr == NULL) {
+        // use default values
+        networking_attr_t def_attr;
+        attr = &def_attr;
+        init_attr((networking_attr_t *)attr);
+    }
     int socktype;
     int family;
     network_attr_get_socktype(attr, &socktype);
