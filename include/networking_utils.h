@@ -10,6 +10,16 @@
 #define MAX_CONNECTIONS 1 // maximum number of pending connections
 #define TO_INFINITE -1    // infinite timeout for recv_all_data
 
+// TODO: err_type syntax is ugly, need to find an alternative
+enum err_type {
+    SYS,    // system error
+    GAI,    // getaddrinfo error
+    SOCK,   // socket error
+    BIND,   // bind error
+    LISTEN, // listen error
+    CONN,   // connect error
+};
+
 /**
  * @brief Attributes for creating a server.
  *

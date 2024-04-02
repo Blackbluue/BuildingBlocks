@@ -5,13 +5,6 @@
 
 /* DATA */
 
-enum err_type {
-    SYS,  // system error
-    GAI,  // getaddrinfo error
-    SOCK, // socket error
-    CONN, // connect error
-};
-
 /* FUNCTIONS */
 
 int get_server_sock(const char *host, const char *port,

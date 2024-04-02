@@ -5,14 +5,6 @@
 
 /* DATA */
 
-enum err_type {
-    SYS,    // system error
-    GAI,    // getaddrinfo error
-    SOCK,   // socket error
-    BIND,   // bind error
-    LISTEN, // listen error
-};
-
 typedef struct server server_t;
 
 /* FUNCTIONS */
