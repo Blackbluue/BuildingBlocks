@@ -30,7 +30,7 @@ int get_server_sock(const char *host, const char *port,
     struct addrinfo hints = {
         .ai_family = family,
         .ai_socktype = socktype,
-        .ai_flags = AI_ADDRCONFIG | AI_V4MAPPED,
+        .ai_flags = AI_V4MAPPED,
         .ai_protocol = 0,
     };
 
