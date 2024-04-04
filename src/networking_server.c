@@ -240,7 +240,7 @@ int run_service(server_t *server, const char *name) {
     int err = SUCCESS;
     bool keep_running = true;
     while (keep_running) {
-        struct sockaddr_in addr;
+        struct sockaddr_storage addr;
         socklen_t addrlen = sizeof(addr);
         int client_sock =
             accept(server->sock, (struct sockaddr *)&addr, &addrlen);
@@ -274,7 +274,8 @@ int run_service(server_t *server, const char *name) {
             }
             DEBUG_PRINT("packet successfully received\n");
 
-            err = server->service(pkt, &addr, addrlen, client_sock);
+            err = server->service(pkt, (struct sockaddr *)&addr, addrlen,
+                                  client_sock);
             if (err != SUCCESS) {
                 keep_running = false;
                 handle_client = false;

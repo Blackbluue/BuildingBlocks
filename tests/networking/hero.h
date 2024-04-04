@@ -101,7 +101,7 @@ ssize_t hero_size(const struct hero *hero);
  * @param client_sock - The socket descriptor.
  * @return int - 0 on success, non-zero on failure.
  */
-int send_response(struct packet *pkt, struct sockaddr_in *addr,
-                  socklen_t addrlen, int client_sock);
+int send_response(struct packet *pkt, struct sockaddr *addr, socklen_t addrlen,
+                  int client_sock);
 
 #endif /* HERO_H */
