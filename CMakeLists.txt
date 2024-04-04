@@ -79,9 +79,22 @@ add_library(serialization OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/serialization.c
 target_link_libraries(serialization buildingblocks)
 set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/serialization.c)
 
+add_library(networking_utils OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_utils.c)
+target_link_libraries(networking_utils buildingblocks)
+set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_utils.c)
+
+add_library(networking_client OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_client.c)
+target_link_libraries(networking_client buildingblocks networking_utils)
+set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_client.c)
+
+add_library(networking_server OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_server.c)
+target_link_libraries(networking_server buildingblocks networking_utils)
+set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_server.c)
+
 ### INSTALL TARGETS ###
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/private_include)
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
 install(TARGETS ${PROJECT_NAME} LIBRARY DESTINATION /lib)
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/ DESTINATION /include/${PROJECT_NAME})
@@ -96,7 +109,6 @@ if(NOT TARGET uninstall)
     add_custom_target(uninstall
         COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
 endif()
-
 
 
 ### TESTS ###
@@ -132,6 +144,13 @@ if(BUILD_TESTING)
     add_executable(test_tree ${CMAKE_CURRENT_SOURCE_DIR}/tests/avl_tree_tests.c)
     target_link_libraries(test_tree buildingblocks avl_tree queue linked_list cunit)
     add_test(NAME TestTree COMMAND test_tree)
+
+    add_library(hero OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/hero.c)
+    add_executable(test_net_adventure ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/adventure.c)
+    target_link_libraries(test_net_adventure buildingblocks serialization networking_utils networking_server hero)
+    add_executable(test_net_hero ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/hero_client.c)
+    target_link_libraries(test_net_hero buildingblocks serialization networking_utils networking_client hero cunit)
+    add_test(NAME TestNetworking COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/test_networking.sh ${CMAKE_CURRENT_BINARY_DIR}/test_net_adventure ${CMAKE_CURRENT_BINARY_DIR}/test_net_hero)
 
     # add_executable(test_threadpool ${CMAKE_CURRENT_SOURCE_DIR}/tests/threadpool_tests.c)
     # target_link_libraries(test_threadpool buildingblocks threadpool cunit)
