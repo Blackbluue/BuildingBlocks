@@ -251,6 +251,7 @@ int run_service(server_t *server, const char *name) {
             break;
         }
         fcntl(client_sock, F_SETFL, O_NONBLOCK);
+        DEBUG_PRINT("client accepted\n");
 
         bool handle_client = true;
         while (handle_client) {
@@ -262,6 +263,7 @@ int run_service(server_t *server, const char *name) {
                 case ENODATA:             // client disconnected
                 case ETIMEDOUT:           // client timed out
                 case EINVAL:              // invalid packet
+                    err = 0;              // clear error
                     continue;             // don't close the server
                 case EINTR:               // signal interrupt
                     err = SUCCESS;        // no error
@@ -270,14 +272,17 @@ int run_service(server_t *server, const char *name) {
                     continue;
                 }
             }
+            DEBUG_PRINT("packet successfully received\n");
 
             err = server->service(pkt, &addr, addrlen, client_sock);
             if (err != SUCCESS) {
                 keep_running = false;
                 handle_client = false;
             }
+            DEBUG_PRINT("packet successfully processed\n\n");
             free_packet(pkt);
         }
+        DEBUG_PRINT("closing client\n\n\n");
         close(client_sock);
     }
     return err;
