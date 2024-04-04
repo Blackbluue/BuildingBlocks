@@ -109,8 +109,8 @@ ssize_t hero_size(const struct hero *hero) {
     return sizeof(*hero) - sizeof(hero->name) + strlen(hero->name) + 1;
 }
 
-int send_response(struct packet *pkt, struct sockaddr_in *addr,
-                  socklen_t addrlen, int client_sock) {
+int send_response(struct packet *pkt, struct sockaddr *addr, socklen_t addrlen,
+                  int client_sock) {
     (void)addr;
     (void)addrlen;
     if (pkt == NULL) {
