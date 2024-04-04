@@ -21,6 +21,10 @@ int read_exact(int fd, void *buff, size_t read_sz) {
     DEBUG_PRINT("expecting %zu bytes\n", read_sz);
     do {
         if ((bytes_read = read(fd, buf_ptr, read_sz)) < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // retry the read if the call would block
+                continue;
+            }
             DEBUG_PRINT("from call to read(2): %s\n", strerror(errno));
             return errno;
         } else if (bytes_read == 0) {
