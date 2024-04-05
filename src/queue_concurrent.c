@@ -67,7 +67,7 @@ struct deferred_signals_t {
  *
  * @param queue pointer to queue object
  * @param lock mutex lock
- * @param counter_lock mutex lock for counter
+ * @param counter_lock mutex lock for counters
  * @param signals deferred signals object
  * @param lock_free condition variable to signal the lock is not in use
  * @param waiting_for_lock number of threads waiting for the lock
@@ -86,10 +86,11 @@ struct queue_c_t {
     pthread_cond_t lock_free;
 #ifndef __STDC_NO_ATOMICS__
     _Atomic size_t waiting_for_lock;
+    _Atomic size_t waiting_for_cond;
 #else
     size_t waiting_for_lock;
-#endif
     size_t waiting_for_cond;
+#endif
     pthread_t locked_by;
     bool manually_locked;
     bool is_destroying;
@@ -318,6 +319,7 @@ static int wait_for(queue_c_t *queue, pthread_cond_t *cond, PREDICATE pred) {
         return EINVAL;
     }
     DEBUG_PRINT("on thread %lX: getting condition lock\n", pthread_self());
+    ATOMIC_INC(queue->waiting_for_cond, queue->counter_lock);
     int err = lock_queue(queue);
     // check for deadlock and queue destruction
     if (err != SUCCESS) {
@@ -328,7 +330,7 @@ static int wait_for(queue_c_t *queue, pthread_cond_t *cond, PREDICATE pred) {
         DEBUG_PRINT("on thread %lX: waiting for condition\n", pthread_self());
         pthread_cond_wait(cond, &queue->lock);
     }
-    queue->waiting_for_cond--;
+    ATOMIC_DEC(queue->waiting_for_cond, queue->counter_lock);
     if (!keep_waiting(queue)) {
         DEBUG_PRINT("on thread %lX: should stop waiting\n", pthread_self());
         // TODO: waiting_for_cond is being checked before other threads can
@@ -365,6 +367,7 @@ static int timed_wait_for(queue_c_t *queue, pthread_cond_t *cond,
     }
     struct timespec abs_timeout = {time(NULL) + timeout, 0};
     DEBUG_PRINT("on thread %lX: getting condition lock\n", pthread_self());
+    ATOMIC_INC(queue->waiting_for_cond, queue->counter_lock);
     int err = lock_queue(queue);
     // check for deadlock and queue destruction
     if (err != SUCCESS) {
@@ -380,7 +383,7 @@ static int timed_wait_for(queue_c_t *queue, pthread_cond_t *cond,
             return ETIMEDOUT;
         }
     }
-    queue->waiting_for_cond--;
+    ATOMIC_DEC(queue->waiting_for_cond, queue->counter_lock);
     if (!keep_waiting(queue)) {
         DEBUG_PRINT("on thread %lX: should stop waiting\n", pthread_self());
         // stop canceling wait if no other thread is waiting for a condition
