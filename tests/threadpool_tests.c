@@ -300,9 +300,7 @@ void test_threadpool_shutdown() {
 int main(void) {
     CU_TestInfo suite1_tests[] = {
         {"Testing threadpool attributes:", test_threadpool_attributes},
-
         {"Testing threadpool tasks:", test_threadpool_run_tasks},
-
         {"Testing threadpool shutdown:", test_threadpool_shutdown},
 
         CU_TEST_INFO_NULL};

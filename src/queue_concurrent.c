@@ -1,9 +1,14 @@
 #include "queue_concurrent.h"
+#include "debug.h"
 #include "queue.h"
 #include <errno.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdlib.h>
+
+#ifdef DEBUG
+#include <string.h>
+#endif
 
 #ifndef __STDC_NO_ATOMICS__
 #include <stdatomic.h>
@@ -199,7 +204,10 @@ static void unlock_queue(queue_c_t *queue) {
         }
         // can't tell if this thread owns the lock, so we have to try to unlock
         // it and ignore the error
-        pthread_mutex_unlock(&queue->lock);
+        int err = pthread_mutex_unlock(&queue->lock);
+        DEBUG_PRINT("on thread %lX: the queue was%s unlocked successfully%s\n",
+                    pthread_self(), err == SUCCESS ? "" : " NOT",
+                    err == EPERM ? " (not locked)" : "");
     }
 }
 
@@ -215,15 +223,20 @@ static int lock_queue(queue_c_t *queue) {
     if (queue == NULL || queue->is_destroying) {
         return EINVAL;
     }
+    DEBUG_PRINT("on thread %lX: waiting for lock\n", pthread_self());
     ATOMIC_INC(queue->waiting_for_lock, queue->counter_lock);
     int err = pthread_mutex_lock(&queue->lock);
     ATOMIC_DEC(queue->waiting_for_lock, queue->counter_lock);
     // check if destruction was called while waiting for lock
     if (queue->is_destroying) {
+        DEBUG_PRINT("on thread %lX: the queue is being destroyed\n",
+                    pthread_self());
         unlock_queue(queue);
         return EINTR;
     }
-
+    DEBUG_PRINT("on thread %lX: the queue was%s locked successfully%s\n",
+                pthread_self(), err == SUCCESS ? "" : " NOT",
+                err == EDEADLK ? " (deadlock)" : "");
     return err;
 }
 
@@ -287,6 +300,8 @@ static int keep_waiting(queue_c_t *queue) {
     if (queue == NULL) {
         return 0; // nothing to wait on, so stop waiting
     }
+    DEBUG_PRINT("on thread %lX: checking if should keep waiting\n",
+                pthread_self());
     return !queue->cancel_wait && !queue->is_destroying;
 }
 
@@ -302,17 +317,23 @@ static int wait_for(queue_c_t *queue, pthread_cond_t *cond, PREDICATE pred) {
     if (queue == NULL || queue->is_destroying || cond == NULL || pred == NULL) {
         return EINVAL;
     }
+    DEBUG_PRINT("on thread %lX: getting condition lock\n", pthread_self());
     int err = lock_queue(queue);
     // check for deadlock and queue destruction
     if (err != SUCCESS) {
         return err;
     }
-    queue->waiting_for_cond++;
+    DEBUG_PRINT("on thread %lX: condition lock acquired\n", pthread_self());
     if ((!pred(queue)) && keep_waiting(queue)) {
+        DEBUG_PRINT("on thread %lX: waiting for condition\n", pthread_self());
         pthread_cond_wait(cond, &queue->lock);
     }
     queue->waiting_for_cond--;
     if (!keep_waiting(queue)) {
+        DEBUG_PRINT("on thread %lX: should stop waiting\n", pthread_self());
+        // TODO: waiting_for_cond is being checked before other threads can
+        // start waiting, thus cancel_wait is being turned false too soon
+
         // stop canceling wait if no other thread is waiting for a condition
         if (queue->waiting_for_cond == 0) {
             queue->cancel_wait = false;
@@ -343,13 +364,15 @@ static int timed_wait_for(queue_c_t *queue, pthread_cond_t *cond,
         return EINVAL;
     }
     struct timespec abs_timeout = {time(NULL) + timeout, 0};
+    DEBUG_PRINT("on thread %lX: getting condition lock\n", pthread_self());
     int err = lock_queue(queue);
     // check for deadlock and queue destruction
     if (err != SUCCESS) {
         return err;
     }
-    queue->waiting_for_cond++;
+    DEBUG_PRINT("on thread %lX: condition lock acquired\n", pthread_self());
     if ((!pred(queue)) && keep_waiting(queue)) {
+        DEBUG_PRINT("on thread %lX: waiting for condition\n", pthread_self());
         int err = pthread_cond_timedwait(cond, &queue->lock, &abs_timeout);
         if (err == ETIMEDOUT) {
             queue->waiting_for_cond--;
@@ -359,6 +382,7 @@ static int timed_wait_for(queue_c_t *queue, pthread_cond_t *cond,
     }
     queue->waiting_for_cond--;
     if (!keep_waiting(queue)) {
+        DEBUG_PRINT("on thread %lX: should stop waiting\n", pthread_self());
         // stop canceling wait if no other thread is waiting for a condition
         if (queue->waiting_for_cond == 0) {
             queue->cancel_wait = false;
@@ -396,6 +420,7 @@ int queue_c_is_full(queue_c_t *queue) {
     } else if (queue_capacity(queue->queue) == QUEUE_UNLIMITED) {
         return 0;
     }
+    DEBUG_PRINT("on thread %lX: checking if queue is full\n", pthread_self());
     return queue_is_full(queue->queue);
 }
 
@@ -441,6 +466,7 @@ int queue_c_is_empty(queue_c_t *queue) {
     if (queue == NULL || queue->is_destroying) {
         return INVALID;
     }
+    DEBUG_PRINT("on thread %lX: checking if queue is empty\n", pthread_self());
     return queue_is_empty(queue->queue);
 }
 
@@ -491,6 +517,7 @@ int queue_c_lock(queue_c_t *queue) {
     if (queue == NULL || queue->is_destroying) {
         return EINVAL;
     }
+    DEBUG_PRINT("on thread %lX: getting manual lock\n", pthread_self());
     int err = lock_queue(queue);
     // check for deadlock and queue destruction
     if (err == SUCCESS) {
@@ -513,7 +540,11 @@ int queue_c_unlock(queue_c_t *queue) {
         if (queue->waiting_for_lock == 0) {
             pthread_cond_signal(&queue->lock_free);
         }
-        return pthread_mutex_unlock(&queue->lock);
+        int err = pthread_mutex_unlock(&queue->lock);
+        DEBUG_PRINT("on thread %lX: the queue was %s successfully\n",
+                    pthread_self(),
+                    err == SUCCESS ? "unlocked" : "not unlocked");
+        return err;
     }
     return EPERM;
 }
@@ -539,18 +570,24 @@ int queue_c_enqueue(queue_c_t *queue, void *data) {
 
     // deadlock error can be ignored, it was caused by one of the lock functions
     // check if destruction was called while waiting for lock
+    DEBUG_PRINT("on thread %lX: getting auto lock\n", pthread_self());
     if (lock_queue(queue) == EINTR) {
         return EINTR;
     } else if (queue_c_is_full(queue)) {
+        DEBUG_PRINT("on thread %lX: the queue is full\n", pthread_self());
         unlock_queue(queue);
         return EOVERFLOW;
     }
 
+    DEBUG_PRINT("enqueueing...\n");
     int res = queue_enqueue(queue->queue, data);
     if (res != SUCCESS) {
+        DEBUG_PRINT("on thread %lX: enqueue failed: %s\n", pthread_self(),
+                    strerror(res));
         unlock_queue(queue);
         return res;
     }
+    DEBUG_PRINT("on thread %lX: enqueue successful\n", pthread_self());
 
     // set up signals
     queue->signals.not_empty = true;
@@ -570,14 +607,17 @@ void *queue_c_dequeue(queue_c_t *queue, int *err) {
 
     // deadlock error can be ignored, it was caused by one of the lock functions
     // check if destruction was called while waiting for lock
+    DEBUG_PRINT("on thread %lX: getting auto lock\n", pthread_self());
     if (lock_queue(queue) == EINTR) {
         set_err(err, EINTR);
         return NULL;
     } else if (queue_c_is_empty(queue)) {
+        DEBUG_PRINT("on thread %lX: the queue is empty\n", pthread_self());
         unlock_queue(queue);
         return NULL;
     }
 
+    DEBUG_PRINT("dequeueing...\n");
     void *data = queue_dequeue(queue->queue);
 
     // set up signals
@@ -603,6 +643,7 @@ int queue_c_clear(queue_c_t *queue) {
     }
     // deadlock error can be ignored, it was caused by one of the lock functions
     // check if destruction was called while waiting for lock
+    DEBUG_PRINT("on thread %lX: getting auto lock\n", pthread_self());
     if (lock_queue(queue) == EINTR) {
         return EINTR;
     }
@@ -624,6 +665,7 @@ int queue_c_destroy(queue_c_t **queue_addr) {
     // deadlock error can be ignored, it was caused by one of the lock functions
     // check if destruction was called while waiting for lock
     // pthread_mutex_lock(&(*queue_addr)->lock);
+    DEBUG_PRINT("on thread %lX: getting auto lock\n", pthread_self());
     if (lock_queue((*queue_addr)) == EINTR) {
         return EINTR;
     }
