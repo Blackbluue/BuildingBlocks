@@ -153,10 +153,14 @@ void teardown_test(threadpool_t **pool, threadpool_attr_t *attr) {
 
 void dummy_task(void *arg, void *arg2) {
     (void)arg2;
+    fprintf(stderr, "\ton thread %lX: dummy_task\n", pthread_self());
     sleep(TIMEOUT);
+    fprintf(stderr, "\ton thread %lX: work starting\n", pthread_self());
     int *done = arg;
     pthread_mutex_lock(&lock);
     (*done)++;
+    fprintf(stderr, "\ton thread %lX: %d task(s) done\n", pthread_self(),
+            *done);
     pthread_mutex_unlock(&lock);
 }
 

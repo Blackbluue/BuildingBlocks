@@ -178,6 +178,7 @@ static void wake_all_threads(struct deferred_signals_t *signals) {
     if (signals == NULL) {
         return;
     }
+    DEBUG_PRINT("\ton thread %lX: waking all threads\n", pthread_self());
     pthread_cond_broadcast(&signals->cond_is_empty);
     pthread_cond_broadcast(&signals->cond_is_full);
     pthread_cond_broadcast(&signals->cond_not_empty);
@@ -191,7 +192,7 @@ static void wake_all_threads(struct deferred_signals_t *signals) {
  *
  * @param queue pointer to queue object
  */
-static void unlock_queue(queue_c_t *queue) {
+static void auto_unlock_queue(queue_c_t *queue) {
     if (queue == NULL) {
         return;
     }
@@ -232,7 +233,7 @@ static int lock_queue(queue_c_t *queue) {
     if (queue->is_destroying) {
         DEBUG_PRINT("on thread %lX: the queue is being destroyed\n",
                     pthread_self());
-        unlock_queue(queue);
+        auto_unlock_queue(queue);
         return EINTR;
     }
     DEBUG_PRINT("on thread %lX: the queue was%s locked successfully%s\n",
@@ -255,6 +256,7 @@ static void send_signals(queue_c_t *queue) {
     }
     if (!(queue->manually_locked &&
           pthread_equal(queue->locked_by, pthread_self()))) {
+        DEBUG_PRINT("on thread %lX: sending signals\n", pthread_self());
         if (queue->signals.is_empty) {
             pthread_cond_broadcast(&queue->signals.cond_is_empty);
             queue->signals.is_empty = false;
@@ -275,11 +277,11 @@ static void send_signals(queue_c_t *queue) {
 }
 
 /**
- * @brief Manually lock queue.
+ * @brief Mark the queue as manually locked.
  *
  * @param queue pointer to queue object
  */
-static void manual_lock(queue_c_t *queue) {
+static void mark_manually_locked(queue_c_t *queue) {
     if (queue == NULL) {
         return;
     }
@@ -323,6 +325,8 @@ static int wait_for(queue_c_t *queue, pthread_cond_t *cond, PREDICATE pred) {
     int err = lock_queue(queue);
     // check for deadlock and queue destruction
     if (err != SUCCESS) {
+        DEBUG_PRINT("on thread %lX: could not get condition lock\n",
+                    pthread_self());
         return err;
     }
     DEBUG_PRINT("on thread %lX: condition lock acquired\n", pthread_self());
@@ -340,11 +344,12 @@ static int wait_for(queue_c_t *queue, pthread_cond_t *cond, PREDICATE pred) {
         if (queue->waiting_for_cond == 0) {
             queue->cancel_wait = false;
         }
-        unlock_queue(queue);
+        auto_unlock_queue(queue);
         // EINTR takes precedence over EAGAIN
         return queue->is_destroying ? EINTR : EAGAIN;
     }
-    manual_lock(queue);
+    DEBUG_PRINT("on thread %lX: condition met\n", pthread_self());
+    mark_manually_locked(queue);
     return SUCCESS;
 }
 
@@ -379,7 +384,7 @@ static int timed_wait_for(queue_c_t *queue, pthread_cond_t *cond,
         int err = pthread_cond_timedwait(cond, &queue->lock, &abs_timeout);
         if (err == ETIMEDOUT) {
             queue->waiting_for_cond--;
-            unlock_queue(queue);
+            auto_unlock_queue(queue);
             return ETIMEDOUT;
         }
     }
@@ -390,11 +395,11 @@ static int timed_wait_for(queue_c_t *queue, pthread_cond_t *cond,
         if (queue->waiting_for_cond == 0) {
             queue->cancel_wait = false;
         }
-        unlock_queue(queue);
+        auto_unlock_queue(queue);
         // EINTR takes precedence over EAGAIN
         return queue->is_destroying ? EINTR : EAGAIN;
     }
-    manual_lock(queue);
+    mark_manually_locked(queue);
     return SUCCESS;
 }
 
@@ -424,7 +429,10 @@ int queue_c_is_full(queue_c_t *queue) {
         return 0;
     }
     DEBUG_PRINT("on thread %lX: checking if queue is full\n", pthread_self());
-    return queue_is_full(queue->queue);
+    int response = queue_is_full(queue->queue);
+    DEBUG_PRINT("on thread %lX: queue is%s full\n", pthread_self(),
+                response ? "" : " NOT");
+    return response;
 }
 
 int queue_c_wait_for_full(queue_c_t *queue) {
@@ -470,7 +478,10 @@ int queue_c_is_empty(queue_c_t *queue) {
         return INVALID;
     }
     DEBUG_PRINT("on thread %lX: checking if queue is empty\n", pthread_self());
-    return queue_is_empty(queue->queue);
+    int response = queue_is_empty(queue->queue);
+    DEBUG_PRINT("on thread %lX: queue is%s empty\n", pthread_self(),
+                response ? "" : " NOT");
+    return response;
 }
 
 int queue_c_wait_for_empty(queue_c_t *queue) {
@@ -524,7 +535,7 @@ int queue_c_lock(queue_c_t *queue) {
     int err = lock_queue(queue);
     // check for deadlock and queue destruction
     if (err == SUCCESS) {
-        manual_lock(queue);
+        mark_manually_locked(queue);
     }
     return err;
 }
@@ -578,7 +589,7 @@ int queue_c_enqueue(queue_c_t *queue, void *data) {
         return EINTR;
     } else if (queue_c_is_full(queue)) {
         DEBUG_PRINT("on thread %lX: the queue is full\n", pthread_self());
-        unlock_queue(queue);
+        auto_unlock_queue(queue);
         return EOVERFLOW;
     }
 
@@ -587,7 +598,7 @@ int queue_c_enqueue(queue_c_t *queue, void *data) {
     if (res != SUCCESS) {
         DEBUG_PRINT("on thread %lX: enqueue failed: %s\n", pthread_self(),
                     strerror(res));
-        unlock_queue(queue);
+        auto_unlock_queue(queue);
         return res;
     }
     DEBUG_PRINT("on thread %lX: enqueue successful\n", pthread_self());
@@ -598,7 +609,7 @@ int queue_c_enqueue(queue_c_t *queue, void *data) {
         queue->signals.is_full = true;
     }
     send_signals(queue);
-    unlock_queue(queue);
+    auto_unlock_queue(queue);
     return SUCCESS;
 }
 
@@ -616,7 +627,7 @@ void *queue_c_dequeue(queue_c_t *queue, int *err) {
         return NULL;
     } else if (queue_c_is_empty(queue)) {
         DEBUG_PRINT("on thread %lX: the queue is empty\n", pthread_self());
-        unlock_queue(queue);
+        auto_unlock_queue(queue);
         return NULL;
     }
 
@@ -629,7 +640,7 @@ void *queue_c_dequeue(queue_c_t *queue, int *err) {
         queue->signals.is_empty = true;
     }
     send_signals(queue);
-    unlock_queue(queue);
+    auto_unlock_queue(queue);
     return data;
 }
 
@@ -656,7 +667,7 @@ int queue_c_clear(queue_c_t *queue) {
     queue->signals.not_full = true;
     queue->signals.is_empty = true;
     send_signals(queue);
-    unlock_queue(queue);
+    auto_unlock_queue(queue);
     return SUCCESS;
 }
 

@@ -167,22 +167,24 @@ static int add_task(threadpool_t *pool, ROUTINE action, void *arg, void *arg2) {
     struct task_t *task = malloc(sizeof(*task));
     if (task == NULL) {
         queue_c_unlock(pool->queue);
-        DEBUG_PRINT("\tFailed to allocate memory for task\n");
+        DEBUG_PRINT("\ton thread %lX: Failed to allocate memory for task\n",
+                    pthread_self());
         return ENOMEM;
     }
     task->action = action;
     task->arg = arg;
     task->arg2 = arg2;
-    DEBUG_PRINT("\t\tEnqueueing...\n");
+    DEBUG_PRINT("\ton thread %lX: \tEnqueueing...\n", pthread_self());
     int res = queue_c_enqueue(pool->queue, task);
     if (res != SUCCESS) {
         queue_c_unlock(pool->queue);
         free(task);
-        DEBUG_PRINT("\tFailed to enqueue task\n");
+        DEBUG_PRINT("\ton thread %lX: Failed to enqueue task\n",
+                    pthread_self());
         return res;
     }
     queue_c_unlock(pool->queue);
-    DEBUG_PRINT("\tTask added to queue\n");
+    DEBUG_PRINT("\ton thread %lX: Task added to queue\n", pthread_self());
     return SUCCESS;
 }
 
@@ -193,7 +195,7 @@ static int add_task(threadpool_t *pool, ROUTINE action, void *arg, void *arg2) {
  * @return void* NULL
  */
 static void *thread_task(void *arg) {
-    DEBUG_PRINT("Thread task: thread %lu\n", pthread_self());
+    DEBUG_PRINT("Thread task: thread %lX\n", pthread_self());
     threadpool_t *pool = arg;
     int old_type;
     // determine if the thread can be force cancelled
@@ -265,9 +267,9 @@ threadpool_t *threadpool_create(threadpool_attr_t *attr, int *err) {
 
 int threadpool_add_work(threadpool_t *pool, ROUTINE action, void *arg,
                         void *arg2) {
-    DEBUG_PRINT("Adding work to threadpool\n");
+    DEBUG_PRINT("\ton thread %lX: Adding work to threadpool\n", pthread_self());
     if (pool == NULL || action == NULL) {
-        DEBUG_PRINT("\tInvalid arguments\n");
+        DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
         return EINVAL;
     }
 
@@ -277,7 +279,7 @@ int threadpool_add_work(threadpool_t *pool, ROUTINE action, void *arg,
         return threadpool_timed_add_work(pool, action, arg, arg2,
                                          pool->attr.default_wait);
     } else if (check_flag(pool->attr.flags, BLOCK_ON_ADD)) {
-        DEBUG_PRINT("\t...Blocking on add\n");
+        DEBUG_PRINT("\ton thread %lX: ...Blocking on add\n", pthread_self());
         while (queue_c_is_full(pool->queue)) {
             queue_c_wait_for_not_full(pool->queue);
         }
@@ -285,47 +287,50 @@ int threadpool_add_work(threadpool_t *pool, ROUTINE action, void *arg,
         queue_c_lock(pool->queue);
         if (queue_c_is_full(pool->queue)) {
             queue_c_unlock(pool->queue);
-            DEBUG_PRINT("\tQueue is full\n");
+            DEBUG_PRINT("\ton thread %lX: Queue is full\n", pthread_self());
             return EAGAIN;
         }
     }
 
-    DEBUG_PRINT("\tAdding task to queue\n");
+    DEBUG_PRINT("\ton thread %lX: Adding task to queue\n", pthread_self());
     return add_task(pool, action, arg, arg2);
 }
 
 int threadpool_timed_add_work(threadpool_t *pool, ROUTINE action, void *arg,
                               void *arg2, time_t timeout) {
-    DEBUG_PRINT("Adding work to threadpool with timeout\n");
+    DEBUG_PRINT("\ton thread %lX: Adding work to threadpool with timeout\n",
+                pthread_self());
     if (pool == NULL || action == NULL || timeout <= 0) {
-        DEBUG_PRINT("\tInvalid arguments\n");
+        DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
         return EINVAL;
     }
 
-    DEBUG_PRINT("\t...Blocking on add with timeout\n");
+    DEBUG_PRINT("\ton thread %lX: ...Blocking on add with timeout\n",
+                pthread_self());
     while (queue_c_is_full(pool->queue)) {
         if (queue_c_timed_wait_for_not_full(pool->queue, timeout) ==
             ETIMEDOUT) {
-            DEBUG_PRINT("\tTimed out\n");
+            DEBUG_PRINT("\ton thread %lX: Timed out\n", pthread_self());
             return ETIMEDOUT;
         }
     }
 
-    DEBUG_PRINT("\tAdding task to queue\n");
+    DEBUG_PRINT("\ton thread %lX: Adding task to queue\n", pthread_self());
     return add_task(pool, action, arg, arg2);
 }
 
 int threadpool_wait(threadpool_t *pool) {
-    DEBUG_PRINT("Waiting for threadpool\n");
+    DEBUG_PRINT("\ton thread %lX: Waiting for threadpool\n", pthread_self());
     if (pool == NULL) {
-        DEBUG_PRINT("\tInvalid arguments\n");
+        DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
         return EINVAL;
     }
     if (check_flag(pool->attr.flags, TIMED_WAIT)) {
         return threadpool_timed_wait(pool, pool->attr.default_wait);
     }
 
-    DEBUG_PRINT("\t...Waiting for queue to be empty\n");
+    DEBUG_PRINT("\ton thread %lX: ...Waiting for queue to be empty\n",
+                pthread_self());
     while (!queue_c_is_empty(pool->queue)) {
         queue_c_wait_for_empty(pool->queue);
     }
@@ -336,23 +341,26 @@ int threadpool_wait(threadpool_t *pool) {
     // all threads are idle
     pthread_rwlock_unlock(&pool->running_lock);
     queue_c_unlock(pool->queue);
-    DEBUG_PRINT("\tAll tasks complete\n");
+    DEBUG_PRINT("\ton thread %lX: All tasks complete\n", pthread_self());
     return SUCCESS;
 }
 
 int threadpool_timed_wait(threadpool_t *pool, time_t timeout) {
-    DEBUG_PRINT("Waiting for threadpool with timeout\n");
+    DEBUG_PRINT("\ton thread %lX: Waiting for threadpool with timeout\n",
+                pthread_self());
     if (pool == NULL || timeout <= 0) {
-        DEBUG_PRINT("\tInvalid arguments\n");
+        DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
         return EINVAL;
     }
 
     struct timespec abstime = {time(NULL) + timeout, 0};
 
-    DEBUG_PRINT("\t...Waiting for queue to be empty with timeout\n");
+    DEBUG_PRINT(
+        "\ton thread %lX: ...Waiting for queue to be empty with timeout\n",
+        pthread_self());
     while (!queue_c_is_empty(pool->queue)) {
         if (queue_c_timed_wait_for_empty(pool->queue, timeout) == ETIMEDOUT) {
-            DEBUG_PRINT("\tTimed out\n");
+            DEBUG_PRINT("\ton thread %lX: Timed out\n", pthread_self());
             return ETIMEDOUT;
         }
     }
@@ -361,22 +369,22 @@ int threadpool_timed_wait(threadpool_t *pool, time_t timeout) {
     int res = pthread_rwlock_timedwrlock(&pool->running_lock, &abstime);
     if (res == ETIMEDOUT) {
         queue_c_unlock(pool->queue);
-        DEBUG_PRINT("\tTimed out\n");
+        DEBUG_PRINT("\ton thread %lX: Timed out\n", pthread_self());
         return ETIMEDOUT;
     }
 
     // all threads are idle
     pthread_rwlock_unlock(&pool->running_lock);
     queue_c_unlock(pool->queue);
-    DEBUG_PRINT("\tAll tasks complete\n");
+    DEBUG_PRINT("\ton thread %lX: All tasks complete\n", pthread_self());
     return SUCCESS;
 }
 
 int threadpool_destroy(threadpool_t *pool, int flag) {
-    DEBUG_PRINT("Destroying threadpool\n");
+    DEBUG_PRINT("\ton thread %lX: Destroying threadpool\n", pthread_self());
     if (pool == NULL ||
         (flag != SHUTDOWN_GRACEFUL && flag != SHUTDOWN_FORCEFUL)) {
-        DEBUG_PRINT("\tInvalid arguments\n");
+        DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
         return EINVAL;
     }
     if (flag == SHUTDOWN_GRACEFUL) {
@@ -384,21 +392,22 @@ int threadpool_destroy(threadpool_t *pool, int flag) {
     }
     // wake up all threads
     pool->shutdown = flag;
-    DEBUG_PRINT("\tWaking threads\n");
+    DEBUG_PRINT("\ton thread %lX: Waking threads\n", pthread_self());
     queue_c_cancel_wait(pool->queue);
     for (size_t i = 0; i < pool->num_threads; i++) {
         if (flag == SHUTDOWN_FORCEFUL) {
             // will be ignored if thread is already cancelled
-            DEBUG_PRINT("\tCancelling thread %zu with id %lX\n", i,
-                        pool->threads[i]);
+            DEBUG_PRINT("\ton thread %lX: Cancelling thread %zu with id %lX\n",
+                        i, pool->threads[i], pthread_self());
             pthread_cancel(pool->threads[i]);
         }
-        DEBUG_PRINT("\tJoining thread %zu with id %lX\n", i, pool->threads[i]);
+        DEBUG_PRINT("\ton thread %lX: Joining thread %zu with id %lX\n", i,
+                    pool->threads[i], pthread_self());
         pthread_join(pool->threads[i], NULL);
-        DEBUG_PRINT("\tThread %zu joined\n", i);
+        DEBUG_PRINT("\ton thread %lX: Thread %zu joined\n", i, pthread_self());
     }
     free_pool(pool);
-    DEBUG_PRINT("\tThreadpool destroyed\n");
+    DEBUG_PRINT("\ton thread %lX: Threadpool destroyed\n", pthread_self());
     return SUCCESS;
 }
 
