@@ -330,7 +330,7 @@ static int wait_for(queue_c_t *queue, pthread_cond_t *cond, PREDICATE pred) {
         return err;
     }
     DEBUG_PRINT("on thread %lX: condition lock acquired\n", pthread_self());
-    if ((!pred(queue)) && keep_waiting(queue)) {
+    while ((!pred(queue)) && keep_waiting(queue)) {
         DEBUG_PRINT("on thread %lX: waiting for condition\n", pthread_self());
         pthread_cond_wait(cond, &queue->lock);
     }
