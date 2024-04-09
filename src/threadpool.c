@@ -42,18 +42,6 @@ struct threadpool_t {
 /* PRIVATE FUNCTIONS */
 
 /**
- * @brief Sets the error code.
- *
- * @param err The error code.
- * @param value The value to set.
- */
-static void set_err(int *err, int value) {
-    if (err != NULL) {
-        *err = value;
-    }
-}
-
-/**
  * @brief Check if a flag is set.
  *
  * @param flags The flag to check.
