@@ -1,4 +1,5 @@
 #include "hash_table.h"
+#include "buildingblocks.h"
 #include "linked_list.h"
 #include <errno.h>
 #include <stdint.h>
@@ -75,17 +76,6 @@ struct action_data_t {
 
 /* PRIVATE FUNCTIONS */
 
-/**
- * @brief Sets the error code.
- *
- * @param err The error code.
- * @param value The value to set.
- */
-static inline void set_err(int *err, int value) {
-    if (err != NULL) {
-        *err = value;
-    }
-}
 /**
  * @brief Comparison function to pass to list_new.
  *

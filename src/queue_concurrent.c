@@ -1,5 +1,5 @@
 #include "queue_concurrent.h"
-#include "debug.h"
+#include "buildingblocks.h"
 #include "queue.h"
 #include <errno.h>
 #include <pthread.h>
@@ -98,18 +98,6 @@ struct queue_c_t {
 };
 
 /* PRIVATE FUNCTIONS */
-
-/**
- * @brief Sets the error code.
- *
- * @param err The error code.
- * @param value The value to set.
- */
-static void set_err(int *err, int value) {
-    if (err != NULL) {
-        *err = value;
-    }
-}
 
 /**
  * @brief Initialize thread constructs.
