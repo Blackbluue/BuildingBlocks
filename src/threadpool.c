@@ -206,7 +206,14 @@ static void *thread_task(void *arg) {
         DEBUG_PRINT("\ton thread %lX: ..Waiting for work\n", pthread_self());
         // wait for work queue to be not empty
         while (queue_c_is_empty(pool->queue) && pool->shutdown == NO_SHUTDOWN) {
-            queue_c_wait_for_not_empty(pool->queue);
+            int err = queue_c_wait_for_not_empty(pool->queue);
+            if (!(err == SUCCESS || err == EAGAIN)) {
+                // EAGAIN returned if threadpool is being gracefully destroyed
+                DEBUG_PRINT("\ton thread %lX: Error waiting for work\n",
+                            pthread_self());
+                queue_c_unlock(pool->queue);
+                return NULL;
+            }
         }
 
         // check if threadpool is shutting down
@@ -222,8 +229,13 @@ static void *thread_task(void *arg) {
         DEBUG_PRINT("\ton thread %lX: ..Performing work\n", pthread_self());
         // perform work
         struct task_t *task = queue_c_dequeue(pool->queue, NULL);
-        DEBUG_PRINT("\ton thread %lX: Work dequeued\n", pthread_self());
         queue_c_unlock(pool->queue);
+        if (task == NULL) {
+            DEBUG_PRINT("\ton thread %lX: Failed to dequeue task\n",
+                        pthread_self());
+            continue;
+        }
+        DEBUG_PRINT("\ton thread %lX: Work dequeued\n", pthread_self());
         ROUTINE action = task->action;
         void *action_arg = task->arg;
         void *action_arg2 = task->arg2;
