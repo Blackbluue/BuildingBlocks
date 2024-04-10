@@ -22,7 +22,7 @@ struct task_t {
     void *arg2;
 };
 
-struct thread_info {
+struct thread {
     pthread_t id;
     threadpool_t *pool;
     struct task_t *task;
@@ -40,7 +40,7 @@ struct threadpool_attr_t {
 };
 
 struct threadpool_t {
-    struct thread_info *threads;
+    struct thread *threads;
     pthread_rwlock_t running_lock;
     queue_c_t *queue;
     size_t num_threads;
@@ -67,10 +67,10 @@ static inline int check_flag(int flags, int to_check) {
 /**
  * @brief Set the status of the thread.
  *
- * @param self pointer to thread_info object
+ * @param self pointer to thread object
  * @param status status to set
  */
-static void set_status(struct thread_info *self, thread_status status) {
+static void set_status(struct thread *self, thread_status status) {
     pthread_mutex_lock(&self->info_lock);
     self->status = status;
     pthread_mutex_unlock(&self->info_lock);
@@ -84,7 +84,7 @@ static void set_status(struct thread_info *self, thread_status status) {
 static void free_pool(threadpool_t *pool) {
     DEBUG_PRINT("\tFreeing threadpool\n");
     for (size_t i = 0; i < pool->attr.max_threads; i++) {
-        struct thread_info *thread = &pool->threads[i];
+        struct thread *thread = &pool->threads[i];
         pthread_cond_destroy(&thread->error_cond);
         pthread_mutex_destroy(&thread->info_lock);
         if (thread->task != NULL) {
@@ -134,7 +134,7 @@ static threadpool_t *init_thread_info(threadpool_t *pool, int *err) {
     }
     for (size_t i = 0; i < pool->attr.max_threads; i++) {
         DEBUG_PRINT("\tInitializing thread %zu\n", i);
-        struct thread_info *thread = &pool->threads[i];
+        struct thread *thread = &pool->threads[i];
         thread->pool = pool;
         thread->task = NULL;
         pthread_mutex_init(&thread->info_lock, NULL);
@@ -197,7 +197,7 @@ static threadpool_t *init_pool(threadpool_attr_t *attr, int *err) {
     return init_thread_info(pool, err);
 }
 
-static void wait_on_error(struct thread_info *self) {
+static void wait_on_error(struct thread *self) {
     // TODO: the check for wait will be conditional on a flag on the threadpool
     while (self->error != SUCCESS) {
         self->status = BLOCKED;
@@ -247,7 +247,7 @@ static int add_task(threadpool_t *pool, ROUTINE action, void *arg, void *arg2) {
  */
 static void *thread_task(void *arg) {
     DEBUG_PRINT("Thread task: thread %lX\n", pthread_self());
-    struct thread_info *self = arg;
+    struct thread *self = arg;
     threadpool_t *pool = self->pool;
     set_status(self, IDLE);
     int old_type;
@@ -314,10 +314,10 @@ static void *thread_task(void *arg) {
 /**
  * @brief Restart a thread.
  *
- * @param thread pointer to thread_info
+ * @param thread pointer to thread
  * @return int 0 if successful, otherwise error code
  */
-static int restart_thread(struct thread_info *thread) {
+static int restart_thread(struct thread *thread) {
     if (thread == NULL) {
         return EINVAL;
     }
@@ -353,7 +353,7 @@ threadpool_t *threadpool_create(threadpool_attr_t *attr, int *err) {
     // fail to start
     for (size_t i = 0; i < pool->attr.max_threads; i++) {
         DEBUG_PRINT("\tCreating thread %zu\n", i);
-        struct thread_info *thread = &pool->threads[i];
+        struct thread *thread = &pool->threads[i];
         int res = pthread_create(&thread->id, NULL, thread_task, thread);
         if (res != SUCCESS) {
             threadpool_destroy(pool, SHUTDOWN_GRACEFUL);
@@ -421,6 +421,31 @@ int threadpool_timed_add_work(threadpool_t *pool, ROUTINE action, void *arg,
 
     DEBUG_PRINT("\ton thread %lX: Adding task to queue\n", pthread_self());
     return add_task(pool, action, arg, arg2);
+}
+
+int threadpool_thread_status(threadpool_t *pool, size_t thread_id,
+                             struct thread_info *info) {
+    DEBUG_PRINT("\ton thread %lX: Getting thread status\n", pthread_self());
+    if (pool == NULL || info == NULL) {
+        DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
+        return EINVAL;
+    } else if (thread_id >= pool->attr.max_threads) {
+        DEBUG_PRINT("\ton thread %lX: %zu is not a valid thread\n",
+                    pthread_self(), thread_id);
+        return ENOENT;
+    }
+    struct thread *thread = &pool->threads[thread_id];
+    pthread_mutex_lock(&thread->info_lock);
+    info->index = thread_id;
+    info->action = thread->task->action;
+    info->arg = thread->task->arg;
+    info->arg2 = thread->task->arg2;
+    info->status = thread->status;
+    info->error = thread->error;
+    pthread_mutex_unlock(&thread->info_lock);
+    DEBUG_PRINT("\ton thread %lX: Thread %zu status: %d\n", pthread_self(),
+                thread_id, info->status);
+    return SUCCESS;
 }
 
 int threadpool_restart_thread(threadpool_t *pool, size_t thread_id) {
@@ -528,7 +553,7 @@ int threadpool_destroy(threadpool_t *pool, int flag) {
     DEBUG_PRINT("\ton thread %lX: Waking threads\n", pthread_self());
     queue_c_cancel_wait(pool->queue);
     for (size_t i = 0; i < pool->num_threads; i++) {
-        struct thread_info *thread = &pool->threads[i];
+        struct thread *thread = &pool->threads[i];
         if (flag == SHUTDOWN_FORCEFUL) {
             // will be ignored if thread is already cancelled
             DEBUG_PRINT("\ton thread %lX: Cancelling thread %zu with id %lX\n",

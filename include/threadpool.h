@@ -61,6 +61,15 @@ typedef struct threadpool_attr_t threadpool_attr_t;
 
 typedef struct threadpool_t threadpool_t;
 
+struct thread_info {
+    size_t index;         // thread index
+    ROUTINE action;       // routine to execute
+    void *arg;            // routine argument
+    void *arg2;           // second routine argument
+    thread_status status; // thread status
+    int error;            // error code
+};
+
 /* FUNCTIONS */
 
 /**
@@ -123,6 +132,25 @@ int threadpool_add_work(threadpool_t *pool, ROUTINE action, void *arg,
  */
 int threadpool_timed_add_work(threadpool_t *pool, ROUTINE action, void *arg,
                               void *arg2, time_t timeout);
+
+/**
+ * @brief Get the information of a thread in the threadpool.
+ *
+ * The function will return the information of the thread with the given
+ * thread_id. The information returned is just a snapshot of the thread's
+ * current state; the thread may change state after the function returns.
+ *
+ * Possible error codes:
+ *      EINVAL - pool is NULL
+ *      ENOENT - thread_id is not valid
+ *
+ * @param pool The threadpool to get the thread information from.
+ * @param thread_id The id of the thread to get the information of.
+ * @param info The struct to store the thread information.
+ * @return int 0 on success, non-zero on failure.
+ */
+int threadpool_thread_status(threadpool_t *pool, size_t thread_id,
+                             struct thread_info *info);
 
 /**
  * @brief Restart a thread in the threadpool.
