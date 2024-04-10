@@ -16,13 +16,6 @@ enum attr_flags {
     BLOCK_ON_ADD = 1 << 2, // true = block on add, false = return EAGAIN
 };
 
-typedef enum thread_status {
-    STOPPED,    // thread is not running
-    IDLE,       // thread is waiting for work
-    RUNNING,    // thread is performing work
-    DESTROYING, // thread is being destroyed
-} thread_status;
-
 struct task_t {
     ROUTINE action;
     void *arg;
@@ -36,6 +29,7 @@ struct thread_info {
     pthread_mutex_t info_lock;
     thread_status status;
     int error;
+    pthread_cond_t error_cond;
 };
 
 struct threadpool_attr_t {
@@ -91,6 +85,7 @@ static void free_pool(threadpool_t *pool) {
     DEBUG_PRINT("\tFreeing threadpool\n");
     for (size_t i = 0; i < pool->attr.max_threads; i++) {
         struct thread_info *thread = &pool->threads[i];
+        pthread_cond_destroy(&thread->error_cond);
         pthread_mutex_destroy(&thread->info_lock);
         if (thread->task != NULL) {
             free(thread->task);
@@ -145,6 +140,7 @@ static threadpool_t *init_thread_info(threadpool_t *pool, int *err) {
         pthread_mutex_init(&thread->info_lock, NULL);
         thread->status = STOPPED;
         thread->error = SUCCESS;
+        pthread_cond_init(&thread->error_cond, NULL);
     }
     DEBUG_PRINT("\tThreadpool initialized\n");
     return pool;
@@ -199,6 +195,14 @@ static threadpool_t *init_pool(threadpool_attr_t *attr, int *err) {
         return NULL;
     }
     return init_thread_info(pool, err);
+}
+
+static void wait_on_error(struct thread_info *self) {
+    // TODO: the check for wait will be conditional on a flag on the threadpool
+    while (self->error != SUCCESS) {
+        self->status = BLOCKED;
+        pthread_cond_wait(&self->error_cond, &self->info_lock);
+    }
 }
 
 /**
@@ -292,9 +296,11 @@ static void *thread_task(void *arg) {
         pthread_mutex_unlock(&self->info_lock);
         DEBUG_PRINT("\ton thread %lX: Work dequeued\n", pthread_self());
         pthread_rwlock_rdlock(&pool->running_lock);
-        self->task->action(self->task->arg, self->task->arg2);
+        int err = self->task->action(self->task->arg, self->task->arg2);
         pthread_rwlock_unlock(&pool->running_lock);
         pthread_mutex_lock(&self->info_lock);
+        self->error = err;
+        wait_on_error(self);
         free(self->task);
         self->task = NULL;
         self->status = IDLE;
@@ -303,6 +309,34 @@ static void *thread_task(void *arg) {
     }
     set_status(self, STOPPED);
     return NULL;
+}
+
+/**
+ * @brief Restart a thread.
+ *
+ * @param thread pointer to thread_info
+ * @return int 0 if successful, otherwise error code
+ */
+static int restart_thread(struct thread_info *thread) {
+    if (thread == NULL) {
+        return EINVAL;
+    }
+    int res = EALREADY;
+    pthread_mutex_lock(&thread->info_lock);
+    switch (thread->status) {
+    case BLOCKED: // thread is blocked
+        thread->error = SUCCESS;
+        pthread_cond_signal(&thread->error_cond);
+        res = SUCCESS;
+        break;
+    case STOPPED: // thread is not running
+        res = pthread_create(&thread->id, NULL, thread_task, thread);
+        break;
+    default:
+        break;
+    }
+    pthread_mutex_unlock(&thread->info_lock);
+    return res;
 }
 
 /* PUBLIC FUNCTIONS */
@@ -387,6 +421,35 @@ int threadpool_timed_add_work(threadpool_t *pool, ROUTINE action, void *arg,
 
     DEBUG_PRINT("\ton thread %lX: Adding task to queue\n", pthread_self());
     return add_task(pool, action, arg, arg2);
+}
+
+int threadpool_restart_thread(threadpool_t *pool, size_t thread_id) {
+    DEBUG_PRINT("\ton thread %lX: Restarting thread %zu\n", pthread_self(),
+                thread_id);
+    if (pool == NULL) {
+        DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
+        return EINVAL;
+    } else if (thread_id >= pool->attr.max_threads) {
+        DEBUG_PRINT("\ton thread %lX: %zu is not a valid thread\n",
+                    pthread_self(), thread_id);
+        return ENOENT;
+    }
+
+    return restart_thread(&pool->threads[thread_id]);
+}
+
+int threadpool_refresh(threadpool_t *pool) {
+    DEBUG_PRINT("\ton thread %lX: Refreshing all threads\n", pthread_self());
+    if (pool == NULL) {
+        DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
+        return EINVAL;
+    }
+
+    for (size_t i = 0; i < pool->attr.max_threads; i++) {
+        // ignore error on failure to start thread
+        restart_thread(&pool->threads[i]);
+    }
+    return SUCCESS;
 }
 
 int threadpool_wait(threadpool_t *pool) {
@@ -487,6 +550,7 @@ threadpool_attr_t *threadpool_attr_init(void) {
     threadpool_attr_t *attr = malloc(sizeof(*attr));
     if (attr == NULL) {
         DEBUG_PRINT("\tFailed to allocate memory for attributes\n");
+        // TODO: don't set errno
         errno = ENOMEM;
         return NULL;
     }

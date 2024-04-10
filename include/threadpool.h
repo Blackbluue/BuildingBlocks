@@ -10,6 +10,14 @@
 #define DEFAULT_QUEUE 16  // default queue size
 #define DEFAULT_WAIT 10   // default wait time for blocking calls (in seconds)
 
+typedef enum thread_status {
+    STOPPED,    // thread is not running
+    IDLE,       // thread is waiting for work
+    RUNNING,    // thread is performing work
+    BLOCKED,    // thread is blocked
+    DESTROYING, // thread is being destroyed
+} thread_status;
+
 enum shutdown_flags {
     NO_SHUTDOWN,       // do not shutdown the threadpool
     SHUTDOWN_GRACEFUL, // wait for all tasks to finish and queue to empty
@@ -37,12 +45,17 @@ enum block_on_add_flags {
  * The two arguments passed to the routine are optional. If the routine does
  * not require any arguments, the arguments can be ignored. Although not
  * required, the second argument is typically used to pass an output parameter
- * to the routine.
+ * to the routine. The routine's return value will be stored by the threadpool,
+ * and can be accessed later. The behavior of the threadpool changes based on
+ * the block_on_error flag: if set to true, the executing thread will block
+ * on a non-zero return value, and must be manually started again. Otherwise,
+ * the threadpool will not block and continue to run, ignoring the error.
  *
  * @param arg The argument to be passed to the routine.
  * @param arg2 The second argument to be passed to the routine.
+ * @return int The return value of the routine.
  */
-typedef void (*ROUTINE)(void *arg, void *arg2);
+typedef int (*ROUTINE)(void *arg, void *arg2);
 
 typedef struct threadpool_attr_t threadpool_attr_t;
 
@@ -110,6 +123,40 @@ int threadpool_add_work(threadpool_t *pool, ROUTINE action, void *arg,
  */
 int threadpool_timed_add_work(threadpool_t *pool, ROUTINE action, void *arg,
                               void *arg2, time_t timeout);
+
+/**
+ * @brief Restart a thread in the threadpool.
+ *
+ * The threadpool will attempt to restart the thread with the given thread_id.
+ * Only STOPPED and BLOCKED threads can be restarted. Any recorded errors
+ * on BLOCKED threads will be cleared.
+ *
+ * Possible error codes:
+ *      EINVAL - pool is NULL
+ *      ENOENT - thread_id is not valid
+ *      EAGAIN - Insufficient resources to create another thread.
+ *      EALREADY - thread is already running
+ *
+ * @param pool The threadpool to restart the thread in.
+ * @param thread_id The id of the thread to restart.
+ * @return int 0 on success, non-zero on failure.
+ */
+int threadpool_restart_thread(threadpool_t *pool, size_t thread_id);
+
+/**
+ * @brief Restart all threads in the threadpool.
+ *
+ * The threadpool will attempt to restart all threads in the threadpool. Only
+ * STOPPED and BLOCKED threads can be restarted. Any recorded errors on
+ * BLOCKED threads will be cleared.
+ *
+ * Possible error codes:
+ *      EINVAL - pool is NULL
+ *
+ * @param pool The threadpool to restart the threads in.
+ * @return int 0 on success, non-zero on failure.
+ */
+int threadpool_refresh(threadpool_t *pool);
 
 /**
  * @brief Wait for all tasks in the threadpool to finish.

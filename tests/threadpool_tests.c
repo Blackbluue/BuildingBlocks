@@ -151,7 +151,7 @@ void teardown_test(threadpool_t **pool, threadpool_attr_t *attr) {
     fprintf(stderr, "\tteardown_test done\n");
 }
 
-void dummy_task(void *arg, void *arg2) {
+int dummy_task(void *arg, void *arg2) {
     (void)arg2;
     fprintf(stderr, "\ton thread %lX: dummy_task\n", pthread_self());
     sleep(TIMEOUT);
@@ -162,6 +162,7 @@ void dummy_task(void *arg, void *arg2) {
     fprintf(stderr, "\ton thread %lX: %d task(s) done\n", pthread_self(),
             *done);
     pthread_mutex_unlock(&lock);
+    return SUCCESS;
 }
 
 /**
