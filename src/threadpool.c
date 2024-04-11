@@ -41,12 +41,14 @@ struct threadpool_attr_t {
 
 struct threadpool_t {
     struct thread *threads;
+    struct thread_info *info;
     pthread_rwlock_t running_lock;
     queue_c_t *queue;
     size_t num_threads;
     int shutdown;
     // TODO: remove cancel type. don't allow async cancel
     int cancel_type;
+    // TODO: move attribute code to new private file
     threadpool_attr_t attr;
 };
 
@@ -92,6 +94,7 @@ static void free_pool(threadpool_t *pool) {
         }
     }
     free(pool->threads);
+    free(pool->info);
     pthread_rwlock_destroy(&pool->running_lock);
     queue_c_destroy(&pool->queue);
     free(pool);
@@ -126,9 +129,12 @@ static threadpool_t *init_thread_info(threadpool_t *pool, int *err) {
         return NULL;
     }
     pool->threads = malloc(sizeof(*pool->threads) * pool->attr.max_threads);
-    if (pool->threads == NULL) {
+    pool->info = malloc(sizeof(*pool->info) * pool->attr.max_threads);
+    if (pool->threads == NULL || pool->info == NULL) {
         DEBUG_PRINT("\tFailed to allocate memory for threads\n");
         free_pool(pool);
+        free(pool->threads);
+        free(pool->info);
         set_err(err, ENOMEM);
         return NULL;
     }
@@ -141,6 +147,14 @@ static threadpool_t *init_thread_info(threadpool_t *pool, int *err) {
         thread->status = STOPPED;
         thread->error = SUCCESS;
         pthread_cond_init(&thread->error_cond, NULL);
+
+        struct thread_info *info = &pool->info[i];
+        info->index = i;
+        info->action = NULL;
+        info->arg = NULL;
+        info->arg2 = NULL;
+        info->status = STOPPED;
+        info->error = SUCCESS;
     }
     DEBUG_PRINT("\tThreadpool initialized\n");
     return pool;
@@ -445,6 +459,26 @@ int threadpool_thread_status(threadpool_t *pool, size_t thread_id,
     pthread_mutex_unlock(&thread->info_lock);
     DEBUG_PRINT("\ton thread %lX: Thread %zu status: %d\n", pthread_self(),
                 thread_id, info->status);
+    return SUCCESS;
+}
+
+int threadpool_thread_status_all(threadpool_t *pool,
+                                 struct thread_info **info_arr) {
+    DEBUG_PRINT("\ton thread %lX: Getting all thread statuses\n",
+                pthread_self());
+    if (pool == NULL) {
+        DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
+        return EINVAL;
+    }
+
+    for (size_t i = 0; i < pool->attr.max_threads; i++) {
+        threadpool_thread_status(pool, i, &pool->info[i]);
+    }
+    if (info_arr != NULL) {
+        *info_arr = pool->info;
+    }
+    DEBUG_PRINT("\ton thread %lX: All thread statuses retrieved\n",
+                pthread_self());
     return SUCCESS;
 }
 

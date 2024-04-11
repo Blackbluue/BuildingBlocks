@@ -153,6 +153,29 @@ int threadpool_thread_status(threadpool_t *pool, size_t thread_id,
                              struct thread_info *info);
 
 /**
+ * @brief Get the information of all threads in the threadpool.
+ *
+ * The function will return the information of all threads in the threadpool.
+ * The information returned is just a snapshot of the threads' current state;
+ * the threads may change state after the function returns.
+
+ * The array returned is internally maintained by the threadpool. Repeated
+ * calls to this function will return the same array, but the contents are
+ * only updated when the function is called. If the address of the array is not
+ * needed, the function can be called with NULL. The array must not be freed by
+ * the caller.
+ *
+ * Possible error codes:
+ *     EINVAL - pool is NULL
+ *
+ * @param pool The threadpool to get the thread information from.
+ * @param info_arr The array to store the thread information.
+ * @return int 0 on success, non-zero on failure.
+ */
+int threadpool_thread_status_all(threadpool_t *pool,
+                                 struct thread_info **info_arr);
+
+/**
  * @brief Restart a thread in the threadpool.
  *
  * The threadpool will attempt to restart the thread with the given thread_id.
