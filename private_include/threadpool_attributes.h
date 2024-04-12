@@ -46,21 +46,23 @@ enum block_on_error_flags {
  * threadpools. After the threadpool is created, the attribute object can be
  * destroyed, and modifying it will not affect the threadpool.
  *
- * If an error occurs while allocating memory for the attribute object, the
- * function will set errno to ENOMEM and return NULL.
+ * This function will always return 0.
  *
- * @return pointer to threadpool_attr_t.
+ * @param attr pointer to attribute object
+ * @return always returns 0.
  */
 int threadpool_attr_init(threadpool_attr_t *attr);
 
 /**
  * @brief Destroy a threadpool attribute object.
  *
- * The threadpool attribute object will be destroyed. If attr is NULL, the
- * function will return EINVAL.
+ * Destroys a threadpool attribute object, which must not be reused until it is
+ * reinitialized. This function always returns 0.
+ *
+ * @note This function currently does not do anything.
  *
  * @param attr pointer to threadpool_attr_t
- * @return int 0 on success, non-zero on failure.
+ * @return always returns 0.
  */
 int threadpool_attr_destroy(threadpool_attr_t *attr);
 
