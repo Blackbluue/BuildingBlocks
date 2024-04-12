@@ -33,8 +33,6 @@ struct threadpool_t {
     size_t num_threads;
     size_t max_threads;
     int shutdown;
-    // TODO: remove cancel type. don't allow async cancel
-    int cancel_type;
     int timed_wait;
     int block_on_add;
     time_t default_wait;
@@ -160,7 +158,6 @@ static threadpool_t *init_pool(threadpool_attr_t *attr, int *err) {
     pthread_rwlock_init(&pool->running_lock, NULL);
     pool->num_threads = 0;
     pool->shutdown = NO_SHUTDOWN;
-    pool->cancel_type = PTHREAD_CANCEL_DEFERRED;
 
     // initialize queue/threads
     pool->queue = queue_c_init(q_size, free, err);
@@ -226,11 +223,6 @@ static void *thread_task(void *arg) {
     struct thread *self = arg;
     threadpool_t *pool = self->pool;
     set_status(self, IDLE);
-    int old_type;
-    // determine if the thread can be force cancelled
-    pthread_setcanceltype(pool->cancel_type, &old_type);
-    DEBUG_PRINT("\ton thread %lX: Thread type set to %d\n", pthread_self(),
-                pool->cancel_type);
     for (;;) {
         DEBUG_PRINT("\ton thread %lX: ..Waiting for work\n", pthread_self());
         // wait for work queue to be not empty

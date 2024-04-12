@@ -199,11 +199,6 @@ void test_threadpool_attributes() {
     threadpool_attr_t attr;
     threadpool_attr_init(&attr);
 
-    // Test threadpool_attr_t cancel_type
-    ATTR_FLAG_TEST_FAIL(cancel_type, &attr);
-    ATTR_FLAG_TEST_PASS(cancel_type, &attr, CANCEL_ASYNC);
-    ATTR_FLAG_TEST_PASS(cancel_type, &attr, CANCEL_DEFERRED);
-
     // Test threadpool_attr_t timed_wait/timeout
     ATTR_FLAG_TEST_FAIL(timed_wait, &attr);
     ATTR_FLAG_TEST_PASS(timed_wait, &attr, TIMED_WAIT_ENABLED);

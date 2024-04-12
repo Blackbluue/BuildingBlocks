@@ -39,43 +39,6 @@ int threadpool_attr_destroy(threadpool_attr_t *attr) {
     return SUCCESS;
 }
 
-int threadpool_attr_set_cancel_type(threadpool_attr_t *attr, int cancel_type) {
-    DEBUG_PRINT("Setting cancel type\n");
-    if (attr == NULL) {
-        DEBUG_PRINT("\tInvalid arguments\n");
-        return EINVAL;
-    }
-    struct inner_threadpool_attr_t *inner =
-        ((struct inner_threadpool_attr_t *)attr);
-    switch (cancel_type) {
-    case CANCEL_ASYNC:
-        inner->flags |= CANCEL_TYPE;
-        DEBUG_PRINT("\tCancel type set to asynchronous\n");
-        return SUCCESS;
-    case CANCEL_DEFERRED:
-        inner->flags &= ~CANCEL_TYPE;
-        DEBUG_PRINT("\tCancel type set to deferred\n");
-        return SUCCESS;
-    default:
-        DEBUG_PRINT("\tInvalid cancel type\n");
-        return EINVAL;
-    }
-}
-
-int threadpool_attr_get_cancel_type(threadpool_attr_t *attr, int *cancel_type) {
-    DEBUG_PRINT("Getting cancel type\n");
-    if (attr == NULL || cancel_type == NULL) {
-        DEBUG_PRINT("\tInvalid arguments\n");
-        return EINVAL;
-    }
-    struct inner_threadpool_attr_t *inner =
-        ((struct inner_threadpool_attr_t *)attr);
-    *cancel_type =
-        check_flag(inner->flags, CANCEL_TYPE) ? CANCEL_ASYNC : CANCEL_DEFERRED;
-    DEBUG_PRINT("\tCancel type: %d\n", *cancel_type);
-    return SUCCESS;
-}
-
 int threadpool_attr_set_timed_wait(threadpool_attr_t *attr, int timed_wait) {
     DEBUG_PRINT("Setting timed wait\n");
     if (attr == NULL) {

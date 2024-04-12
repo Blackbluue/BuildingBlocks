@@ -15,15 +15,10 @@
 
 enum attr_flags {
     DEFAULT_FLAGS = 0,     // no flags
-    CANCEL_TYPE = 1 << 0,  // true = asynchronous, false = deferred
-    TIMED_WAIT = 1 << 1,   // true = timed wait, false = infinite wait
-    BLOCK_ON_ADD = 1 << 2, // true = block on add, false = return EAGAIN
+    TIMED_WAIT = 1 << 0,   // true = timed wait, false = infinite wait
+    BLOCK_ON_ADD = 1 << 1, // true = block on add, false = return EAGAIN
 };
 
-enum cancel_type_flags {
-    CANCEL_DEFERRED, // cancel threads at cancellation points
-    CANCEL_ASYNC,    // allow asynchronous cancellation
-};
 enum wait_type_flags {
     TIMED_WAIT_DISABLED, // wait indefinitely when blocking
     TIMED_WAIT_ENABLED,  // use timeout when blocking
@@ -65,31 +60,6 @@ int threadpool_attr_init(threadpool_attr_t *attr);
  * @return always returns 0.
  */
 int threadpool_attr_destroy(threadpool_attr_t *attr);
-
-/**
- * @brief Set the cancellation type for the threadpool attribute object.
- *
- * The cancellation type will be set to either CANCEL_DEFERRED or CANCEL_ASYNC.
- * If attr is NULL or cancel_type is not CANCEL_DEFERRED or CANCEL_ASYNC, the
- * function will return EINVAL.
- *
- * @param attr pointer to threadpool_attr_t
- * @param cancel_type CANCEL_DEFERRED or CANCEL_ASYNC
- * @return int 0 on success, non-zero on failure.
- */
-int threadpool_attr_set_cancel_type(threadpool_attr_t *attr, int cancel_type);
-
-/**
- * @brief Get the cancellation type for the threadpool attribute object.
- *
- * The cancellation type will be returned in cancel_type. If attr or cancel_type
- * are NULL, the function will return EINVAL.
- *
- * @param attr pointer to threadpool_attr_t
- * @param cancel_type pointer to int
- * @return int 0 on success, non-zero on failure.
- */
-int threadpool_attr_get_cancel_type(threadpool_attr_t *attr, int *cancel_type);
 
 /**
  * @brief Set the timed wait flag for the threadpool attribute object.
