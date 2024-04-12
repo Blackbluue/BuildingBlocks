@@ -69,8 +69,12 @@ set_property(TARGET queue_concurrent PROPERTY POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(queue_concurrent buildingblocks queue linked_list)
 set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/queue_concurrent.c)
 
+add_library(threadpool_attributes OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/threadpool_attributes.c)
+target_link_libraries(threadpool_attributes buildingblocks )
+set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/threadpool_attributes.c)
+
 add_library(threadpool OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/threadpool.c)
-target_link_libraries(threadpool buildingblocks queue_concurrent Threads::Threads)
+target_link_libraries(threadpool buildingblocks threadpool_attributes queue_concurrent Threads::Threads)
 set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/threadpool.c)
 
 add_library(weighted_graph OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/weighted_graph.c)
@@ -155,6 +159,6 @@ if(BUILD_TESTING)
     add_test(NAME TestNetworking COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/test_networking.sh ${CMAKE_CURRENT_BINARY_DIR}/test_net_adventure ${CMAKE_CURRENT_BINARY_DIR}/test_net_hero)
 
     add_executable(test_threadpool ${CMAKE_CURRENT_SOURCE_DIR}/tests/threadpool_tests.c)
-    target_link_libraries(test_threadpool buildingblocks threadpool queue_concurrent queue linked_list cunit)
+    target_link_libraries(test_threadpool buildingblocks threadpool_attributes threadpool queue_concurrent queue linked_list cunit)
     add_test(NAME TestThreadPool COMMAND test_threadpool)
 endif()

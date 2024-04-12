@@ -8,3 +8,7 @@ void set_err(int *err, int value) {
         *err = value;
     }
 }
+
+int check_flag(int bit_flags, int position) {
+    return (bit_flags & position) == position;
+}
