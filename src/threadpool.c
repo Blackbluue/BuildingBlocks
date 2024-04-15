@@ -355,7 +355,8 @@ int threadpool_add_work(threadpool_t *pool, ROUTINE action, void *arg,
     }
 
     // timeout ignored if TIMED_WAIT is not set
-    if (pool->block_on_add && pool->timed_wait) {
+    if (pool->block_on_add == BLOCK_ON_ADD_ENABLED &&
+        pool->timed_wait == TIMED_WAIT_ENABLED) {
         return threadpool_timed_add_work(pool, action, arg, arg2,
                                          pool->default_wait);
     } else if (pool->block_on_add) {
@@ -479,7 +480,7 @@ int threadpool_wait(threadpool_t *pool) {
         DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
         return EINVAL;
     }
-    if (pool->timed_wait) {
+    if (pool->timed_wait == TIMED_WAIT_ENABLED) {
         return threadpool_timed_wait(pool, pool->default_wait);
     }
 
