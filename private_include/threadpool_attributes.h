@@ -26,6 +26,11 @@ enum block_on_error_flags {
     BLOCK_ON_ERR_DISABLED, // do not block when a routine returns an error
 };
 
+enum thread_creation_flags {
+    THREAD_CREATE_STRICT, // operations fail if threads cannot be created
+    THREAD_CREATE_LAZY,   // operations continue if threads cannot be created
+};
+
 /**
  * @brief Initialize a threadpool attribute object.
  *
@@ -171,6 +176,43 @@ int threadpool_attr_set_block_on_err(threadpool_attr_t *attr, int block_on_err);
 int threadpool_attr_get_block_on_err(threadpool_attr_t *attr,
                                      int *block_on_err);
 
+/**
+ * @brief Set the thread creation flag for the threadpool attribute object.
+ *
+ * The thread creation flag will be set to either THREAD_CREATE_LAZY or
+ * THREAD_CREATE_STRICT. If THREAD_CREATE_LAZY is set, operations will continue
+ * even if threads cannot be created. If THREAD_CREATE_STRICT is set, operations
+ * will fail if threads cannot be created. Operations include creating the
+ * thread pool, and refreshing the thread pool.
+ *
+ * Possible return values:
+ * - EINVAL: attr is NULL
+ * - ENOTSUP: thread_creation is not THREAD_CREATE_LAZY or THREAD_CREATE_STRICT
+ *
+ * @param attr pointer to threadpool_attr_t
+ * @param thread_creation THREAD_CREATE_LAZY or THREAD_CREATE_STRICT
+ * @return int 0 on success, non-zero on failure.
+ */
+int threadpool_attr_set_thread_creation(threadpool_attr_t *attr,
+                                        int thread_creation);
+
+/**
+ * @brief Get the thread creation flag for the threadpool attribute object.
+ *
+ * If THREAD_CREATE_LAZY is set, operations will continue even if threads cannot
+ * be created. If THREAD_CREATE_STRICT is set, operations will fail if threads
+ * cannot be created. Operations include creating the thread pool, and
+ * refreshing the thread pool.
+ *
+ * Possible return values:
+ * - EINVAL: attr or thread_creation are NULL
+ *
+ * @param attr pointer to threadpool_attr_t
+ * @param thread_creation pointer to hold the value of the flag
+ * @return int 0 on success, non-zero on failure.
+ */
+int threadpool_attr_get_thread_creation(threadpool_attr_t *attr,
+                                        int *thread_creation);
 /**
  * @brief Set the number of threads for the threadpool attribute object.
  *

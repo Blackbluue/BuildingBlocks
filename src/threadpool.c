@@ -36,6 +36,7 @@ struct threadpool_t {
     int timed_wait;
     int block_on_add;
     int block_on_err;
+    int thread_creation;
     time_t default_wait;
 };
 
@@ -153,6 +154,7 @@ static threadpool_t *init_pool(threadpool_attr_t *attr, int *err) {
     threadpool_attr_get_thread_count(attr, &pool->max_threads);
     threadpool_attr_get_block_on_add(attr, &pool->block_on_add);
     threadpool_attr_get_block_on_err(attr, &pool->block_on_err);
+    threadpool_attr_get_thread_creation(attr, &pool->thread_creation);
     threadpool_attr_get_timed_wait(attr, &pool->timed_wait);
     threadpool_attr_get_timeout(attr, &pool->default_wait);
 
@@ -255,6 +257,43 @@ static void *thread_task(void *arg) {
 }
 
 /**
+ * @brief Start a new thread.
+ *
+ * If the threadpool is not at capacity, a new thread will be started.
+ *
+ * @param pool pointer to threadpool_t
+ * @return int 0 if successful, otherwise error code
+ */
+static int start_new_thread(threadpool_t *pool) {
+    if (pool->num_threads >= pool->max_threads) {
+        return SUCCESS;
+    }
+    // look for the first available thread
+    int res;
+    for (size_t i = 0; i < pool->max_threads; i++) {
+        struct thread *thread = &pool->threads[i];
+        pthread_mutex_lock(&thread->info_lock);
+        switch (thread->status) {
+        case STOPPED:
+            res = pthread_create(&thread->id, NULL, thread_task, thread);
+            pthread_mutex_unlock(&thread->info_lock);
+            if (res == SUCCESS) {
+                pool->num_threads++;
+            }
+            return res;
+        case IDLE:
+            // assume this thread will eventually pick up the task
+            pthread_mutex_unlock(&thread->info_lock);
+            return SUCCESS;
+        default: // keep looking
+            break;
+        }
+        pthread_mutex_unlock(&thread->info_lock);
+    }
+    return EAGAIN;
+}
+
+/**
  * @brief Add a task to the queue.
  *
  * @param pool pointer to threadpool_t
@@ -285,6 +324,16 @@ static int add_task(threadpool_t *pool, ROUTINE action, void *arg, void *arg2) {
     }
     queue_c_unlock(pool->queue);
     DEBUG_PRINT("\ton thread %lX: Task added to queue\n", pthread_self());
+    // lazy creation allows for threads to be created on demand
+    // even if thread creation fails, the task still stays in the queue
+    if (pool->thread_creation == THREAD_CREATE_LAZY) {
+        res = start_new_thread(pool);
+        if (res != SUCCESS) {
+            DEBUG_PRINT("\ton thread %lX: Failed to start new thread\n",
+                        pthread_self());
+            return res;
+        }
+    }
     return SUCCESS;
 }
 
@@ -325,23 +374,22 @@ threadpool_t *threadpool_create(threadpool_attr_t *attr, int *err) {
         return NULL;
     }
 
-    // threadpool creation fails if any thread fails to start
-    // TODO: add flag to allow threadpool creation to succeed if some threads
-    // fail to start
-    for (size_t i = 0; i < pool->max_threads; i++) {
-        DEBUG_PRINT("\tCreating thread %zu\n", i);
-        struct thread *thread = &pool->threads[i];
-        int res = pthread_create(&thread->id, NULL, thread_task, thread);
-        if (res != SUCCESS) {
-            threadpool_destroy(pool, SHUTDOWN_GRACEFUL);
-            set_err(err, res);
-            DEBUG_PRINT("\tFailed to create thread %zu\n", i);
-            return NULL;
+    // strict creation requires all threads to be created before returning
+    if (pool->thread_creation == THREAD_CREATE_STRICT) {
+        for (size_t i = 0; i < pool->max_threads; i++) {
+            DEBUG_PRINT("\tCreating thread %zu\n", i);
+            struct thread *thread = &pool->threads[i];
+            int res = pthread_create(&thread->id, NULL, thread_task, thread);
+            if (res != SUCCESS) {
+                threadpool_destroy(pool, SHUTDOWN_GRACEFUL);
+                set_err(err, res);
+                DEBUG_PRINT("\tFailed to create thread %zu\n", i);
+                return NULL;
+            }
+            DEBUG_PRINT("\tCreated thread %zu with id: %lX\n", i, thread->id);
+            pool->num_threads++;
         }
-        DEBUG_PRINT("\tCreated thread %zu with id: %lX\n", i, thread->id);
-        pool->num_threads++;
     }
-
     DEBUG_PRINT("\tThreadpool created\n");
     return pool;
 }
@@ -369,7 +417,7 @@ int threadpool_add_work(threadpool_t *pool, ROUTINE action, void *arg,
         if (queue_c_is_full(pool->queue)) {
             queue_c_unlock(pool->queue);
             DEBUG_PRINT("\ton thread %lX: Queue is full\n", pthread_self());
-            return EAGAIN;
+            return EOVERFLOW;
         }
     }
 
@@ -469,7 +517,12 @@ int threadpool_refresh(threadpool_t *pool) {
 
     for (size_t i = 0; i < pool->max_threads; i++) {
         // ignore error on failure to start thread
-        restart_thread(&pool->threads[i]);
+        int res = restart_thread(&pool->threads[i]);
+        if (res != SUCCESS && pool->thread_creation == THREAD_CREATE_STRICT) {
+            DEBUG_PRINT("\ton thread %lX: Failed to refresh thread %zu\n",
+                        pthread_self(), i);
+            return EAGAIN;
+        }
     }
     return SUCCESS;
 }

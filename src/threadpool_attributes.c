@@ -8,10 +8,11 @@
 #define SUCCESS 0
 
 enum attr_flags {
-    DEFAULT_FLAGS = 0,     // no flags
-    TIMED_WAIT = 1 << 0,   // true = timed wait, false = infinite wait
-    BLOCK_ON_ADD = 1 << 1, // true = block on add, false = return EAGAIN
-    BLOCK_ON_ERR = 1 << 2, // true = block on error, false = return error
+    DEFAULT_FLAGS = 0,        // no flags
+    TIMED_WAIT = 1 << 0,      // true = timed wait, false = infinite wait
+    BLOCK_ON_ADD = 1 << 1,    // true = block on add, false = return EAGAIN
+    BLOCK_ON_ERR = 1 << 2,    // true = block on error, false = continue running
+    THREAD_CREATION = 1 << 3, // true = lazy creation, false = strict creation
 };
 
 struct inner_threadpool_attr_t {
@@ -175,6 +176,43 @@ int threadpool_attr_get_block_on_err(threadpool_attr_t *attr,
     *block_on_err = check_flag(inner->flags, BLOCK_ON_ERR)
                         ? BLOCK_ON_ERR_ENABLED
                         : BLOCK_ON_ERR_DISABLED;
+    return SUCCESS;
+}
+
+int threadpool_attr_set_thread_creation(threadpool_attr_t *attr,
+                                        int thread_creation) {
+    DEBUG_PRINT("Setting thread creation\n");
+    if (attr == NULL) {
+        DEBUG_PRINT("\tInvalid arguments\n");
+        return EINVAL;
+    }
+    struct inner_threadpool_attr_t *inner =
+        ((struct inner_threadpool_attr_t *)attr);
+    switch (thread_creation) {
+    case THREAD_CREATE_LAZY:
+        inner->flags |= THREAD_CREATION;
+        return SUCCESS;
+    case THREAD_CREATE_STRICT:
+        inner->flags &= ~THREAD_CREATION;
+        return SUCCESS;
+    default:
+        DEBUG_PRINT("\tInvalid thread creation flag\n");
+        return EINVAL;
+    }
+}
+
+int threadpool_attr_get_thread_creation(threadpool_attr_t *attr,
+                                        int *thread_creation) {
+    DEBUG_PRINT("Getting thread creation\n");
+    if (attr == NULL || thread_creation == NULL) {
+        DEBUG_PRINT("\tInvalid arguments\n");
+        return EINVAL;
+    }
+    struct inner_threadpool_attr_t *inner =
+        ((struct inner_threadpool_attr_t *)attr);
+    *thread_creation = check_flag(inner->flags, THREAD_CREATION)
+                           ? THREAD_CREATE_STRICT
+                           : THREAD_CREATE_LAZY;
     return SUCCESS;
 }
 

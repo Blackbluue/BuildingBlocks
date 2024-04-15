@@ -56,9 +56,13 @@ struct thread_info {
  * The threadpool will be created with the given attributes. If attr is NULL,
  * the default attributes will be used.
  *
+ * If the THREAD_CREATE_STRICT attribute is set, the function will require
+ * all threads be successfully created before returning. Otherwise, threads
+ * will be created as they are needed.
+ *
  * Possible error codes:
- * ENOMEM - memory allocation failed
- * EAGAIN - thread creation failed
+ *      ENOMEM: memory allocation failed
+ *      EAGAIN: THREAD_CREATE_STRICT is set and thread creation failed
  *
  * @param attr The threadpool attribute object.
  * @param err Where to store the error code.
@@ -74,10 +78,18 @@ threadpool_t *threadpool_create(threadpool_attr_t *attr, int *err);
  * return EAGAIN (default behavior). Otherwise, the function will block until
  * there is room in the queue.
  *
- * If an error occurs while adding the task to the queue, the function will
- * return ENOMEM. If either pool or action is NULL, the function will return
- * EINVAL. If TIMED_WAIT is enabled, the default timeout will be used and the
- * function will return ETIMEDOUT if the timeout elapses.
+ * If THREAD_CREATE_LAZY is set on the threadpool, the function will attempt
+ * to create a new thread if there are no available threads to execute the task.
+ * In this case, since the check for the thread is done after the task is added
+ * to the queue, even if the thread creation fails the task will still be added
+ * to the queue.
+ *
+ * Possible error codes:
+ *      ENOMEM: memory allocation failed
+ *      EOVERFLOW: queue is full and BLOCK_ON_ADD is not set
+ *      EINVAL: pool or action is NULL
+ *      ETIMEDOUT: TIMED_WAIT is enabled and the timeout elapses
+ *      EAGAIN: THREAD_CREATE_LAZY is set and thread creation failed
  *
  * @param pool The threadpool to add the task to.
  * @param action The routine to be executed by the threadpool.
@@ -96,10 +108,17 @@ int threadpool_add_work(threadpool_t *pool, ROUTINE action, void *arg,
  * has elapsed. This function ignores the BLOCK_ON_ADD and TIMED_WAIT flags set
  * on the threadpool.
  *
- * If an error occurs while adding the task to the queue, the function will
- * return ENOMEM. If either pool or action are NULL or timeout is less than or
- * equal to 0 the function will return EINVAL. The function will return
- * ETIMEDOUT if the timeout elapses.
+ * If THREAD_CREATE_LAZY is set on the threadpool, the function will attempt
+ * to create a new thread if there are no available threads to execute the task.
+ * In this case, since the check for the thread is done after the task is added
+ * to the queue, even if the thread creation fails the task will still be added
+ * to the queue.
+ *
+ * Possible error codes:
+ *      ENOMEM: memory allocation failed
+ *      EINVAL: pool or action is NULL or timeout is negative
+ *      ETIMEDOUT: the timeout elapses
+ *      EAGAIN: THREAD_CREATE_LAZY is set and thread creation failed
  *
  * @param pool The threadpool to add the task to.
  * @param action The routine to be executed by the threadpool.
@@ -119,8 +138,8 @@ int threadpool_timed_add_work(threadpool_t *pool, ROUTINE action, void *arg,
  * current state; the thread may change state after the function returns.
  *
  * Possible error codes:
- *      EINVAL - pool is NULL
- *      ENOENT - thread_id is not valid
+ *      EINVAL: pool is NULL
+ *      ENOENT: thread_id is not valid
  *
  * @param pool The threadpool to get the thread information from.
  * @param thread_id The id of the thread to get the information of.
@@ -144,7 +163,7 @@ int threadpool_thread_status(threadpool_t *pool, size_t thread_id,
  * the caller.
  *
  * Possible error codes:
- *     EINVAL - pool is NULL
+ *      EINVAL: pool is NULL
  *
  * @param pool The threadpool to get the thread information from.
  * @param info_arr The array to store the thread information.
@@ -161,10 +180,10 @@ int threadpool_thread_status_all(threadpool_t *pool,
  * on BLOCKED threads will be cleared.
  *
  * Possible error codes:
- *      EINVAL - pool is NULL
- *      ENOENT - thread_id is not valid
- *      EAGAIN - Insufficient resources to create another thread.
- *      EALREADY - thread is already running
+ *      EINVAL: pool is NULL
+ *      ENOENT: thread_id is not valid
+ *      EAGAIN: Insufficient resources to create another thread.
+ *      EALREADY: thread is already running
  *
  * @param pool The threadpool to restart the thread in.
  * @param thread_id The id of the thread to restart.
@@ -179,8 +198,12 @@ int threadpool_restart_thread(threadpool_t *pool, size_t thread_id);
  * STOPPED and BLOCKED threads can be restarted. Any recorded errors on
  * BLOCKED threads will be cleared.
  *
+ * If the THREAD_CREATE_STRICT attribute is set, the function will fail if there
+ * are insufficient resources to create another thread.
+ *
  * Possible error codes:
- *      EINVAL - pool is NULL
+ *      EINVAL: pool is NULL
+ *      EAGAIN: THREAD_CREATE_STRICT is set and thread creation failed
  *
  * @param pool The threadpool to restart the threads in.
  * @return int 0 on success, non-zero on failure.
