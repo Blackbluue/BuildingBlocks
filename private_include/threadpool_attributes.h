@@ -13,12 +13,6 @@
 
 /* attribute flags */
 
-enum attr_flags {
-    DEFAULT_FLAGS = 0,     // no flags
-    TIMED_WAIT = 1 << 0,   // true = timed wait, false = infinite wait
-    BLOCK_ON_ADD = 1 << 1, // true = block on add, false = return EAGAIN
-};
-
 enum wait_type_flags {
     TIMED_WAIT_DISABLED, // wait indefinitely when blocking
     TIMED_WAIT_ENABLED,  // use timeout when blocking

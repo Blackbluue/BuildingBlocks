@@ -7,6 +7,12 @@
 
 #define SUCCESS 0
 
+enum attr_flags {
+    DEFAULT_FLAGS = 0,     // no flags
+    TIMED_WAIT = 1 << 0,   // true = timed wait, false = infinite wait
+    BLOCK_ON_ADD = 1 << 1, // true = block on add, false = return EAGAIN
+};
+
 struct inner_threadpool_attr_t {
     int flags;          // bit flags
     size_t max_threads; // maximum number of threads
