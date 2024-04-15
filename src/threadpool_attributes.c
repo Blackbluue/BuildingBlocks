@@ -56,11 +56,9 @@ int threadpool_attr_set_timed_wait(threadpool_attr_t *attr, int timed_wait) {
     switch (timed_wait) {
     case TIMED_WAIT_ENABLED:
         inner->flags |= TIMED_WAIT;
-        DEBUG_PRINT("\tTimed wait enabled\n");
         return SUCCESS;
     case TIMED_WAIT_DISABLED:
         inner->flags &= ~TIMED_WAIT;
-        DEBUG_PRINT("\tTimed wait disabled\n");
         return SUCCESS;
     default:
         DEBUG_PRINT("\tInvalid timed wait\n");
@@ -78,7 +76,6 @@ int threadpool_attr_get_timed_wait(threadpool_attr_t *attr, int *timed_wait) {
         ((struct inner_threadpool_attr_t *)attr);
     *timed_wait = check_flag(inner->flags, TIMED_WAIT) ? TIMED_WAIT_ENABLED
                                                        : TIMED_WAIT_DISABLED;
-    DEBUG_PRINT("\tTimed wait: %d\n", *timed_wait);
     return SUCCESS;
 }
 
@@ -91,7 +88,6 @@ int threadpool_attr_set_timeout(threadpool_attr_t *attr, time_t timeout) {
     struct inner_threadpool_attr_t *inner =
         ((struct inner_threadpool_attr_t *)attr);
     inner->default_wait = timeout;
-    DEBUG_PRINT("\tTimeout set to %ld\n", timeout);
     return SUCCESS;
 }
 
@@ -104,7 +100,6 @@ int threadpool_attr_get_timeout(threadpool_attr_t *attr, time_t *timeout) {
     struct inner_threadpool_attr_t *inner =
         ((struct inner_threadpool_attr_t *)attr);
     *timeout = inner->default_wait;
-    DEBUG_PRINT("\tTimeout: %ld\n", *timeout);
     return SUCCESS;
 }
 
@@ -120,11 +115,9 @@ int threadpool_attr_set_block_on_add(threadpool_attr_t *attr,
     switch (block_on_add) {
     case BLOCK_ON_ADD_ENABLED:
         inner->flags |= BLOCK_ON_ADD;
-        DEBUG_PRINT("\tBlocking on add enabled\n");
         return SUCCESS;
     case BLOCK_ON_ADD_DISABLED:
         inner->flags &= ~BLOCK_ON_ADD;
-        DEBUG_PRINT("\tBlocking on add disabled\n");
         return SUCCESS;
     default:
         DEBUG_PRINT("\tInvalid block on add\n");
@@ -144,7 +137,6 @@ int threadpool_attr_get_block_on_add(threadpool_attr_t *attr,
     *block_on_add = check_flag(inner->flags, BLOCK_ON_ADD)
                         ? BLOCK_ON_ADD_ENABLED
                         : BLOCK_ON_ADD_DISABLED;
-    DEBUG_PRINT("\tBlock on add: %d\n", *block_on_add);
     return SUCCESS;
 }
 
@@ -158,7 +150,6 @@ int threadpool_attr_set_thread_count(threadpool_attr_t *attr,
     struct inner_threadpool_attr_t *inner =
         ((struct inner_threadpool_attr_t *)attr);
     inner->max_threads = num_threads;
-    DEBUG_PRINT("\tThread count set to %zu\n", num_threads);
     return SUCCESS;
 }
 
@@ -172,7 +163,6 @@ int threadpool_attr_get_thread_count(threadpool_attr_t *attr,
     struct inner_threadpool_attr_t *inner =
         ((struct inner_threadpool_attr_t *)attr);
     *num_threads = inner->max_threads;
-    DEBUG_PRINT("\tThread count: %zu\n", *num_threads);
     return SUCCESS;
 }
 
@@ -185,7 +175,6 @@ int threadpool_attr_set_queue_size(threadpool_attr_t *attr, size_t queue_size) {
     struct inner_threadpool_attr_t *inner =
         ((struct inner_threadpool_attr_t *)attr);
     inner->max_q_size = queue_size;
-    DEBUG_PRINT("\tQueue size set to %zu\n", queue_size);
     return SUCCESS;
 }
 
@@ -199,6 +188,5 @@ int threadpool_attr_get_queue_size(threadpool_attr_t *attr,
     struct inner_threadpool_attr_t *inner =
         ((struct inner_threadpool_attr_t *)attr);
     *queue_size = inner->max_q_size;
-    DEBUG_PRINT("\tQueue size: %zu\n", *queue_size);
     return SUCCESS;
 }
