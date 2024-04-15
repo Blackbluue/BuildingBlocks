@@ -22,8 +22,8 @@ enum block_on_add_flags {
     BLOCK_ON_ADD_ENABLED,  // block when adding to full queue
 };
 enum block_on_error_flags {
-    BLOCK_ON_ERROR_ENABLED,  // block when a routine returns an error
-    BLOCK_ON_ERROR_DISABLED, // do not block when a routine returns an error
+    BLOCK_ON_ERR_ENABLED,  // block when a routine returns an error
+    BLOCK_ON_ERR_DISABLED, // do not block when a routine returns an error
 };
 
 /**
@@ -137,6 +137,39 @@ int threadpool_attr_set_block_on_add(threadpool_attr_t *attr, int block_on_add);
  */
 int threadpool_attr_get_block_on_add(threadpool_attr_t *attr,
                                      int *block_on_add);
+
+/**
+ * @brief Set the block on error flag for the threadpool attribute object.
+ *
+ * The block on error flag will be set to either BLOCK_ON_ERR_DISABLED or
+ * BLOCK_ON_ERR_ENABLED. If enabled, a thread will block when a routine returns
+ * a non-zero, until the error is cleared.
+ *
+ * Possible return values:
+ * - EINVAL: attr is NULL
+ * - ENOTSUP: block_on_err is not BLOCK_ON_ERR_DISABLED or BLOCK_ON_ERR_ENABLED
+ *
+ * @param attr pointer to threadpool_attr_t
+ * @param block_on_err BLOCK_ON_ERR_DISABLED or BLOCK_ON_ERR_ENABLED
+ * @return int 0 on success, non-zero on failure.
+ */
+int threadpool_attr_set_block_on_err(threadpool_attr_t *attr, int block_on_err);
+
+/**
+ * @brief Get the block on error flag for the threadpool attribute object.
+ *
+ *  If enabled, a thread will block when a routine returns a non-zero, until the
+ * error is cleared.
+ *
+ * Possible return values:
+ * - EINVAL: attr or block_on_err are NULL
+ *
+ * @param attr pointer to threadpool_attr_t
+ * @param block_on_err pointer to hold the value of the flag
+ * @return int 0 on success, non-zero on failure.
+ */
+int threadpool_attr_get_block_on_err(threadpool_attr_t *attr,
+                                     int *block_on_err);
 
 /**
  * @brief Set the number of threads for the threadpool attribute object.

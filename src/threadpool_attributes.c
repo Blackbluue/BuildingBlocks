@@ -11,6 +11,7 @@ enum attr_flags {
     DEFAULT_FLAGS = 0,     // no flags
     TIMED_WAIT = 1 << 0,   // true = timed wait, false = infinite wait
     BLOCK_ON_ADD = 1 << 1, // true = block on add, false = return EAGAIN
+    BLOCK_ON_ERR = 1 << 2, // true = block on error, false = return error
 };
 
 struct inner_threadpool_attr_t {
@@ -137,6 +138,43 @@ int threadpool_attr_get_block_on_add(threadpool_attr_t *attr,
     *block_on_add = check_flag(inner->flags, BLOCK_ON_ADD)
                         ? BLOCK_ON_ADD_ENABLED
                         : BLOCK_ON_ADD_DISABLED;
+    return SUCCESS;
+}
+
+int threadpool_attr_set_block_on_err(threadpool_attr_t *attr,
+                                     int block_on_err) {
+    DEBUG_PRINT("Setting block on err\n");
+    if (attr == NULL) {
+        DEBUG_PRINT("\tInvalid arguments\n");
+        return EINVAL;
+    }
+    struct inner_threadpool_attr_t *inner =
+        ((struct inner_threadpool_attr_t *)attr);
+    switch (block_on_err) {
+    case BLOCK_ON_ERR_ENABLED:
+        inner->flags |= BLOCK_ON_ERR;
+        return SUCCESS;
+    case BLOCK_ON_ERR_DISABLED:
+        inner->flags &= ~BLOCK_ON_ERR;
+        return SUCCESS;
+    default:
+        DEBUG_PRINT("\tInvalid block on err flag\n");
+        return EINVAL;
+    }
+}
+
+int threadpool_attr_get_block_on_err(threadpool_attr_t *attr,
+                                     int *block_on_err) {
+    DEBUG_PRINT("Getting block on err\n");
+    if (attr == NULL || block_on_err == NULL) {
+        DEBUG_PRINT("\tInvalid arguments\n");
+        return EINVAL;
+    }
+    struct inner_threadpool_attr_t *inner =
+        ((struct inner_threadpool_attr_t *)attr);
+    *block_on_err = check_flag(inner->flags, BLOCK_ON_ERR)
+                        ? BLOCK_ON_ERR_ENABLED
+                        : BLOCK_ON_ERR_DISABLED;
     return SUCCESS;
 }
 

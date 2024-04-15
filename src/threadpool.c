@@ -35,6 +35,7 @@ struct threadpool_t {
     int shutdown;
     int timed_wait;
     int block_on_add;
+    int block_on_err;
     time_t default_wait;
 };
 
@@ -151,6 +152,7 @@ static threadpool_t *init_pool(threadpool_attr_t *attr, int *err) {
     threadpool_attr_get_queue_size(attr, &q_size);
     threadpool_attr_get_thread_count(attr, &pool->max_threads);
     threadpool_attr_get_block_on_add(attr, &pool->block_on_add);
+    threadpool_attr_get_block_on_err(attr, &pool->block_on_err);
     threadpool_attr_get_timed_wait(attr, &pool->timed_wait);
     threadpool_attr_get_timeout(attr, &pool->default_wait);
 
@@ -170,11 +172,20 @@ static threadpool_t *init_pool(threadpool_attr_t *attr, int *err) {
     return init_thread_info(pool, err);
 }
 
+/**
+ * @brief Wait for error to be cleared.
+ *
+ * If block_on_err is enabled, the thread will wait for any error to be cleared.
+ * If block_on_err is disabled, the thread will return immediately.
+ *
+ * @param self pointer to thread
+ */
 static void wait_on_error(struct thread *self) {
-    // TODO: the check for wait will be conditional on a flag on the threadpool
-    while (self->error != SUCCESS) {
-        self->status = BLOCKED;
-        pthread_cond_wait(&self->error_cond, &self->info_lock);
+    if (self->pool->block_on_err == BLOCK_ON_ERR_ENABLED) {
+        while (self->error != SUCCESS) {
+            self->status = BLOCKED;
+            pthread_cond_wait(&self->error_cond, &self->info_lock);
+        }
     }
 }
 
