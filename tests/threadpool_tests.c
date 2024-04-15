@@ -112,24 +112,22 @@ void attr_timeout_test_pass(attr_timeout_set set, attr_timeout_get get,
  *
  * @return threadpool_t* pointer to threadpool_t
  */
-threadpool_t *setup_test(threadpool_attr_t **attr) {
-    if (*attr == NULL) {
-        *attr = threadpool_attr_init();
-        CU_ASSERT_PTR_NOT_NULL_FATAL(*attr);
-        CU_ASSERT_EQUAL_FATAL(
-            threadpool_attr_set_thread_count(*attr, THREAD_COUNT), SUCCESS);
-        CU_ASSERT_EQUAL_FATAL(threadpool_attr_set_queue_size(*attr, QUEUE_SIZE),
-                              SUCCESS);
-        CU_ASSERT_EQUAL_FATAL(
-            threadpool_attr_set_block_on_add(*attr, BLOCK_ON_ADD_ENABLED),
-            SUCCESS);
-        CU_ASSERT_EQUAL_FATAL(
-            threadpool_attr_set_timed_wait(*attr, TIMED_WAIT_ENABLED), SUCCESS);
-        CU_ASSERT_EQUAL_FATAL(threadpool_attr_set_timeout(*attr, TIMEOUT),
-                              SUCCESS);
-    }
+threadpool_t *setup_test(void) {
+    threadpool_attr_t attr;
+    threadpool_attr_init(&attr);
+    CU_ASSERT_EQUAL_FATAL(threadpool_attr_set_thread_count(&attr, THREAD_COUNT),
+                          SUCCESS);
+    CU_ASSERT_EQUAL_FATAL(threadpool_attr_set_queue_size(&attr, QUEUE_SIZE),
+                          SUCCESS);
+    CU_ASSERT_EQUAL_FATAL(
+        threadpool_attr_set_block_on_add(&attr, BLOCK_ON_ADD_ENABLED), SUCCESS);
+    CU_ASSERT_EQUAL_FATAL(
+        threadpool_attr_set_timed_wait(&attr, TIMED_WAIT_ENABLED), SUCCESS);
+    CU_ASSERT_EQUAL_FATAL(threadpool_attr_set_timeout(&attr, TIMEOUT), SUCCESS);
+
     fprintf(stderr, "\tsetup_test\n");
-    threadpool_t *pool = threadpool_create(*attr, NULL);
+    threadpool_t *pool = threadpool_create(&attr, NULL);
+    CU_ASSERT_EQUAL(threadpool_attr_destroy(&attr), SUCCESS);
     CU_ASSERT_PTR_NOT_NULL_FATAL(pool);
     fprintf(stderr, "\tsetup_test done\n");
     return pool;
@@ -143,15 +141,14 @@ threadpool_t *setup_test(threadpool_attr_t **attr) {
  *
  * @param pool pointer to threadpool_t
  */
-void teardown_test(threadpool_t **pool, threadpool_attr_t *attr) {
+void teardown_test(threadpool_t **pool) {
     fprintf(stderr, "\tteardown_test\n");
     CU_ASSERT_EQUAL(threadpool_destroy(*pool, SHUTDOWN_GRACEFUL), SUCCESS);
     *pool = NULL;
-    CU_ASSERT_EQUAL(threadpool_attr_destroy(attr), SUCCESS);
     fprintf(stderr, "\tteardown_test done\n");
 }
 
-void dummy_task(void *arg, void *arg2) {
+int dummy_task(void *arg, void *arg2) {
     (void)arg2;
     fprintf(stderr, "\ton thread %lX: dummy_task\n", pthread_self());
     sleep(TIMEOUT);
@@ -162,6 +159,7 @@ void dummy_task(void *arg, void *arg2) {
     fprintf(stderr, "\ton thread %lX: %d task(s) done\n", pthread_self(),
             *done);
     pthread_mutex_unlock(&lock);
+    return SUCCESS;
 }
 
 /**
@@ -183,7 +181,6 @@ int start_tasks(threadpool_t *pool, int *done) {
         case SUCCESS:
             tasks++;
             break;
-        // case EAGAIN:
         case ETIMEDOUT:
             // adding work failed in an expected way
             break;
@@ -198,46 +195,38 @@ int start_tasks(threadpool_t *pool, int *done) {
 void test_threadpool_attributes() {
     fprintf(stderr, "\ntest_threadpool_attributes start\n");
     // Test threadpool_attr_init()
-    threadpool_attr_t *attr = threadpool_attr_init();
-    CU_ASSERT_PTR_NOT_NULL_FATAL(attr);
-
-    // Test threadpool_attr_t cancel_type
-    ATTR_FLAG_TEST_FAIL(cancel_type, attr);
-    ATTR_FLAG_TEST_PASS(cancel_type, attr, CANCEL_ASYNC);
-    ATTR_FLAG_TEST_PASS(cancel_type, attr, CANCEL_DEFERRED);
+    threadpool_attr_t attr;
+    threadpool_attr_init(&attr);
 
     // Test threadpool_attr_t timed_wait/timeout
-    ATTR_FLAG_TEST_FAIL(timed_wait, attr);
-    ATTR_FLAG_TEST_PASS(timed_wait, attr, TIMED_WAIT_ENABLED);
-    ATTR_FLAG_TEST_PASS(timed_wait, attr, TIMED_WAIT_DISABLED);
-    ATTR_TIMEOUT_TEST_FAIL(timeout, attr, 0);
-    ATTR_TIMEOUT_TEST_PASS(timeout, attr, TIMEOUT);
+    ATTR_FLAG_TEST_FAIL(timed_wait, &attr);
+    ATTR_FLAG_TEST_PASS(timed_wait, &attr, TIMED_WAIT_ENABLED);
+    ATTR_FLAG_TEST_PASS(timed_wait, &attr, TIMED_WAIT_DISABLED);
+    ATTR_TIMEOUT_TEST_FAIL(timeout, &attr, 0);
+    ATTR_TIMEOUT_TEST_PASS(timeout, &attr, TIMEOUT);
 
     // Test threadpool_attr_t block_on_add
-    ATTR_FLAG_TEST_FAIL(block_on_add, attr);
-    ATTR_FLAG_TEST_PASS(block_on_add, attr, BLOCK_ON_ADD_ENABLED);
-    ATTR_FLAG_TEST_PASS(block_on_add, attr, BLOCK_ON_ADD_DISABLED);
+    ATTR_FLAG_TEST_FAIL(block_on_add, &attr);
+    ATTR_FLAG_TEST_PASS(block_on_add, &attr, BLOCK_ON_ADD_ENABLED);
+    ATTR_FLAG_TEST_PASS(block_on_add, &attr, BLOCK_ON_ADD_DISABLED);
 
     // Test threadpool_attr_t thread_count
-    ATTR_COUNT_TEST_FAIL(thread_count, attr, 0);
-    ATTR_COUNT_TEST_FAIL(thread_count, attr, MAX_THREADS + 1);
-    ATTR_COUNT_TEST_PASS(thread_count, attr, THREAD_COUNT);
+    ATTR_COUNT_TEST_FAIL(thread_count, &attr, 0);
+    ATTR_COUNT_TEST_FAIL(thread_count, &attr, MAX_THREADS + 1);
+    ATTR_COUNT_TEST_PASS(thread_count, &attr, THREAD_COUNT);
 
     // Test threadpool_attr_t queue_size
-    ATTR_COUNT_TEST_FAIL(queue_size, attr, 0);
-    ATTR_COUNT_TEST_PASS(queue_size, attr, QUEUE_SIZE);
+    ATTR_COUNT_TEST_FAIL(queue_size, &attr, 0);
+    ATTR_COUNT_TEST_PASS(queue_size, &attr, QUEUE_SIZE);
 
     // Test threadpool_attr_destroy()
-    CU_ASSERT_NOT_EQUAL(threadpool_attr_destroy(NULL), SUCCESS);
-    CU_ASSERT_EQUAL(threadpool_attr_destroy(attr), SUCCESS);
+    CU_ASSERT_EQUAL(threadpool_attr_destroy(&attr), SUCCESS);
     fprintf(stderr, "test_threadpool_attributes done\n\n");
 }
 
 void test_threadpool_run_tasks() {
     fprintf(stderr, "test_threadpool_run_tasks start\n");
-    threadpool_attr_t *attr = NULL;
-
-    threadpool_t *pool = setup_test(&attr);
+    threadpool_t *pool = setup_test();
 
     // Confirm that threadpool_add_work() returns EINVAL when pool or action are
     // NULL
@@ -265,14 +254,13 @@ void test_threadpool_run_tasks() {
     // Confirm that all tasks were completed
     CU_ASSERT_EQUAL(done, tasks);
 
-    teardown_test(&pool, attr);
+    teardown_test(&pool);
     fprintf(stderr, "test_threadpool_run_tasks done\n\n");
 }
 
 void test_threadpool_shutdown() {
     fprintf(stderr, "test_threadpool_shutdown start\n");
-    threadpool_attr_t *attr = NULL;
-    threadpool_t *pool = setup_test(&attr);
+    threadpool_t *pool = setup_test();
 
     // Confirm that threadpool_destroy() returns EINVAL when pool is NULL
     CU_ASSERT_EQUAL(threadpool_destroy(NULL, SHUTDOWN_GRACEFUL), EINVAL);
@@ -289,14 +277,14 @@ void test_threadpool_shutdown() {
 
     // Confirm that threadpool_destroy() gracefully destroys the threadpool
     fprintf(stderr, "\tQUIT_GRACEFUL\n");
-    pool = setup_test(&attr);
+    pool = setup_test();
     CU_ASSERT_PTR_NOT_NULL_FATAL(pool);
     sleep(1); // allow all threads to start up
     done = 0;
     pthread_mutex_lock(&lock);
     tasks = start_tasks(pool, &done);
     pthread_mutex_unlock(&lock);
-    teardown_test(&pool, attr);
+    teardown_test(&pool);
     CU_ASSERT_EQUAL(done, tasks);
     fprintf(stderr, "test_threadpool_shutdown done\n\n");
 }

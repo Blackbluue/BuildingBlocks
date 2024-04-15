@@ -29,4 +29,14 @@ enum query_cmds {
  */
 void set_err(int *err, int value);
 
+/**
+ * @brief Check if a flag is set.
+ *
+ * @param bit_flags The flag to check.
+ * @param position The bit position to check.
+ * @retval non-zero if the flag is set.
+ * @retval 0 if the flag is not set.
+ */
+int check_flag(int bit_flags, int position);
+
 #endif /* BUILDINGBLOCKS_H */

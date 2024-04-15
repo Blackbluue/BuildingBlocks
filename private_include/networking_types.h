@@ -1,9 +1,9 @@
 #ifndef NETWORKING_TYPES_H
 #define NETWORKING_TYPES_H
 
-#include "sizes.h"
-
 /* DATA */
+
+#define NETWORKING_ATTR_SIZE 32
 
 union networking_attr_t {
     char __size[NETWORKING_ATTR_SIZE];

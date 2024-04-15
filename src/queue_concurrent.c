@@ -325,9 +325,6 @@ static int wait_for(queue_c_t *queue, pthread_cond_t *cond, PREDICATE pred) {
     ATOMIC_DEC(queue->waiting_for_cond, queue->counter_lock);
     if (!keep_waiting(queue)) {
         DEBUG_PRINT("on thread %lX: should stop waiting\n", pthread_self());
-        // TODO: waiting_for_cond is being checked before other threads can
-        // start waiting, thus cancel_wait is being turned false too soon
-
         // stop canceling wait if no other thread is waiting for a condition
         if (queue->waiting_for_cond == 0) {
             queue->cancel_wait = false;
