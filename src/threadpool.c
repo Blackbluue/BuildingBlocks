@@ -190,40 +190,6 @@ static void wait_on_error(struct thread *self) {
 }
 
 /**
- * @brief Add a task to the queue.
- *
- * @param pool pointer to threadpool_t
- * @param action pointer to function to be performed
- * @param arg pointer to argument for action
- * @param arg2 pointer to second argument for action
- * @return int 0 if successful, otherwise error code
- */
-static int add_task(threadpool_t *pool, ROUTINE action, void *arg, void *arg2) {
-    struct task_t *task = malloc(sizeof(*task));
-    if (task == NULL) {
-        queue_c_unlock(pool->queue);
-        DEBUG_PRINT("\ton thread %lX: Failed to allocate memory for task\n",
-                    pthread_self());
-        return ENOMEM;
-    }
-    task->action = action;
-    task->arg = arg;
-    task->arg2 = arg2;
-    DEBUG_PRINT("\ton thread %lX: \tEnqueueing...\n", pthread_self());
-    int res = queue_c_enqueue(pool->queue, task);
-    if (res != SUCCESS) {
-        queue_c_unlock(pool->queue);
-        free(task);
-        DEBUG_PRINT("\ton thread %lX: Failed to enqueue task\n",
-                    pthread_self());
-        return res;
-    }
-    queue_c_unlock(pool->queue);
-    DEBUG_PRINT("\ton thread %lX: Task added to queue\n", pthread_self());
-    return SUCCESS;
-}
-
-/**
  * @brief Perform a task for the threadpool.
  *
  * @param arg pointer to threadpool_t
@@ -286,6 +252,40 @@ static void *thread_task(void *arg) {
         pthread_mutex_unlock(&self->info_lock);
         DEBUG_PRINT("\ton thread %lX: Work complete\n", pthread_self());
     }
+}
+
+/**
+ * @brief Add a task to the queue.
+ *
+ * @param pool pointer to threadpool_t
+ * @param action pointer to function to be performed
+ * @param arg pointer to argument for action
+ * @param arg2 pointer to second argument for action
+ * @return int 0 if successful, otherwise error code
+ */
+static int add_task(threadpool_t *pool, ROUTINE action, void *arg, void *arg2) {
+    struct task_t *task = malloc(sizeof(*task));
+    if (task == NULL) {
+        queue_c_unlock(pool->queue);
+        DEBUG_PRINT("\ton thread %lX: Failed to allocate memory for task\n",
+                    pthread_self());
+        return ENOMEM;
+    }
+    task->action = action;
+    task->arg = arg;
+    task->arg2 = arg2;
+    DEBUG_PRINT("\ton thread %lX: \tEnqueueing...\n", pthread_self());
+    int res = queue_c_enqueue(pool->queue, task);
+    if (res != SUCCESS) {
+        queue_c_unlock(pool->queue);
+        free(task);
+        DEBUG_PRINT("\ton thread %lX: Failed to enqueue task\n",
+                    pthread_self());
+        return res;
+    }
+    queue_c_unlock(pool->queue);
+    DEBUG_PRINT("\ton thread %lX: Task added to queue\n", pthread_self());
+    return SUCCESS;
 }
 
 /**
