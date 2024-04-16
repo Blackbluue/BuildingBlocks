@@ -158,6 +158,13 @@ if(BUILD_TESTING)
     target_link_libraries(test_net_hero buildingblocks serialization networking_utils networking_client hero cunit)
     add_test(NAME TestNetworking COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/test_networking.sh ${CMAKE_CURRENT_BINARY_DIR}/test_net_adventure ${CMAKE_CURRENT_BINARY_DIR}/test_net_hero)
 
+    add_library(utils OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/multi_thread/utils.c)
+    add_executable(threaded_server ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/multi_thread/server.c)
+    target_link_libraries(threaded_server buildingblocks serialization networking_utils networking_server utils)
+    add_executable(client ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/multi_thread/client.c)
+    target_link_libraries(client buildingblocks serialization networking_utils networking_client utils cunit)
+    add_test(NAME TestThreadedNetworking COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/test_networking.sh ${CMAKE_CURRENT_BINARY_DIR}/threaded_server ${CMAKE_CURRENT_BINARY_DIR}/client)
+
     add_executable(test_threadpool ${CMAKE_CURRENT_SOURCE_DIR}/tests/threadpool_tests.c)
     target_link_libraries(test_threadpool buildingblocks threadpool_attributes threadpool queue_concurrent queue linked_list cunit)
     add_test(NAME TestThreadPool COMMAND test_threadpool)
