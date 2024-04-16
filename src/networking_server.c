@@ -259,14 +259,15 @@ int run_service(server_t *server, const char *name) {
             if (pkt == NULL) {
                 handle_client = false; // drop the client
                 switch (err) {
-                case EWOULDBLOCK:         // no data available
-                case ENODATA:             // client disconnected
-                case ETIMEDOUT:           // client timed out
-                case EINVAL:              // invalid packet
-                    err = 0;              // clear error
-                    continue;             // don't close the server
-                case EINTR:               // signal interrupt
-                    err = SUCCESS;        // no error
+                case EWOULDBLOCK:  // no data available
+                case ENODATA:      // client disconnected
+                case ETIMEDOUT:    // client timed out
+                case EINVAL:       // invalid packet
+                    err = 0;       // clear error
+                    continue;      // don't close the server
+                case EINTR:        // signal interrupt
+                    err = SUCCESS; // no error
+                    // fall through
                 default:                  // other errors
                     keep_running = false; // close the server
                     continue;
