@@ -151,10 +151,10 @@ if(BUILD_TESTING)
     target_link_libraries(test_tree buildingblocks avl_tree queue linked_list cunit)
     add_test(NAME TestTree COMMAND test_tree)
 
-    add_library(hero OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/hero.c)
-    add_executable(test_net_adventure ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/adventure.c)
+    add_library(hero OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/single_thread/hero.c)
+    add_executable(test_net_adventure ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/single_thread/adventure.c)
     target_link_libraries(test_net_adventure buildingblocks serialization networking_utils networking_server hero)
-    add_executable(test_net_hero ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/hero_client.c)
+    add_executable(test_net_hero ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/single_thread/hero_client.c)
     target_link_libraries(test_net_hero buildingblocks serialization networking_utils networking_client hero cunit)
     add_test(NAME TestNetworking COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/test_networking.sh ${CMAKE_CURRENT_BINARY_DIR}/test_net_adventure ${CMAKE_CURRENT_BINARY_DIR}/test_net_hero)
 
