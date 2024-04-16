@@ -162,7 +162,7 @@ if(BUILD_TESTING)
     add_executable(threaded_server ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/multi_thread/server.c)
     target_link_libraries(threaded_server buildingblocks serialization networking_utils networking_server utils)
     add_executable(client ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/multi_thread/client.c)
-    target_link_libraries(client buildingblocks serialization networking_utils networking_client utils cunit)
+    target_link_libraries(client buildingblocks serialization networking_utils networking_client utils cunit Threads::Threads)
     add_test(NAME TestThreadedNetworking COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/test_networking.sh ${CMAKE_CURRENT_BINARY_DIR}/threaded_server ${CMAKE_CURRENT_BINARY_DIR}/client)
 
     add_executable(test_threadpool ${CMAKE_CURRENT_SOURCE_DIR}/tests/threadpool_tests.c)
