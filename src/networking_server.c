@@ -289,3 +289,18 @@ int run_service(server_t *server, const char *name) {
     }
     return err;
 }
+
+int run_server(server_t *server) {
+    if (server == NULL) {
+        return EINVAL;
+    }
+
+    int err = SUCCESS;
+    bool keep_running = true;
+    while (keep_running) {
+        // TODO: implement run_server
+        pause();
+        break;
+    }
+    return err;
+}

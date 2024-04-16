@@ -130,4 +130,20 @@ int register_service(server_t *server, const char *name, service_f service,
  */
 int run_service(server_t *server, const char *name);
 
+/**
+ * @brief Run the server.
+ *
+ * Runs the server, accepting incoming connections and running the designated
+ * services. The function will block while running the server; it will return
+ * when it encounters a network error or when all services terminate.
+ *
+ * Possible errors:
+ * - EINVAL: server is NULL.
+ * See accept(2) and the service function for more error details.
+ *
+ * @param server - The server to run.
+ * @return int - 0 on success, non-zero on failure.
+ */
+int run_server(server_t *server);
+
 #endif /* NETWORKING_SERVER_H */
