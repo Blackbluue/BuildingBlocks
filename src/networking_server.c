@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "networking_server.h"
 #include "buildingblocks.h"
+#include "hash_table.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
@@ -15,23 +16,71 @@
 #define SUCCESS 0
 #define FAILURE -1
 
-struct server {
+struct service_info {
     char *name;
     int flags;
     service_f service;
     int sock;
 };
 
+struct server {
+    hash_table_t *services;
+};
+
 /* PRIVATE FUNCTIONS */
 
 /**
- * @brief Create an inet socket object
+ * @brief Free a service object.
  *
- * @param result - the result of getaddrinfo
- * @param connections - the maximum number of connections
- * @param sock - the socket to be created
- * @param err_type - the type of error that occurred
- * @return int - 0 on success, non-zero on failure
+ * @param srv - The service object to be freed.
+ */
+static void free_service(struct service_info *srv) {
+    free(srv->name);
+    if (srv->sock != FAILURE) {
+        close(srv->sock);
+    }
+    free(srv);
+}
+
+/**
+ * @brief Create a new service object and add it to the server.
+ *
+ * @param server - The server to add the service to.
+ * @param name - The name of the service.
+ * @param srv - The service object to be created.
+ * @return int - 0 on success, non-zero on failure.
+ */
+static int new_service(server_t *server, const char *name,
+                       struct service_info **srv) {
+    *srv = hash_table_lookup(server->services, name);
+    if (*srv != NULL) {
+        return EEXIST;
+    }
+    *srv = calloc(1, sizeof(**srv));
+    if (*srv == NULL) {
+        return ENOMEM;
+    }
+    (*srv)->sock = FAILURE; // to signify the socket has not been created yet
+    (*srv)->name = strdup(name);
+    if ((*srv)->name == NULL) {
+        free(*srv);
+        return ENOMEM;
+    }
+    int err = hash_table_set(server->services, *srv, (*srv)->name);
+    if (err != SUCCESS) {
+        free_service(*srv);
+    }
+    return err;
+}
+
+/**
+ * @brief Create an inet socket object.
+ *
+ * @param result - the result of getaddrinfo.
+ * @param connections - the maximum number of connections.
+ * @param sock - the socket to be created.
+ * @param err_type - the type of error that occurred.
+ * @return int - 0 on success, non-zero on failure.
  */
 static int create_socket(struct addrinfo *result, int connections, int *sock,
                          int *err_type) {
@@ -78,20 +127,24 @@ static int create_socket(struct addrinfo *result, int connections, int *sock,
 /* PUBLIC FUNCTIONS */
 
 server_t *init_server(int *err) {
-    server_t *server = calloc(1, sizeof(*server));
+    server_t *server = malloc(sizeof(*server));
     if (server == NULL) {
         set_err(err, errno);
         return NULL;
     }
-    server->sock = FAILURE;
+    server->services =
+        hash_table_init(0, (FREE_F)free_service, (CMP_F)strcmp, err);
+    if (server->services == NULL) {
+        free(server);
+        return NULL;
+    }
     return server;
 }
 
 int destroy_server(server_t *server) {
     if (server != NULL) {
         // TODO: check if server is still running
-        free(server->name);
-        close(server->sock);
+        hash_table_destroy(&server->services);
         free(server);
     }
     return SUCCESS;
@@ -103,16 +156,12 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
         set_err(err_type, SYS);
         return EINVAL;
     }
-    // until multithread support is added, only one socket can be opened
-    close(server->sock); // ignore EBADF error if sock is still -1
-    server->sock = FAILURE;
-    char *loc_name = strdup(name);
-    if (loc_name == NULL) {
+    struct service_info *srv = NULL;
+    int err = new_service(server, name, &srv);
+    if (err != SUCCESS) {
         set_err(err_type, SYS);
-        return ENOMEM;
+        return err;
     }
-    free(server->name);
-    server->name = NULL;
 
     if (attr == NULL) {
         // use default values
@@ -135,7 +184,7 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
     };
 
     struct addrinfo *result = NULL;
-    int err = getaddrinfo(NULL, port, &hints, &result);
+    err = getaddrinfo(NULL, port, &hints, &result);
     if (err != SUCCESS) {
         if (err == EAI_SYSTEM) {
             err = errno;
@@ -146,16 +195,15 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
         goto error;
     }
 
-    err = create_socket(result, connections, &server->sock, err_type);
+    err = create_socket(result, connections, &srv->sock, err_type);
     if (err == SUCCESS) {
         goto cleanup;
     }
     // only get here if no address worked
 error:
-    free(loc_name);
-    loc_name = NULL;
+    hash_table_remove(server->services, srv->name);
+    free_service(srv);
 cleanup:
-    server->name = loc_name;
     freeaddrinfo(result);
     return err;
 }
@@ -165,14 +213,11 @@ int open_unix_socket(server_t *server, const char *name, const char *path,
     if (server == NULL || name == NULL || path == NULL) {
         return EINVAL;
     }
-    // until multithread support is added, only one socket can be opened
-    close(server->sock); // ignore EBADF error if sock is still -1
-    char *loc_name = strdup(name);
-    if (loc_name == NULL) {
-        return ENOMEM;
+    struct service_info *srv = NULL;
+    int err = new_service(server, name, &srv);
+    if (err != SUCCESS) {
+        return err;
     }
-    free(server->name);
-    server->name = NULL;
 
     if (attr == NULL) {
         // use default values
@@ -185,9 +230,9 @@ int open_unix_socket(server_t *server, const char *name, const char *path,
     network_attr_get_socktype(attr, &socktype);
     network_attr_get_max_connections(attr, &connections);
 
-    int err = SUCCESS;
-    server->sock = socket(AF_UNIX, socktype, 0);
-    if (server->sock == FAILURE) {
+    err = SUCCESS;
+    srv->sock = socket(AF_UNIX, socktype, 0);
+    if (srv->sock == FAILURE) {
         goto error;
     }
 
@@ -196,12 +241,12 @@ int open_unix_socket(server_t *server, const char *name, const char *path,
     };
     strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
 
-    if (bind(server->sock, (struct sockaddr *)&addr, sizeof(addr)) == FAILURE) {
+    if (bind(srv->sock, (struct sockaddr *)&addr, sizeof(addr)) == FAILURE) {
         goto error;
     }
 
     if (socktype == SOCK_STREAM || socktype == SOCK_SEQPACKET) {
-        if (listen(server->sock, connections) == FAILURE) {
+        if (listen(srv->sock, connections) == FAILURE) {
             goto error;
         }
     }
@@ -209,12 +254,9 @@ int open_unix_socket(server_t *server, const char *name, const char *path,
 
 error:
     err = errno;
-    close(server->sock); // ignores EBADF error if sock is still -1
-    server->sock = FAILURE;
-    free(loc_name);
-    loc_name = NULL;
+    hash_table_remove(server->services, srv->name);
+    free_service(srv);
 cleanup: // if jumped directly here, function succeeded
-    server->name = loc_name;
     return err;
 }
 
@@ -222,18 +264,22 @@ int register_service(server_t *server, const char *name, service_f service,
                      int flags) {
     if (server == NULL || name == NULL || service == NULL) {
         return EINVAL;
-    } else if (strncmp(server->name, name, strlen(server->name)) != 0) {
+    }
+    struct service_info *srv = hash_table_lookup(server->services, name);
+    if (srv == NULL) {
         return ENOENT;
     }
-    server->service = service;
-    server->flags = flags;
+    srv->service = service;
+    srv->flags = flags;
     return SUCCESS;
 }
 
 int run_service(server_t *server, const char *name) {
     if (server == NULL || name == NULL) {
         return EINVAL;
-    } else if (strncmp(server->name, name, strlen(server->name)) != 0) {
+    }
+    struct service_info *srv = hash_table_lookup(server->services, name);
+    if (srv == NULL) {
         return ENOENT;
     }
 
@@ -242,8 +288,7 @@ int run_service(server_t *server, const char *name) {
     while (keep_running) {
         struct sockaddr_storage addr;
         socklen_t addrlen = sizeof(addr);
-        int client_sock =
-            accept(server->sock, (struct sockaddr *)&addr, &addrlen);
+        int client_sock = accept(srv->sock, (struct sockaddr *)&addr, &addrlen);
         if (client_sock == FAILURE) {
             if (errno != EINTR) {
                 err = errno;
@@ -275,8 +320,8 @@ int run_service(server_t *server, const char *name) {
             }
             DEBUG_PRINT("packet successfully received\n");
 
-            err = server->service(pkt, (struct sockaddr *)&addr, addrlen,
-                                  client_sock);
+            err = srv->service(pkt, (struct sockaddr *)&addr, addrlen,
+                               client_sock);
             if (err != SUCCESS) {
                 keep_running = false;
                 handle_client = false;

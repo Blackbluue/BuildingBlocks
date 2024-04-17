@@ -40,6 +40,7 @@ int destroy_server(server_t *server);
  *
  * Errors are separated into different types. The error type will be stored in
  * optional err_type argument, while the error itself will always be returned.
+ *
  * Possible errors:
  * - SOCK: socket error
  *      See socket(2)for more details.
@@ -48,13 +49,11 @@ int destroy_server(server_t *server);
  * - SYS: system error
  *      EINVAL: server, name, or port is NULL
  *      ENOMEM: Insufficient memory is available.
+ *      EEXIST: The socket with the given name already exists
  * - BIND: bind error
  *      See bind(2)for more details.
  * - LISTEN: listen error
  *      See listen(2)for more details.
- *
- * @note Until multiple services are supported, the name will be ignored and
- * calling this function multiple times will overwrite the previous service.
  *
  * @param server - The server to store the socket.
  * @param name - The identifier of the service.
@@ -76,10 +75,8 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
  * Possible errors:
  * - EINVAL: server, name, or path is NULL
  * - ENOMEM: Insufficient memory is available.
+ * - EEXIST: The socket with the given name already exists
  * See socket(2), bind(2) and listen(2) for more error details.
- *
- * @note Until multiple services are supported, the name will be ignored and
- * calling this function multiple times will overwrite the previous service.
  *
  * @param server - the server to store the socket.
  * @param name - the identifier of the service.
