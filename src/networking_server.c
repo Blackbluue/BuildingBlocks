@@ -54,21 +54,25 @@ static int new_service(server_t *server, const char *name,
                        struct service_info **srv) {
     *srv = hash_table_lookup(server->services, name);
     if (*srv != NULL) {
+        DEBUG_PRINT("new_service: service %s already exists\n", name);
         return EEXIST;
     }
     *srv = calloc(1, sizeof(**srv));
     if (*srv == NULL) {
+        DEBUG_PRINT("new_service: calloc failed\n");
         return ENOMEM;
     }
     (*srv)->sock = FAILURE; // to signify the socket has not been created yet
     (*srv)->name = strdup(name);
     if ((*srv)->name == NULL) {
         free(*srv);
+        DEBUG_PRINT("new_service: strdup failed\n");
         return ENOMEM;
     }
     int err = hash_table_set(server->services, *srv, (*srv)->name);
     if (err != SUCCESS) {
         free_service(*srv);
+        DEBUG_PRINT("new_service: hash_table_set failed\n");
     }
     return err;
 }
@@ -92,6 +96,7 @@ static int create_socket(struct addrinfo *result, int connections, int *sock,
         if (*sock == FAILURE) { // error caught at the end of the loop
             err = errno;
             set_err(err_type, SOCK);
+            DEBUG_PRINT("socket error: %s\n", strerror(err));
             continue;
         }
 
@@ -108,6 +113,7 @@ static int create_socket(struct addrinfo *result, int connections, int *sock,
                     set_err(err_type, LISTEN);
                     close(*sock);
                     *sock = FAILURE;
+                    DEBUG_PRINT("listen error: %s\n", strerror(err));
                     continue;
                 }
             } else {           // don't attempt to listen
@@ -119,6 +125,7 @@ static int create_socket(struct addrinfo *result, int connections, int *sock,
             set_err(err_type, BIND);
             close(*sock);
             *sock = FAILURE;
+            DEBUG_PRINT("bind error: %s\n", strerror(err));
         }
     }
     return err;
@@ -127,21 +134,26 @@ static int create_socket(struct addrinfo *result, int connections, int *sock,
 /* PUBLIC FUNCTIONS */
 
 server_t *init_server(int *err) {
+    DEBUG_PRINT("creating server\n");
     server_t *server = malloc(sizeof(*server));
     if (server == NULL) {
         set_err(err, errno);
+        DEBUG_PRINT("init_server: malloc failed\n");
         return NULL;
     }
     server->services =
         hash_table_init(0, (FREE_F)free_service, (CMP_F)strcmp, err);
     if (server->services == NULL) {
         free(server);
+        DEBUG_PRINT("init_server: hash_table_init failed\n");
         return NULL;
     }
+    DEBUG_PRINT("server initialized\n");
     return server;
 }
 
 int destroy_server(server_t *server) {
+    DEBUG_PRINT("destroy_server\n");
     if (server != NULL) {
         // TODO: check if server is still running
         hash_table_destroy(&server->services);
@@ -154,8 +166,10 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
                      const networking_attr_t *attr, int *err_type) {
     if (server == NULL || port == NULL || name == NULL) {
         set_err(err_type, SYS);
+        DEBUG_PRINT("open_inet_socket: server, name, or port is NULL\n");
         return EINVAL;
     }
+    DEBUG_PRINT("opening inet socket %s\n", name);
     struct service_info *srv = NULL;
     int err = new_service(server, name, &srv);
     if (err != SUCCESS) {
@@ -165,6 +179,7 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
 
     if (attr == NULL) {
         // use default values
+        DEBUG_PRINT("open_inet_socket: using default attributes\n");
         networking_attr_t def_attr;
         attr = &def_attr;
         init_attr((networking_attr_t *)attr);
@@ -189,14 +204,17 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
         if (err == EAI_SYSTEM) {
             err = errno;
             set_err(err_type, SYS);
+            DEBUG_PRINT("getaddrinfo error: %s\n", strerror(err));
         } else {
             set_err(err_type, GAI);
+            DEBUG_PRINT("getaddrinfo error: %s\n", gai_strerror(err));
         }
         goto error;
     }
 
     err = create_socket(result, connections, &srv->sock, err_type);
     if (err == SUCCESS) {
+        DEBUG_PRINT("inet socket created\n");
         goto cleanup;
     }
     // only get here if no address worked
@@ -211,8 +229,10 @@ cleanup:
 int open_unix_socket(server_t *server, const char *name, const char *path,
                      const networking_attr_t *attr) {
     if (server == NULL || name == NULL || path == NULL) {
+        DEBUG_PRINT("open_unix_socket: server, name, or path is NULL\n");
         return EINVAL;
     }
+    DEBUG_PRINT("opening unix socket %s\n", name);
     struct service_info *srv = NULL;
     int err = new_service(server, name, &srv);
     if (err != SUCCESS) {
@@ -221,6 +241,7 @@ int open_unix_socket(server_t *server, const char *name, const char *path,
 
     if (attr == NULL) {
         // use default values
+        DEBUG_PRINT("open_unix_socket: using default attributes\n");
         networking_attr_t def_attr;
         attr = &def_attr;
         init_attr((networking_attr_t *)attr);
@@ -250,10 +271,12 @@ int open_unix_socket(server_t *server, const char *name, const char *path,
             goto error;
         }
     }
+    DEBUG_PRINT("unix socket created\n");
     goto cleanup;
 
 error:
     err = errno;
+    DEBUG_PRINT("open_unix_socket: %s\n", strerror(err));
     hash_table_remove(server->services, srv->name);
     free_service(srv);
 cleanup: // if jumped directly here, function succeeded
@@ -263,10 +286,13 @@ cleanup: // if jumped directly here, function succeeded
 int register_service(server_t *server, const char *name, service_f service,
                      int flags) {
     if (server == NULL || name == NULL || service == NULL) {
+        DEBUG_PRINT("register_service: server, name, or service is NULL\n");
         return EINVAL;
     }
+    DEBUG_PRINT("registering service %s\n", name);
     struct service_info *srv = hash_table_lookup(server->services, name);
     if (srv == NULL) {
+        DEBUG_PRINT("register_service: service %s not found\n", name);
         return ENOENT;
     }
     srv->service = service;
@@ -276,12 +302,15 @@ int register_service(server_t *server, const char *name, service_f service,
 
 int run_service(server_t *server, const char *name) {
     if (server == NULL || name == NULL) {
+        DEBUG_PRINT("run_service: server or name is NULL\n");
         return EINVAL;
     }
     struct service_info *srv = hash_table_lookup(server->services, name);
     if (srv == NULL) {
+        DEBUG_PRINT("run_service: service %s not found\n", name);
         return ENOENT;
     }
+    DEBUG_PRINT("running service %s\n", srv->name);
 
     int err = SUCCESS;
     bool keep_running = true;
@@ -337,13 +366,16 @@ int run_service(server_t *server, const char *name) {
 
 int run_server(server_t *server) {
     if (server == NULL) {
+        DEBUG_PRINT("run_server: server is NULL\n");
         return EINVAL;
     }
 
+    DEBUG_PRINT("starting services\n");
     int err = SUCCESS;
     bool keep_running = true;
     while (keep_running) {
         // TODO: implement run_server
+        DEBUG_PRINT("waiting for services to finish\n");
         pause();
         break;
     }
