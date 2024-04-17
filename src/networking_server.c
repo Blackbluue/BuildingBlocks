@@ -131,6 +131,74 @@ static int create_socket(struct addrinfo *result, int connections, int *sock,
     return err;
 }
 
+/**
+ * @brief Run a single service.
+ *
+ * @param srv - The service to run.
+ * @param unused - Unused argument.
+ * @return int - 0 on success, non-zero on failure.
+ */
+static int run_single(struct service_info *srv, void *unused) {
+    (void)unused;
+    if (srv == NULL) {
+        // hash table lookup failed
+        DEBUG_PRINT("run_single: service not found\n");
+        return ENOENT;
+    }
+    DEBUG_PRINT("running service %s\n", srv->name);
+
+    int err = SUCCESS;
+    bool keep_running = true;
+    while (keep_running) {
+        struct sockaddr_storage addr;
+        socklen_t addrlen = sizeof(addr);
+        int client_sock = accept(srv->sock, (struct sockaddr *)&addr, &addrlen);
+        if (client_sock == FAILURE) {
+            if (errno != EINTR) {
+                err = errno;
+            }
+            break;
+        }
+        fcntl(client_sock, F_SETFL, O_NONBLOCK);
+        DEBUG_PRINT("client accepted\n");
+
+        bool handle_client = true;
+        while (handle_client) {
+            struct packet *pkt = recv_pkt_data(client_sock, TO_INFINITE, &err);
+            if (pkt == NULL) {
+                handle_client = false; // drop the client
+                switch (err) {
+                case EWOULDBLOCK:  // no data available
+                case ENODATA:      // client disconnected
+                case ETIMEDOUT:    // client timed out
+                case EINVAL:       // invalid packet
+                    err = 0;       // clear error
+                    continue;      // don't close the server
+                case EINTR:        // signal interrupt
+                    err = SUCCESS; // no error
+                    // fall through
+                default:                  // other errors
+                    keep_running = false; // close the server
+                    continue;
+                }
+            }
+            DEBUG_PRINT("packet successfully received\n");
+
+            err = srv->service(pkt, (struct sockaddr *)&addr, addrlen,
+                               client_sock);
+            if (err != SUCCESS) {
+                keep_running = false;
+                handle_client = false;
+            }
+            DEBUG_PRINT("packet successfully processed\n\n");
+            free_packet(pkt);
+        }
+        DEBUG_PRINT("closing client\n\n\n");
+        close(client_sock);
+    }
+    return err;
+}
+
 /* PUBLIC FUNCTIONS */
 
 server_t *init_server(int *err) {
@@ -305,63 +373,8 @@ int run_service(server_t *server, const char *name) {
         DEBUG_PRINT("run_service: server or name is NULL\n");
         return EINVAL;
     }
-    struct service_info *srv = hash_table_lookup(server->services, name);
-    if (srv == NULL) {
-        DEBUG_PRINT("run_service: service %s not found\n", name);
-        return ENOENT;
-    }
-    DEBUG_PRINT("running service %s\n", srv->name);
-
-    int err = SUCCESS;
-    bool keep_running = true;
-    while (keep_running) {
-        struct sockaddr_storage addr;
-        socklen_t addrlen = sizeof(addr);
-        int client_sock = accept(srv->sock, (struct sockaddr *)&addr, &addrlen);
-        if (client_sock == FAILURE) {
-            if (errno != EINTR) {
-                err = errno;
-            }
-            break;
-        }
-        fcntl(client_sock, F_SETFL, O_NONBLOCK);
-        DEBUG_PRINT("client accepted\n");
-
-        bool handle_client = true;
-        while (handle_client) {
-            struct packet *pkt = recv_pkt_data(client_sock, TO_INFINITE, &err);
-            if (pkt == NULL) {
-                handle_client = false; // drop the client
-                switch (err) {
-                case EWOULDBLOCK:  // no data available
-                case ENODATA:      // client disconnected
-                case ETIMEDOUT:    // client timed out
-                case EINVAL:       // invalid packet
-                    err = 0;       // clear error
-                    continue;      // don't close the server
-                case EINTR:        // signal interrupt
-                    err = SUCCESS; // no error
-                    // fall through
-                default:                  // other errors
-                    keep_running = false; // close the server
-                    continue;
-                }
-            }
-            DEBUG_PRINT("packet successfully received\n");
-
-            err = srv->service(pkt, (struct sockaddr *)&addr, addrlen,
-                               client_sock);
-            if (err != SUCCESS) {
-                keep_running = false;
-                handle_client = false;
-            }
-            DEBUG_PRINT("packet successfully processed\n\n");
-            free_packet(pkt);
-        }
-        DEBUG_PRINT("closing client\n\n\n");
-        close(client_sock);
-    }
-    return err;
+    // run_single will handle the missing service error
+    return run_single(hash_table_lookup(server->services, name), server->pool);
 }
 
 int run_server(server_t *server) {
