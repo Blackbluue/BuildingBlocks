@@ -2,6 +2,7 @@
 #include "networking_server.h"
 #include "buildingblocks.h"
 #include "hash_table.h"
+#include "threadpool.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
@@ -25,6 +26,7 @@ struct service_info {
 
 struct server {
     hash_table_t *services;
+    threadpool_t *pool;
 };
 
 /* PRIVATE FUNCTIONS */
@@ -216,6 +218,13 @@ server_t *init_server(int *err) {
         DEBUG_PRINT("init_server: hash_table_init failed\n");
         return NULL;
     }
+    server->pool = threadpool_create(NULL, err);
+    if (server->pool == NULL) {
+        hash_table_destroy(&server->services);
+        free(server);
+        DEBUG_PRINT("init_server: threadpool_create failed\n");
+        return NULL;
+    }
     DEBUG_PRINT("server initialized\n");
     return server;
 }
@@ -225,6 +234,7 @@ int destroy_server(server_t *server) {
     if (server != NULL) {
         // TODO: check if server is still running
         hash_table_destroy(&server->services);
+        threadpool_destroy(server->pool, SHUTDOWN_GRACEFUL);
         free(server);
     }
     return SUCCESS;

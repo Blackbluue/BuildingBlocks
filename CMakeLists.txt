@@ -94,7 +94,7 @@ target_link_libraries(networking_client buildingblocks networking_utils)
 set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_client.c)
 
 add_library(networking_server OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_server.c)
-target_link_libraries(networking_server buildingblocks networking_utils linked_list hash_table)
+target_link_libraries(networking_server buildingblocks networking_utils linked_list hash_table threadpool)
 set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_server.c)
 
 ### INSTALL TARGETS ###
@@ -153,14 +153,14 @@ if(BUILD_TESTING)
 
     add_library(hero OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/single_thread/hero.c)
     add_executable(test_net_adventure ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/single_thread/adventure.c)
-    target_link_libraries(test_net_adventure buildingblocks serialization networking_utils networking_server hero linked_list hash_table)
+    target_link_libraries(test_net_adventure buildingblocks serialization networking_utils networking_server hero queue_concurrent queue linked_list hash_table threadpool_attributes threadpool)
     add_executable(test_net_hero ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/single_thread/hero_client.c)
     target_link_libraries(test_net_hero buildingblocks serialization networking_utils networking_client hero cunit)
     add_test(NAME TestNetworking COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/test_networking.sh ${CMAKE_CURRENT_BINARY_DIR}/test_net_adventure ${CMAKE_CURRENT_BINARY_DIR}/test_net_hero)
 
     add_library(utils OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/multi_thread/utils.c)
     add_executable(threaded_server ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/multi_thread/server.c)
-    target_link_libraries(threaded_server buildingblocks serialization networking_utils networking_server utils linked_list hash_table)
+    target_link_libraries(threaded_server buildingblocks serialization networking_utils networking_server utils queue_concurrent queue linked_list hash_table threadpool_attributes threadpool Threads::Threads)
     add_executable(client ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/multi_thread/client.c)
     target_link_libraries(client buildingblocks serialization networking_utils networking_client utils cunit Threads::Threads)
     add_test(NAME TestThreadedNetworking COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/test_networking.sh ${CMAKE_CURRENT_BINARY_DIR}/threaded_server ${CMAKE_CURRENT_BINARY_DIR}/client)
