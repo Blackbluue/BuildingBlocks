@@ -152,11 +152,11 @@ static int run_single(struct service_info *srv, void *unused) {
     while (keep_running) {
         struct sockaddr_storage addr;
         socklen_t addrlen = sizeof(addr);
+        DEBUG_PRINT("waiting for client\n");
         int client_sock = accept(srv->sock, (struct sockaddr *)&addr, &addrlen);
         if (client_sock == FAILURE) {
-            if (errno != EINTR) {
-                err = errno;
-            }
+            err = errno;
+            DEBUG_PRINT("accept error: %s\n", strerror(errno));
             break;
         }
         fcntl(client_sock, F_SETFL, O_NONBLOCK);
