@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 #include "queue_concurrent.h"
 #include "buildingblocks.h"
 #include "queue.h"
@@ -178,11 +179,17 @@ static void wake_all_threads(struct deferred_signals_t *signals) {
  *
  * Will also release the manual lock if the queue is being destroyed.
  *
+ * Possible return values:
+ * - EINVAL: the queue is NULL
+ * - EPERM: the queue was locked manually by the user, or the thread does not
+ *          own the lock
+ *
  * @param queue pointer to queue object
+ * @return int 0 if success, error code otherwise
  */
-static void auto_unlock_queue(queue_c_t *queue) {
+static int auto_unlock_queue(queue_c_t *queue) {
     if (queue == NULL) {
-        return;
+        return EINVAL;
     }
     if (!queue->manually_locked ||
         (queue->manually_locked && queue->is_destroying)) {
@@ -192,13 +199,15 @@ static void auto_unlock_queue(queue_c_t *queue) {
         if (queue->waiting_for_lock == 0) {
             pthread_cond_signal(&queue->lock_free);
         }
-        // can't tell if this thread owns the lock, so we have to try to unlock
-        // it and ignore the error
+        // can't confirm if this thread owns the lock, so we have to try to
+        // unlock it anyway
         int err = pthread_mutex_unlock(&queue->lock);
         DEBUG_PRINT("on thread %lX: the queue was%s unlocked successfully%s\n",
                     pthread_self(), err == SUCCESS ? "" : " NOT",
                     err == EPERM ? " (not locked)" : "");
+        return err;
     }
+    return EPERM;
 }
 
 /**
