@@ -6,6 +6,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
+#include <pthread.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,11 +24,13 @@ struct service_info {
     int flags;
     service_f service;
     int sock;
+    server_t *server;
 };
 
 struct server {
     hash_table_t *services;
     threadpool_t *pool;
+    sigset_t oldset;
 };
 
 /* PRIVATE FUNCTIONS */
@@ -75,8 +79,10 @@ static int new_service(server_t *server, const char *name,
     if (err != SUCCESS) {
         free_service(*srv);
         DEBUG_PRINT("new_service: hash_table_set failed\n");
+        return err;
     }
-    return err;
+    (*srv)->server = server;
+    return SUCCESS;
 }
 
 /**
@@ -149,6 +155,9 @@ static int run_single(struct service_info *srv, void *unused) {
     }
     DEBUG_PRINT("running service %s\n", srv->name);
 
+    // unblock signals so the service can handle them
+    sigset_t set;
+    pthread_sigmask(SIG_SETMASK, &srv->server->oldset, &set);
     int err = SUCCESS;
     bool keep_running = true;
     while (keep_running) {
@@ -198,7 +207,54 @@ static int run_single(struct service_info *srv, void *unused) {
         DEBUG_PRINT("closing client\n\n\n");
         close(client_sock);
     }
+    pthread_sigmask(SIG_SETMASK, &set, NULL);
     return err;
+}
+
+static int signal_monitor(threadpool_t *pool, void *unused) {
+    (void)unused;
+    DEBUG_PRINT("Signal Monitor: thread %lX\n", pthread_self());
+    // block all signals for the thread
+    sigset_t all_set;
+    sigfillset(&all_set);
+    while (true) {
+        // wait for any signal sent to the process
+        int sig;
+        sigwait(&all_set, &sig);
+        // TODO: might be able to remove this check if using dedicated thread
+        if (sig == CONTROL_SIGNAL) {
+            DEBUG_PRINT(
+                "\ton Signal Monitor thread: received control signal\n");
+            break;
+        }
+
+        DEBUG_PRINT("\ton Signal Monitor thread: cancelling waits\n");
+        threadpool_cancel_wait(pool);
+
+        // allow any signal handlers set by the application to run
+        DEBUG_PRINT("\ton Signal Monitor thread: resending signal '%s'\n",
+                    strsignal(sig));
+        // causes threads to block
+        threadpool_signal_all(pool, sig);
+        // unblocks all threads, causing threadpool to go idle
+        threadpool_refresh(pool);
+    }
+    return SUCCESS;
+}
+
+int setup_monitor(server_t *server) {
+    if (server == NULL) {
+        DEBUG_PRINT("setup_monitor: server is NULL\n");
+        return EINVAL;
+    }
+    // block all signals for the thread
+    sigset_t all_set;
+    sigfillset(&all_set);
+    pthread_sigmask(SIG_SETMASK, &all_set, &server->oldset);
+    // create a thread to monitor signals
+    // TODO: this may need to be a dedicated thread instead of a worker
+    return threadpool_add_work(server->pool, (ROUTINE)signal_monitor,
+                               server->pool, NULL);
 }
 
 /* PUBLIC FUNCTIONS */
@@ -225,6 +281,13 @@ server_t *init_server(int *err) {
         DEBUG_PRINT("init_server: threadpool_create failed\n");
         return NULL;
     }
+    int res = setup_monitor(server);
+    if (res != SUCCESS) {
+        set_err(err, res);
+        destroy_server(server);
+        DEBUG_PRINT("init_server: setup_monitor failed\n");
+        return NULL;
+    }
     DEBUG_PRINT("server initialized\n");
     return server;
 }
@@ -234,7 +297,10 @@ int destroy_server(server_t *server) {
     if (server != NULL) {
         // TODO: check if server is still running
         hash_table_destroy(&server->services);
+        // signal the monitor thread to stop
+        kill(getpid(), CONTROL_SIGNAL);
         threadpool_destroy(server->pool, SHUTDOWN_GRACEFUL);
+        pthread_sigmask(SIG_SETMASK, &server->oldset, NULL);
         free(server);
     }
     return SUCCESS;

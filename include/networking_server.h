@@ -2,8 +2,12 @@
 #define NETWORKING_SERVER_H
 
 #include "networking_utils.h"
+#include <signal.h>
 
 /* DATA */
+
+// Used internally to control the server. Applications should not use this.
+#define CONTROL_SIGNAL SIGRTMIN + 1
 
 typedef struct server server_t;
 
@@ -13,6 +17,12 @@ typedef struct server server_t;
  * @brief Initialize a server.
  *
  * Creates the server object, which can be used to run multiple services.
+ *
+ * The server will monitor signals sent to the process. Do not alter the signal
+ * mask of the process while the server is running, as this may cause the server
+ * to behave unexpectedly. The mask should be altered before the server is
+ * created. They will be restored when the server is destroyed. Signal handlers
+ * may still be set while the server is running, and will operate as expected.
  *
  * Possible errors:
  * - ENOMEM: Insufficient memory is available.
