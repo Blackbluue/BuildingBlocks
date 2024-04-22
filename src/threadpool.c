@@ -608,6 +608,10 @@ int threadpool_destroy(threadpool_t *pool, int flag) {
     queue_c_cancel_wait(pool->queue);
     for (size_t i = 0; i < pool->max_threads; i++) {
         struct thread *thread = &pool->threads[i];
+        if (thread->status == STOPPED) {
+            // skip threads that are not running
+            continue;
+        }
         if (flag == SHUTDOWN_FORCEFUL) {
             // will be ignored if thread is already cancelled
             DEBUG_PRINT("\ton thread %lX: Cancelling thread %zu with id %lX\n",
