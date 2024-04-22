@@ -75,7 +75,7 @@ threadpool_t *threadpool_create(threadpool_attr_t *attr, int *err);
  *
  * The task will be added to the threadpool's queue. If the queue is full and
  * BLOCK_ON_ADD is not set, the task will not be added and the function will
- * return EAGAIN (default behavior). Otherwise, the function will block until
+ * return EOVERFLOW (default behavior). Otherwise, the function will block until
  * there is room in the queue.
  *
  * If THREAD_CREATE_LAZY is set on the threadpool, the function will attempt
