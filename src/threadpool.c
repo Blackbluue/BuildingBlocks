@@ -516,9 +516,13 @@ int threadpool_refresh(threadpool_t *pool) {
     }
 
     for (size_t i = 0; i < pool->max_threads; i++) {
-        // ignore error on failure to start thread
-        int res = restart_thread(&pool->threads[i]);
-        if (res != SUCCESS && pool->thread_creation == THREAD_CREATE_STRICT) {
+        struct thread *thread = &pool->threads[i];
+        if (pool->thread_creation == THREAD_CREATE_LAZY &&
+            thread->status != BLOCKED) {
+            // only refresh blocked threads when using lazy creation
+            continue;
+        }
+        if (restart_thread(thread) != SUCCESS) {
             DEBUG_PRINT("\ton thread %lX: Failed to refresh thread %zu\n",
                         pthread_self(), i);
             return EAGAIN;

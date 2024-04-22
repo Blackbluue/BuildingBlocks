@@ -194,9 +194,10 @@ int threadpool_restart_thread(threadpool_t *pool, size_t thread_id);
 /**
  * @brief Restart all threads in the threadpool.
  *
- * The threadpool will attempt to restart all threads in the threadpool. Only
- * STOPPED and BLOCKED threads can be restarted. Any recorded errors on
- * BLOCKED threads will be cleared.
+ * The threadpool will attempt to restart all threads in the threadpool. If
+ * THREAD_CREATE_STRICT is set, both STOPPED and BLOCKED threads can be
+ * restarted. If THREAD_CREATE_LAZY is set, only BLOCKED threads can be
+ * restarted. Any recorded errors on BLOCKED threads will be cleared.
  *
  * If the THREAD_CREATE_STRICT attribute is set, the function will fail if there
  * are insufficient resources to create another thread.
