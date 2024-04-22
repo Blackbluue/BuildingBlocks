@@ -544,7 +544,12 @@ int threadpool_wait(threadpool_t *pool) {
     DEBUG_PRINT("\ton thread %lX: ...Waiting for queue to be empty\n",
                 pthread_self());
     while (!queue_c_is_empty(pool->queue)) {
-        queue_c_wait_for_empty(pool->queue);
+        int res = queue_c_wait_for_empty(pool->queue);
+        if (res != SUCCESS) {
+            DEBUG_PRINT("\ton thread %lX: stop waiting on queue: %s\n",
+                        pthread_self(), strerror(res));
+            return res;
+        }
     }
 
     // cant acquire the write lock until all readers are done
@@ -571,9 +576,11 @@ int threadpool_timed_wait(threadpool_t *pool, time_t timeout) {
         "\ton thread %lX: ...Waiting for queue to be empty with timeout\n",
         pthread_self());
     while (!queue_c_is_empty(pool->queue)) {
-        if (queue_c_timed_wait_for_empty(pool->queue, timeout) == ETIMEDOUT) {
-            DEBUG_PRINT("\ton thread %lX: Timed out\n", pthread_self());
-            return ETIMEDOUT;
+        int res = queue_c_timed_wait_for_empty(pool->queue, timeout);
+        if (res != SUCCESS) {
+            DEBUG_PRINT("\ton thread %lX: stop waiting on queue: %s\n",
+                        pthread_self(), strerror(res));
+            return res;
         }
     }
 
@@ -589,6 +596,17 @@ int threadpool_timed_wait(threadpool_t *pool, time_t timeout) {
     pthread_rwlock_unlock(&pool->running_lock);
     queue_c_unlock(pool->queue);
     DEBUG_PRINT("\ton thread %lX: All tasks complete\n", pthread_self());
+    return SUCCESS;
+}
+
+int threadpool_cancel_wait(threadpool_t *pool) {
+    if (pool == NULL) {
+        DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
+        return EINVAL;
+    }
+    DEBUG_PRINT("\ton thread %lX: Cancelling wait on threadpool\n",
+                pthread_self());
+    queue_c_cancel_wait(pool->queue);
     return SUCCESS;
 }
 

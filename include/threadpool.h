@@ -214,10 +214,13 @@ int threadpool_refresh(threadpool_t *pool);
 /**
  * @brief Wait for all tasks in the threadpool to finish.
  *
- * If pool is NULL, the function will return EINVAL. If TIMED_WAIT_ENABLED is
- * set, the function will return ETIMEDOUT if the default timeout elapses.
- * Otherwise, the function will block until all tasks in the threadpool have
- * finished (default behavior).
+ * Blocks until all tasks in the threadpool have finished executing. If the
+ * TIMED_WAIT flag is set on the threadpool, the default timeout will be used.
+ *
+ * Possible error codes:
+ *      EINVAL: pool is NULL
+ *      ETIMEDOUT: TIMED_WAIT is enabled and the default timeout elapses
+ *      EAGAIN: The wait was cancelled
  *
  * @param pool The threadpool to wait for.
  * @return int 0 on success, non-zero on failure.
@@ -227,15 +230,35 @@ int threadpool_wait(threadpool_t *pool);
 /**
  * @brief Wait for all tasks in the threadpool to finish.
  *
- * If pool is NULL, the function will return EINVAL. The TIMED_WAIT flag is
- * ignored and the function will return ETIMEDOUT if the specified seconds
- * elapse.
+ * Blocks until all tasks in the threadpool have finished executing. The
+ * TIMED_WAIT flag is ignored, and the given timeout will always be used.
+ *
+ * Possible error codes:
+ *      EINVAL: pool is NULL or timeout is negative
+ *      ETIMEDOUT: The given timeout elapses
+ *      EAGAIN: The wait was cancelled
  *
  * @param pool The threadpool to wait for.
  * @param timeout The number of seconds to wait.
  * @return int 0 on success, non-zero on failure.
  */
 int threadpool_timed_wait(threadpool_t *pool, time_t timeout);
+
+/**
+ * @brief Cancel a wait on the threadpool.
+ *
+ * This function will cancel a wait on the threadpool on all threads. If no
+ * threads are in a waiting status, this function does nothing. For any
+ * threads that are waiting, execution is resumed and the application should
+ * assume the running threads have not completed all of their work.
+ *
+ * Possible error codes:
+ *      EINVAL: pool is NULL
+ *
+ * @param pool The threadpool to cancel the wait on.
+ * @return int 0 on success, non-zero on failure
+ */
+int threadpool_cancel_wait(threadpool_t *pool);
 
 /**
  * @brief Destroy the threadpool.
