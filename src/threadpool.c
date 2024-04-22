@@ -1,9 +1,12 @@
+#define _DEFAULT_SOURCE
 #include "threadpool.h"
 #include "buildingblocks.h"
 #include "queue_concurrent.h"
 #include <errno.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* DATA */
 
@@ -607,6 +610,27 @@ int threadpool_cancel_wait(threadpool_t *pool) {
     DEBUG_PRINT("\ton thread %lX: Cancelling wait on threadpool\n",
                 pthread_self());
     queue_c_cancel_wait(pool->queue);
+    return SUCCESS;
+}
+
+int threadpool_signal_all(threadpool_t *pool, int sig) {
+    if (pool == NULL) {
+        DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
+        return EINVAL;
+    }
+
+    DEBUG_PRINT("\ton thread %lX: Signaling threadpool\n", pthread_self());
+    for (size_t i = 0; i < pool->max_threads; i++) {
+        struct thread *thread = &pool->threads[i];
+        pthread_mutex_lock(&thread->info_lock);
+        if (thread->status == RUNNING) {
+            if (pthread_kill(thread->id, sig) == EINVAL) {
+                pthread_mutex_unlock(&thread->info_lock);
+                return EINVAL; // invalid signal
+            }
+        }
+        pthread_mutex_unlock(&thread->info_lock);
+    }
     return SUCCESS;
 }
 

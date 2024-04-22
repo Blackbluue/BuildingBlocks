@@ -261,6 +261,21 @@ int threadpool_timed_wait(threadpool_t *pool, time_t timeout);
 int threadpool_cancel_wait(threadpool_t *pool);
 
 /**
+ * @brief Signal the threadpool.
+ *
+ * The threadpool will be signaled with the given signal. The signal will be
+ * sent to all running (not idle) threads in the threadpool.
+ *
+ * Possible error codes:
+ *      EINVAL: pool is NULL or sig is not recognized
+ *
+ * @param pool The threadpool to signal.
+ * @param sig The signal to send.
+ * @return int 0 on success, non-zero on failure.
+ */
+int threadpool_signal_all(threadpool_t *pool, int sig);
+
+/**
  * @brief Destroy the threadpool.
  *
  * The threadpool will be destroyed. If flag is SHUTDOWN_GRACEFUL, the function
