@@ -157,10 +157,6 @@ static int run_single(struct service_info *srv, void *unused) {
     }
     DEBUG_PRINT("running service %s\n", srv->name);
 
-    sigset_t set;
-    sigfillset(&set);
-    sigdelset(&set, CONTROL_SIGNAL_2); // allow signal monitor to interrupt
-    pthread_sigmask(SIG_SETMASK, &set, NULL);
     int err = SUCCESS;
     bool keep_running = true;
     while (keep_running) {
@@ -210,7 +206,32 @@ static int run_single(struct service_info *srv, void *unused) {
         DEBUG_PRINT("closing client\n\n\n");
         close(client_sock);
     }
-    pthread_sigmask(SIG_SETMASK, &srv->server->oldset, NULL);
+    return err;
+}
+
+/**
+ * @brief Run each service in the server.
+ *
+ * @param name - The name of the service.
+ * @param srv - The service to run.
+ * @param pool - The threadpool to run the service in.
+ * @return int - 0 on success, non-zero on failure.
+ */
+static int run_each(const char *name, struct service_info **srv,
+                    threadpool_t *pool) {
+    if (name == NULL || srv == NULL || *srv == NULL || pool == NULL) {
+        DEBUG_PRINT("run_each: service %s has invalid arguments\n", name);
+        return EINVAL;
+    } else if ((*srv)->service == NULL) {
+        // skip services without a service function
+        DEBUG_PRINT("run_each: service %s has no service function\n", name);
+        return SUCCESS;
+    }
+    DEBUG_PRINT("adding service %s to pool\n", name);
+    int err = threadpool_add_work(pool, (ROUTINE)run_single, *srv, NULL);
+    if (err != SUCCESS) {
+        DEBUG_PRINT("run_each: error adding work for service %s\n", name);
+    }
     return err;
 }
 
@@ -282,14 +303,25 @@ static void set_control_handler(void (*handler)(int sig)) {
     sigaction(CONTROL_SIGNAL_2, &action, NULL);
 }
 
+/**
+ * @brief Setup the signal monitor.
+ *
+ * This function will create a thread to monitor signals sent to the process.
+ * The thread will block all signals except CONTROL_SIGNAL_2, which is used to
+ * broadcast to all threads in the threadpool.
+ *
+ * @param server - The server object.
+ * @return int - 0 on success, non-zero on failure.
+ */
 static int setup_monitor(server_t *server) {
     if (server == NULL) {
         DEBUG_PRINT("setup_monitor: server is NULL\n");
         return EINVAL;
     }
-    // block all signals for the thread
+    // block all signals for the main and new threads
     sigset_t all_set;
     sigfillset(&all_set);
+    sigdelset(&all_set, CONTROL_SIGNAL_2); // allow signal monitor to interrupt
     pthread_sigmask(SIG_SETMASK, &all_set, &server->oldset);
     // create a thread to monitor signals
     // TODO: this may need to be a dedicated thread instead of a worker
@@ -297,6 +329,7 @@ static int setup_monitor(server_t *server) {
                                   NULL);
     if (res != SUCCESS) {
         DEBUG_PRINT("setup_monitor: error adding signal monitor\n");
+        return res;
     }
     set_control_handler(empty_handler);
     server->self = pthread_self();
@@ -341,8 +374,8 @@ server_t *init_server(int *err) {
 }
 
 int destroy_server(server_t *server) {
-    DEBUG_PRINT("destroy_server\n");
     if (server != NULL) {
+        DEBUG_PRINT("destroy_server\n");
         // TODO: check if server is still running
         hash_table_destroy(&server->services);
         // signal the monitor thread to stop
@@ -509,13 +542,12 @@ int run_server(server_t *server) {
     }
 
     DEBUG_PRINT("starting services\n");
-    int err = SUCCESS;
-    bool keep_running = true;
-    while (keep_running) {
-        // TODO: implement run_server
-        DEBUG_PRINT("waiting for services to finish\n");
-        pause();
-        break;
+    int err = hash_table_iterate(server->services, (ACT_TABLE_F)run_each,
+                                 server->pool);
+    if (err != SUCCESS) {
+        DEBUG_PRINT("run_server: error running services\n");
+        return err;
     }
-    return err;
+    DEBUG_PRINT("waiting for services to finish\n");
+    return threadpool_wait(server->pool);
 }
