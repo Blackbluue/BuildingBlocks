@@ -22,7 +22,7 @@ void allow_graceful_exit(void) {
 
 int main(void) {
     int err;
-    server_t *server = init_server(&err);
+    server_t *server = init_server(1, &err);
     if (server == NULL) {
         fprintf(stderr, "init_server: %s\n", strerror(err));
         return EXIT_FAILURE;

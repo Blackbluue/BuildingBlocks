@@ -59,7 +59,7 @@ int add_counter(server_t *server, const char *name, const char *port) {
 
 int main(void) {
     int err;
-    server_t *server = init_server(&err);
+    server_t *server = init_server(PORT_RANGE, &err);
     if (server == NULL) {
         fprintf(stderr, "init_server: %s\n", strerror(err));
         return EXIT_FAILURE;

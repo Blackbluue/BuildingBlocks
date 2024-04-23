@@ -51,6 +51,52 @@ static void free_service(struct service_info *srv) {
 }
 
 /**
+ * @brief Initialize the server resources.
+ *
+ * @param max_services - The maximum number of services.
+ * @param err - Where to store any errors.
+ * @return server_t* - The server object on success, NULL on failure.
+ */
+static server_t *init_resources(size_t max_services, int *err) {
+    if (max_services == 0 || max_services > MAX_THREADS - 1) {
+        // minus 1 to account for the signal monitor thread
+        set_err(err, EINVAL);
+        DEBUG_PRINT("init_resources: max_services is invalid '%zu\n",
+                    max_services);
+        return NULL;
+    }
+    server_t *server = malloc(sizeof(*server));
+    if (server == NULL) {
+        set_err(err, errno);
+        DEBUG_PRINT("init_server: malloc failed\n");
+        return NULL;
+    }
+    server->services =
+        hash_table_init(max_services, (FREE_F)free_service, (CMP_F)strcmp, err);
+    if (server->services == NULL) {
+        free(server);
+        DEBUG_PRINT("init_server: hash_table_init failed\n");
+        return NULL;
+    }
+
+    // create a threadpool with the maximum number of threads, created lazily
+    threadpool_attr_t attr;
+    threadpool_attr_init(&attr);
+    // plus 1 to account for the signal monitor thread
+    threadpool_attr_set_thread_count(&attr, max_services + 1);
+    threadpool_attr_set_thread_creation(&attr, THREAD_CREATE_LAZY);
+    server->pool = threadpool_create(&attr, err);
+    threadpool_attr_destroy(&attr);
+    if (server->pool == NULL) {
+        hash_table_destroy(&server->services);
+        free(server);
+        DEBUG_PRINT("init_server: threadpool_create failed\n");
+        return NULL;
+    }
+    return server;
+}
+
+/**
  * @brief Create a new service object and add it to the server.
  *
  * @param server - The server to add the service to.
@@ -340,28 +386,13 @@ static int setup_monitor(server_t *server) {
 
 /* PUBLIC FUNCTIONS */
 
-server_t *init_server(int *err) {
+server_t *init_server(size_t max_services, int *err) {
     DEBUG_PRINT("creating server\n");
-    server_t *server = malloc(sizeof(*server));
+    server_t *server = init_resources(max_services, err);
     if (server == NULL) {
-        set_err(err, errno);
-        DEBUG_PRINT("init_server: malloc failed\n");
         return NULL;
     }
-    server->services =
-        hash_table_init(0, (FREE_F)free_service, (CMP_F)strcmp, err);
-    if (server->services == NULL) {
-        free(server);
-        DEBUG_PRINT("init_server: hash_table_init failed\n");
-        return NULL;
-    }
-    server->pool = threadpool_create(NULL, err);
-    if (server->pool == NULL) {
-        hash_table_destroy(&server->services);
-        free(server);
-        DEBUG_PRINT("init_server: threadpool_create failed\n");
-        return NULL;
-    }
+
     int res = setup_monitor(server);
     if (res != SUCCESS) {
         set_err(err, res);

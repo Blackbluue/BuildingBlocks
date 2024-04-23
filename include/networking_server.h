@@ -20,6 +20,9 @@ typedef struct server server_t;
  *
  * Creates the server object, which can be used to run multiple services.
  *
+ * The maximum number of allowed services is determined by the underlying
+ * threadpool @link{threadpool.h}.
+ *
  * The server will monitor signals sent to the process. Do not alter the signal
  * mask of the process while the server is running, as this may cause the server
  * to behave unexpectedly. The mask should be altered before the server is
@@ -31,12 +34,14 @@ typedef struct server server_t;
  * server and may be addressed in future versions.
  *
  * Possible errors:
+ * - EINVAL: max_services is 0 or greater than the maximum number of threads.
  * - ENOMEM: Insufficient memory is available.
  *
- * @param err - The error code.
+ * @param max_services - The maximum number of services the server can run.
+ * @param err - Where to store any errors.
  * @return server_t* - the server on success, NULL on failure.
  */
-server_t *init_server(int *err);
+server_t *init_server(size_t max_services, int *err);
 
 /**
  * @brief Destroy a server.
