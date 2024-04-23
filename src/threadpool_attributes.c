@@ -211,8 +211,8 @@ int threadpool_attr_get_thread_creation(threadpool_attr_t *attr,
     struct inner_threadpool_attr_t *inner =
         ((struct inner_threadpool_attr_t *)attr);
     *thread_creation = check_flag(inner->flags, THREAD_CREATION)
-                           ? THREAD_CREATE_STRICT
-                           : THREAD_CREATE_LAZY;
+                           ? THREAD_CREATE_LAZY
+                           : THREAD_CREATE_STRICT;
     return SUCCESS;
 }
 
