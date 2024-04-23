@@ -30,6 +30,8 @@ struct service_info {
 struct server {
     hash_table_t *services;
     threadpool_t *pool;
+    pthread_t self;
+    size_t monitor;
     sigset_t oldset;
 };
 
@@ -155,9 +157,10 @@ static int run_single(struct service_info *srv, void *unused) {
     }
     DEBUG_PRINT("running service %s\n", srv->name);
 
-    // unblock signals so the service can handle them
     sigset_t set;
-    pthread_sigmask(SIG_SETMASK, &srv->server->oldset, &set);
+    sigfillset(&set);
+    sigdelset(&set, CONTROL_SIGNAL_2); // allow signal monitor to interrupt
+    pthread_sigmask(SIG_SETMASK, &set, NULL);
     int err = SUCCESS;
     bool keep_running = true;
     while (keep_running) {
@@ -207,42 +210,79 @@ static int run_single(struct service_info *srv, void *unused) {
         DEBUG_PRINT("closing client\n\n\n");
         close(client_sock);
     }
-    pthread_sigmask(SIG_SETMASK, &set, NULL);
+    pthread_sigmask(SIG_SETMASK, &srv->server->oldset, NULL);
     return err;
 }
 
-static int signal_monitor(threadpool_t *pool, void *unused) {
+/**
+ * @brief Signal monitor thread.
+ *
+ * This function is used to monitor signals sent to the process. When a signal
+ * is caught, the function will cancel all waiting threads in the threadpool and
+ * signal all threads to unblock. The function will then wait for the next
+ * signal.
+ *
+ * @param server - The server object.
+ * @param unused - Unused argument.
+ * @return Always returns 0.
+ */
+static int signal_monitor(server_t *server, void *unused) {
     (void)unused;
     DEBUG_PRINT("Signal Monitor: thread %lX\n", pthread_self());
     // block all signals for the thread
     sigset_t all_set;
     sigfillset(&all_set);
+    sigdelset(&all_set, CONTROL_SIGNAL_2);
     while (true) {
         // wait for any signal sent to the process
         int sig;
         sigwait(&all_set, &sig);
+        DEBUG_PRINT("\ton Signal Monitor thread: caught signal '%s'\n",
+                    strsignal(sig));
         // TODO: might be able to remove this check if using dedicated thread
-        if (sig == CONTROL_SIGNAL) {
+        if (sig == CONTROL_SIGNAL_1) {
             DEBUG_PRINT(
                 "\ton Signal Monitor thread: received control signal\n");
             break;
         }
 
         DEBUG_PRINT("\ton Signal Monitor thread: cancelling waits\n");
-        threadpool_cancel_wait(pool);
+        threadpool_cancel_wait(server->pool);
 
-        // allow any signal handlers set by the application to run
-        DEBUG_PRINT("\ton Signal Monitor thread: resending signal '%s'\n",
-                    strsignal(sig));
         // causes threads to block
-        threadpool_signal_all(pool, sig);
+        threadpool_signal_all(server->pool, CONTROL_SIGNAL_2);
+        // in case running single service without threads
+        pthread_kill(server->self, CONTROL_SIGNAL_2);
         // unblocks all threads, causing threadpool to go idle
-        threadpool_refresh(pool);
+        threadpool_refresh(server->pool);
     }
     return SUCCESS;
 }
 
-int setup_monitor(server_t *server) {
+/**
+ * @brief Empty signal handler.
+ *
+ * @param sig - The signal number.
+ */
+static void empty_handler(int sig) { (void)sig; }
+
+/**
+ * @brief Set the signal handler for the control signal.
+ *
+ * This will set the handler for the CONTROL_SIGNAL_2 signal, which is broadcast
+ * to all threads in the threadpool when the server catches any signal.
+ *
+ * @param handler - The signal handler.
+ */
+static void set_control_handler(void (*handler)(int sig)) {
+    struct sigaction action;
+    action.sa_handler = handler;
+    action.sa_flags = 0;
+    sigemptyset(&action.sa_mask);
+    sigaction(CONTROL_SIGNAL_2, &action, NULL);
+}
+
+static int setup_monitor(server_t *server) {
     if (server == NULL) {
         DEBUG_PRINT("setup_monitor: server is NULL\n");
         return EINVAL;
@@ -253,8 +293,16 @@ int setup_monitor(server_t *server) {
     pthread_sigmask(SIG_SETMASK, &all_set, &server->oldset);
     // create a thread to monitor signals
     // TODO: this may need to be a dedicated thread instead of a worker
-    return threadpool_add_work(server->pool, (ROUTINE)signal_monitor,
-                               server->pool, NULL);
+    int res = threadpool_add_work(server->pool, (ROUTINE)signal_monitor, server,
+                                  NULL);
+    if (res != SUCCESS) {
+        DEBUG_PRINT("setup_monitor: error adding signal monitor\n");
+    }
+    set_control_handler(empty_handler);
+    server->self = pthread_self();
+    // TODO: don't hardcode this. make the monitor a dedicated thread
+    server->monitor = 0;
+    return res;
 }
 
 /* PUBLIC FUNCTIONS */
@@ -298,9 +346,10 @@ int destroy_server(server_t *server) {
         // TODO: check if server is still running
         hash_table_destroy(&server->services);
         // signal the monitor thread to stop
-        kill(getpid(), CONTROL_SIGNAL);
+        threadpool_signal(server->pool, server->monitor, CONTROL_SIGNAL_1);
         threadpool_destroy(server->pool, SHUTDOWN_GRACEFUL);
         pthread_sigmask(SIG_SETMASK, &server->oldset, NULL);
+        set_control_handler(SIG_DFL);
         free(server);
     }
     return SUCCESS;

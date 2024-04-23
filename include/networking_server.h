@@ -7,7 +7,9 @@
 /* DATA */
 
 // Used internally to control the server. Applications should not use this.
-#define CONTROL_SIGNAL SIGRTMIN + 1
+#define CONTROL_SIGNAL_1 SIGRTMIN + 1
+// Used internally to control the server. Applications should not use this.
+#define CONTROL_SIGNAL_2 SIGRTMIN + 2
 
 typedef struct server server_t;
 
@@ -21,8 +23,12 @@ typedef struct server server_t;
  * The server will monitor signals sent to the process. Do not alter the signal
  * mask of the process while the server is running, as this may cause the server
  * to behave unexpectedly. The mask should be altered before the server is
- * created. They will be restored when the server is destroyed. Signal handlers
- * may still be set while the server is running, and will operate as expected.
+ * created. They will be restored when the server is destroyed.
+ *
+ * @note A current limitation of the server is that it will block any signals
+ * that are sent to the process. The appropriate functions will still exit with
+ * EINTR, but signal handlers will not be called.This is a limitation of the
+ * server and may be addressed in future versions.
  *
  * Possible errors:
  * - ENOMEM: Insufficient memory is available.
