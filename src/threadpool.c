@@ -617,6 +617,9 @@ int threadpool_signal_all(threadpool_t *pool, int sig) {
     if (pool == NULL) {
         DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
         return EINVAL;
+    } else if (sigaction(sig, NULL, NULL) == EINVAL) {
+        DEBUG_PRINT("\ton thread %lX: Invalid signal\n", pthread_self());
+        return EINVAL;
     }
 
     DEBUG_PRINT("\ton thread %lX: Signaling threadpool\n", pthread_self());
@@ -624,10 +627,7 @@ int threadpool_signal_all(threadpool_t *pool, int sig) {
         struct thread *thread = &pool->threads[i];
         pthread_mutex_lock(&thread->info_lock);
         if (thread->status == RUNNING) {
-            if (pthread_kill(thread->id, sig) == EINVAL) {
-                pthread_mutex_unlock(&thread->info_lock);
-                return EINVAL; // invalid signal
-            }
+            pthread_kill(thread->id, sig);
         }
         pthread_mutex_unlock(&thread->info_lock);
     }
