@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200112L
 #include "hero.h"
 #include "networking_server.h"
+#include <errno.h>
 #include <netdb.h>
 #include <signal.h>
 #include <stdio.h>
@@ -60,7 +61,7 @@ int main(void) {
 
     allow_graceful_exit();
     err = run_service(server, "adventure");
-    if (err) {
+    if (err != SUCCESS && err != EINTR) {
         fprintf(stderr, "run_service: %s\n", strerror(err));
         destroy_server(server);
         return EXIT_FAILURE;

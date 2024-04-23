@@ -580,5 +580,6 @@ int run_server(server_t *server) {
         return err;
     }
     DEBUG_PRINT("waiting for services to finish\n");
-    return threadpool_wait(server->pool);
+    err = threadpool_wait(server->pool);
+    return err == EAGAIN ? EINTR : err;
 }
