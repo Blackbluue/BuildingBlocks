@@ -77,7 +77,6 @@ static void free_pool(threadpool_t *pool) {
     pthread_rwlock_destroy(&pool->running_lock);
     queue_c_destroy(&pool->queue);
     free(pool);
-    DEBUG_PRINT("\tThreadpool freed\n");
 }
 
 /**
@@ -102,7 +101,7 @@ static threadpool_t *init_thread_info(threadpool_t *pool, int *err) {
         return NULL;
     }
     for (size_t i = 0; i < pool->max_threads; i++) {
-        DEBUG_PRINT("\tInitializing thread %zu\n", i);
+        DEBUG_PRINT("\tInitializing thread info %zu\n", i);
         struct thread *thread = &pool->threads[i];
         thread->pool = pool;
         thread->task = NULL;
@@ -281,6 +280,7 @@ static int start_new_thread(threadpool_t *pool) {
             res = pthread_create(&thread->id, NULL, thread_task, thread);
             pthread_mutex_unlock(&thread->info_lock);
             if (res == SUCCESS) {
+                DEBUG_PRINT("\tStart thread %zu with id %lX\n", i, thread->id);
                 pool->num_threads++;
             }
             return res;
@@ -380,7 +380,6 @@ threadpool_t *threadpool_create(threadpool_attr_t *attr, int *err) {
     // strict creation requires all threads to be created before returning
     if (pool->thread_creation == THREAD_CREATE_STRICT) {
         for (size_t i = 0; i < pool->max_threads; i++) {
-            DEBUG_PRINT("\tCreating thread %zu\n", i);
             struct thread *thread = &pool->threads[i];
             int res = pthread_create(&thread->id, NULL, thread_task, thread);
             if (res != SUCCESS) {
@@ -535,7 +534,6 @@ int threadpool_refresh(threadpool_t *pool) {
 }
 
 int threadpool_wait(threadpool_t *pool) {
-    DEBUG_PRINT("\ton thread %lX: Waiting for threadpool\n", pthread_self());
     if (pool == NULL) {
         DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
         return EINVAL;
@@ -544,8 +542,9 @@ int threadpool_wait(threadpool_t *pool) {
         return threadpool_timed_wait(pool, pool->default_wait);
     }
 
-    DEBUG_PRINT("\ton thread %lX: ...Waiting for queue to be empty\n",
-                pthread_self());
+    DEBUG_PRINT("\ton thread %lX: ...Waiting for threadpool\n", pthread_self());
+    // this loop is skipped if the queue is empty upon first check,
+    // meaning the queue is never locked. bug?
     while (!queue_c_is_empty(pool->queue)) {
         int res = queue_c_wait_for_empty(pool->queue);
         if (res != SUCCESS) {
@@ -622,7 +621,8 @@ int threadpool_signal_all(threadpool_t *pool, int sig) {
         return EINVAL;
     }
 
-    DEBUG_PRINT("\ton thread %lX: Signaling threadpool\n", pthread_self());
+    DEBUG_PRINT("\ton thread %lX: Signaling threadpool: '%s'\n", pthread_self(),
+                strsignal(sig));
     for (size_t i = 0; i < pool->max_threads; i++) {
         struct thread *thread = &pool->threads[i];
         pthread_mutex_lock(&thread->info_lock);
@@ -659,18 +659,17 @@ int threadpool_signal(threadpool_t *pool, size_t thread_id, int sig) {
 }
 
 int threadpool_destroy(threadpool_t *pool, int flag) {
-    DEBUG_PRINT("\ton thread %lX: Destroying threadpool\n", pthread_self());
     if (pool == NULL ||
         (flag != SHUTDOWN_GRACEFUL && flag != SHUTDOWN_FORCEFUL)) {
         DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
         return EINVAL;
     }
+    DEBUG_PRINT("\ton thread %lX: Destroying threadpool\n", pthread_self());
     if (flag == SHUTDOWN_GRACEFUL) {
         threadpool_wait(pool);
     }
     // wake up all threads
     pool->shutdown = flag;
-    DEBUG_PRINT("\ton thread %lX: Waking threads\n", pthread_self());
     queue_c_cancel_wait(pool->queue);
     for (size_t i = 0; i < pool->max_threads; i++) {
         struct thread *thread = &pool->threads[i];
