@@ -634,6 +634,30 @@ int threadpool_signal_all(threadpool_t *pool, int sig) {
     return SUCCESS;
 }
 
+int threadpool_signal(threadpool_t *pool, size_t thread_id, int sig) {
+    if (pool == NULL) {
+        DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
+        return EINVAL;
+    } else if (thread_id >= pool->max_threads) {
+        DEBUG_PRINT("\ton thread %lX: %zu is not a valid thread\n",
+                    pthread_self(), thread_id);
+        return ENOENT;
+    } else if (sigaction(sig, NULL, NULL) == EINVAL) {
+        DEBUG_PRINT("\ton thread %lX: Invalid signal\n", pthread_self());
+        return EINVAL;
+    }
+
+    DEBUG_PRINT("\ton thread %lX: Signaling thread %zu: '%s'\n", pthread_self(),
+                thread_id, strsignal(sig));
+    struct thread *thread = &pool->threads[thread_id];
+    pthread_mutex_lock(&thread->info_lock);
+    if (thread->status == RUNNING) {
+        pthread_kill(thread->id, sig);
+    }
+    pthread_mutex_unlock(&thread->info_lock);
+    return SUCCESS;
+}
+
 int threadpool_destroy(threadpool_t *pool, int flag) {
     DEBUG_PRINT("\ton thread %lX: Destroying threadpool\n", pthread_self());
     if (pool == NULL ||

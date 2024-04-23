@@ -276,6 +276,23 @@ int threadpool_cancel_wait(threadpool_t *pool);
 int threadpool_signal_all(threadpool_t *pool, int sig);
 
 /**
+ * @brief Signal a thread in the threadpool.
+ *
+ * The threadpool will be signaled with the given signal. The signal will be
+ * sent to the thread with the given thread_id.
+ *
+ * Possible error codes:
+ *      EINVAL: pool is NULL or sig is not recognized
+ *      ENOENT: thread_id is not valid
+ *
+ * @param pool The threadpool to signal.
+ * @param thread_id The id of the thread to signal.
+ * @param sig The signal to send.
+ * @return int 0 on success, non-zero on failure.
+ */
+int threadpool_signal(threadpool_t *pool, size_t thread_id, int sig);
+
+/**
  * @brief Destroy the threadpool.
  *
  * The threadpool will be destroyed. If flag is SHUTDOWN_GRACEFUL, the function
