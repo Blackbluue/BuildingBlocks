@@ -277,12 +277,15 @@ static int start_new_thread(threadpool_t *pool) {
         pthread_mutex_lock(&thread->info_lock);
         switch (thread->status) {
         case STOPPED:
+            thread->status = STARTING;
             res = pthread_create(&thread->id, NULL, thread_task, thread);
-            pthread_mutex_unlock(&thread->info_lock);
             if (res == SUCCESS) {
                 DEBUG_PRINT("\tStart thread %zu with id %lX\n", i, thread->id);
                 pool->num_threads++;
+            } else {
+                thread->status = STOPPED;
             }
+            pthread_mutex_unlock(&thread->info_lock);
             return res;
         case IDLE:
             // assume this thread will eventually pick up the task
@@ -359,7 +362,13 @@ static int restart_thread(struct thread *thread) {
         res = SUCCESS;
         break;
     case STOPPED: // thread is not running
+        thread->status = STARTING;
         res = pthread_create(&thread->id, NULL, thread_task, thread);
+        if (res == SUCCESS) {
+            DEBUG_PRINT("\tRestarted thread %lX\n", thread->id);
+        } else {
+            thread->status = STOPPED;
+        }
         break;
     default:
         break;
@@ -381,6 +390,7 @@ threadpool_t *threadpool_create(threadpool_attr_t *attr, int *err) {
     if (pool->thread_creation == THREAD_CREATE_STRICT) {
         for (size_t i = 0; i < pool->max_threads; i++) {
             struct thread *thread = &pool->threads[i];
+            thread->status = STARTING;
             int res = pthread_create(&thread->id, NULL, thread_task, thread);
             if (res != SUCCESS) {
                 threadpool_destroy(pool, SHUTDOWN_GRACEFUL);

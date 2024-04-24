@@ -7,6 +7,7 @@
 
 typedef enum thread_status {
     STOPPED,    // thread is not running
+    STARTING,   // thread is starting
     IDLE,       // thread is waiting for work
     RUNNING,    // thread is performing work
     BLOCKED,    // thread is blocked
