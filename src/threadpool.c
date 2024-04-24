@@ -200,7 +200,7 @@ static void wait_on_error(struct thread *self) {
  * @return void* NULL
  */
 static void *thread_task(void *arg) {
-    DEBUG_PRINT("Thread task: thread %lX\n", pthread_self());
+    DEBUG_PRINT("Starting thread %lX\n", pthread_self());
     struct thread *self = arg;
     threadpool_t *pool = self->pool;
     set_status(self, IDLE);
@@ -286,6 +286,7 @@ static int start_new_thread(threadpool_t *pool) {
             return res;
         case IDLE:
             // assume this thread will eventually pick up the task
+            DEBUG_PRINT("\tThread %zu is idle, let it take the task\n", i);
             pthread_mutex_unlock(&thread->info_lock);
             return SUCCESS;
         default: // keep looking
@@ -316,7 +317,6 @@ static int add_task(threadpool_t *pool, ROUTINE action, void *arg, void *arg2) {
     task->action = action;
     task->arg = arg;
     task->arg2 = arg2;
-    DEBUG_PRINT("\ton thread %lX: \tEnqueueing...\n", pthread_self());
     int res = queue_c_enqueue(pool->queue, task);
     if (res != SUCCESS) {
         queue_c_unlock(pool->queue);
@@ -332,8 +332,8 @@ static int add_task(threadpool_t *pool, ROUTINE action, void *arg, void *arg2) {
     if (pool->thread_creation == THREAD_CREATE_LAZY) {
         res = start_new_thread(pool);
         if (res != SUCCESS) {
-            DEBUG_PRINT("\ton thread %lX: Failed to start new thread\n",
-                        pthread_self());
+            DEBUG_PRINT("\ton thread %lX: Failed to start new thread '%s'\n",
+                        pthread_self(), strerror(res));
             return res;
         }
     }

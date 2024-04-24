@@ -587,7 +587,7 @@ int queue_c_enqueue(queue_c_t *queue, void *data) {
         return EOVERFLOW;
     }
 
-    DEBUG_PRINT("enqueueing...\n");
+    DEBUG_PRINT("\ton thread %lX: \tEnqueueing...\n", pthread_self());
     int res = queue_enqueue(queue->queue, data);
     if (res != SUCCESS) {
         DEBUG_PRINT("on thread %lX: enqueue failed: %s\n", pthread_self(),

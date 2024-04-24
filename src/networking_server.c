@@ -198,25 +198,27 @@ static int run_single(struct service_info *srv, void *unused) {
     (void)unused;
     if (srv == NULL) {
         // hash table lookup failed
-        DEBUG_PRINT("run_single: service not found\n");
+        DEBUG_PRINT("\ton thread %lX: service not found\n", pthread_self());
         return ENOENT;
     }
-    DEBUG_PRINT("running service %s\n", srv->name);
+    DEBUG_PRINT("\ton thread %lX: running service %s\n", pthread_self(),
+                srv->name);
 
     int err = SUCCESS;
     bool keep_running = true;
     while (keep_running) {
         struct sockaddr_storage addr;
         socklen_t addrlen = sizeof(addr);
-        DEBUG_PRINT("waiting for client\n");
+        DEBUG_PRINT("\ton thread %lX: waiting for client\n", pthread_self());
         int client_sock = accept(srv->sock, (struct sockaddr *)&addr, &addrlen);
         if (client_sock == FAILURE) {
             err = errno;
-            DEBUG_PRINT("accept error: %s\n", strerror(errno));
+            DEBUG_PRINT("\ton thread %lX: accept error: %s\n", pthread_self(),
+                        strerror(errno));
             break;
         }
         fcntl(client_sock, F_SETFL, O_NONBLOCK);
-        DEBUG_PRINT("client accepted\n");
+        DEBUG_PRINT("\ton thread %lX: client accepted\n", pthread_self());
 
         bool handle_client = true;
         while (handle_client) {
@@ -238,7 +240,8 @@ static int run_single(struct service_info *srv, void *unused) {
                     continue;
                 }
             }
-            DEBUG_PRINT("packet successfully received\n");
+            DEBUG_PRINT("\ton thread %lX: packet successfully received\n",
+                        pthread_self());
 
             err = srv->service(pkt, (struct sockaddr *)&addr, addrlen,
                                client_sock);
@@ -246,10 +249,11 @@ static int run_single(struct service_info *srv, void *unused) {
                 keep_running = false;
                 handle_client = false;
             }
-            DEBUG_PRINT("packet successfully processed\n\n");
+            DEBUG_PRINT("\ton thread %lX: packet successfully processed\n\n",
+                        pthread_self());
             free_packet(pkt);
         }
-        DEBUG_PRINT("closing client\n\n\n");
+        DEBUG_PRINT("\ton thread %lX: closing client\n\n\n", pthread_self());
         close(client_sock);
     }
     return err;
@@ -364,6 +368,7 @@ static int setup_monitor(server_t *server) {
         DEBUG_PRINT("setup_monitor: server is NULL\n");
         return EINVAL;
     }
+    DEBUG_PRINT("setting up monitor\n");
     // block all signals for the main and new threads
     sigset_t all_set;
     sigfillset(&all_set);
@@ -423,7 +428,7 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
                      const networking_attr_t *attr, int *err_type) {
     if (server == NULL || port == NULL || name == NULL) {
         set_err(err_type, SYS);
-        DEBUG_PRINT("open_inet_socket: server, name, or port is NULL\n");
+        DEBUG_PRINT("server, name, or port is NULL\n");
         return EINVAL;
     }
     DEBUG_PRINT("opening inet socket %s\n", name);
@@ -436,7 +441,7 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
 
     if (attr == NULL) {
         // use default values
-        DEBUG_PRINT("open_inet_socket: using default attributes\n");
+        DEBUG_PRINT("using default attributes\n");
         networking_attr_t def_attr;
         attr = &def_attr;
         init_attr((networking_attr_t *)attr);
@@ -486,7 +491,7 @@ cleanup:
 int open_unix_socket(server_t *server, const char *name, const char *path,
                      const networking_attr_t *attr) {
     if (server == NULL || name == NULL || path == NULL) {
-        DEBUG_PRINT("open_unix_socket: server, name, or path is NULL\n");
+        DEBUG_PRINT("server, name, or path is NULL\n");
         return EINVAL;
     }
     DEBUG_PRINT("opening unix socket %s\n", name);
@@ -498,7 +503,7 @@ int open_unix_socket(server_t *server, const char *name, const char *path,
 
     if (attr == NULL) {
         // use default values
-        DEBUG_PRINT("open_unix_socket: using default attributes\n");
+        DEBUG_PRINT("using default attributes\n");
         networking_attr_t def_attr;
         attr = &def_attr;
         init_attr((networking_attr_t *)attr);
