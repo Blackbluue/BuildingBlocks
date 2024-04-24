@@ -124,6 +124,9 @@ threadpool_t *setup_test(void) {
     CU_ASSERT_EQUAL_FATAL(
         threadpool_attr_set_timed_wait(&attr, TIMED_WAIT_ENABLED), SUCCESS);
     CU_ASSERT_EQUAL_FATAL(threadpool_attr_set_timeout(&attr, TIMEOUT), SUCCESS);
+    CU_ASSERT_EQUAL_FATAL(
+        threadpool_attr_set_thread_creation(&attr, THREAD_CREATE_LAZY),
+        SUCCESS);
 
     fprintf(stderr, "\tsetup_test\n");
     threadpool_t *pool = threadpool_create(&attr, NULL);
