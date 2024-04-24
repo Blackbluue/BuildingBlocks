@@ -134,7 +134,7 @@ int threadpool_timed_add_work(threadpool_t *pool, ROUTINE action, void *arg,
  * @brief Get the information of a thread in the threadpool.
  *
  * The function will return the information of the thread with the given
- * thread_id. The information returned is just a snapshot of the thread's
+ * index. The information returned is just a snapshot of the thread's
  * current state; the thread may change state after the function returns.
  *
  * Possible error codes:
@@ -142,11 +142,11 @@ int threadpool_timed_add_work(threadpool_t *pool, ROUTINE action, void *arg,
  *      ENOENT: thread_id is not valid
  *
  * @param pool The threadpool to get the thread information from.
- * @param thread_id The id of the thread to get the information of.
+ * @param thread_idx The index of the thread to get the information of.
  * @param info The struct to store the thread information.
  * @return int 0 on success, non-zero on failure.
  */
-int threadpool_thread_status(threadpool_t *pool, size_t thread_id,
+int threadpool_thread_status(threadpool_t *pool, size_t thread_idx,
                              struct thread_info *info);
 
 /**
@@ -175,7 +175,7 @@ int threadpool_thread_status_all(threadpool_t *pool,
 /**
  * @brief Restart a thread in the threadpool.
  *
- * The threadpool will attempt to restart the thread with the given thread_id.
+ * The threadpool will attempt to restart the thread with the given index.
  * Only STOPPED and BLOCKED threads can be restarted. Any recorded errors
  * on BLOCKED threads will be cleared.
  *
@@ -186,10 +186,10 @@ int threadpool_thread_status_all(threadpool_t *pool,
  *      EALREADY: thread is already running
  *
  * @param pool The threadpool to restart the thread in.
- * @param thread_id The id of the thread to restart.
+ * @param thread_idx The index of the thread to restart.
  * @return int 0 on success, non-zero on failure.
  */
-int threadpool_restart_thread(threadpool_t *pool, size_t thread_id);
+int threadpool_restart_thread(threadpool_t *pool, size_t thread_idx);
 
 /**
  * @brief Restart all threads in the threadpool.
@@ -279,18 +279,18 @@ int threadpool_signal_all(threadpool_t *pool, int sig);
  * @brief Signal a thread in the threadpool.
  *
  * The threadpool will be signaled with the given signal. The signal will be
- * sent to the thread with the given thread_id.
+ * sent to the thread with the given index.
  *
  * Possible error codes:
  *      EINVAL: pool is NULL or sig is not recognized
  *      ENOENT: thread_id is not valid
  *
  * @param pool The threadpool to signal.
- * @param thread_id The id of the thread to signal.
+ * @param thread_idx The index of the thread to signal.
  * @param sig The signal to send.
  * @return int 0 on success, non-zero on failure.
  */
-int threadpool_signal(threadpool_t *pool, size_t thread_id, int sig);
+int threadpool_signal(threadpool_t *pool, size_t thread_idx, int sig);
 
 /**
  * @brief Destroy the threadpool.

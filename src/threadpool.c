@@ -450,20 +450,20 @@ int threadpool_timed_add_work(threadpool_t *pool, ROUTINE action, void *arg,
     return add_task(pool, action, arg, arg2);
 }
 
-int threadpool_thread_status(threadpool_t *pool, size_t thread_id,
+int threadpool_thread_status(threadpool_t *pool, size_t thread_idx,
                              struct thread_info *info) {
     DEBUG_PRINT("\ton thread %lX: Getting thread status\n", pthread_self());
     if (pool == NULL || info == NULL) {
         DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
         return EINVAL;
-    } else if (thread_id >= pool->max_threads) {
+    } else if (thread_idx >= pool->max_threads) {
         DEBUG_PRINT("\ton thread %lX: %zu is not a valid thread\n",
-                    pthread_self(), thread_id);
+                    pthread_self(), thread_idx);
         return ENOENT;
     }
-    struct thread *thread = &pool->threads[thread_id];
+    struct thread *thread = &pool->threads[thread_idx];
     pthread_mutex_lock(&thread->info_lock);
-    info->index = thread_id;
+    info->index = thread_idx;
     info->action = thread->task->action;
     info->arg = thread->task->arg;
     info->arg2 = thread->task->arg2;
@@ -471,7 +471,7 @@ int threadpool_thread_status(threadpool_t *pool, size_t thread_id,
     info->error = thread->error;
     pthread_mutex_unlock(&thread->info_lock);
     DEBUG_PRINT("\ton thread %lX: Thread %zu status: %d\n", pthread_self(),
-                thread_id, info->status);
+                thread_idx, info->status);
     return SUCCESS;
 }
 
@@ -495,19 +495,19 @@ int threadpool_thread_status_all(threadpool_t *pool,
     return SUCCESS;
 }
 
-int threadpool_restart_thread(threadpool_t *pool, size_t thread_id) {
+int threadpool_restart_thread(threadpool_t *pool, size_t thread_idx) {
     DEBUG_PRINT("\ton thread %lX: Restarting thread %zu\n", pthread_self(),
-                thread_id);
+                thread_idx);
     if (pool == NULL) {
         DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
         return EINVAL;
-    } else if (thread_id >= pool->max_threads) {
+    } else if (thread_idx >= pool->max_threads) {
         DEBUG_PRINT("\ton thread %lX: %zu is not a valid thread\n",
-                    pthread_self(), thread_id);
+                    pthread_self(), thread_idx);
         return ENOENT;
     }
 
-    return restart_thread(&pool->threads[thread_id]);
+    return restart_thread(&pool->threads[thread_idx]);
 }
 
 int threadpool_refresh(threadpool_t *pool) {
@@ -634,13 +634,13 @@ int threadpool_signal_all(threadpool_t *pool, int sig) {
     return SUCCESS;
 }
 
-int threadpool_signal(threadpool_t *pool, size_t thread_id, int sig) {
+int threadpool_signal(threadpool_t *pool, size_t thread_idx, int sig) {
     if (pool == NULL) {
         DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
         return EINVAL;
-    } else if (thread_id >= pool->max_threads) {
+    } else if (thread_idx >= pool->max_threads) {
         DEBUG_PRINT("\ton thread %lX: %zu is not a valid thread\n",
-                    pthread_self(), thread_id);
+                    pthread_self(), thread_idx);
         return ENOENT;
     } else if (sigaction(sig, NULL, NULL) == EINVAL) {
         DEBUG_PRINT("\ton thread %lX: Invalid signal\n", pthread_self());
@@ -648,8 +648,8 @@ int threadpool_signal(threadpool_t *pool, size_t thread_id, int sig) {
     }
 
     DEBUG_PRINT("\ton thread %lX: Signaling thread %zu: '%s'\n", pthread_self(),
-                thread_id, strsignal(sig));
-    struct thread *thread = &pool->threads[thread_id];
+                thread_idx, strsignal(sig));
+    struct thread *thread = &pool->threads[thread_idx];
     pthread_mutex_lock(&thread->info_lock);
     if (thread->status == RUNNING) {
         pthread_kill(thread->id, sig);
