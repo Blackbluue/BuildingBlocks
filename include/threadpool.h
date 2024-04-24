@@ -252,6 +252,11 @@ int threadpool_timed_wait(threadpool_t *pool, time_t timeout);
  * threads that are waiting, execution is resumed and the application should
  * assume the running threads have not completed all of their work.
  *
+ * @note This function has no way of interrupting the tasks that are currently
+ * running on the threads. The application is responsible for signaling the
+ * tasks to stop their work. This function only cancels the internal waits on
+ * the threadpool.
+ *
  * Possible error codes:
  *      EINVAL: pool is NULL
  *
