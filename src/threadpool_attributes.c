@@ -217,7 +217,7 @@ int threadpool_attr_get_thread_creation(threadpool_attr_t *attr,
                            ? THREAD_CREATE_LAZY
                            : THREAD_CREATE_STRICT;
     DEBUG_PRINT("Thread creation set to %s\n",
-                thread_creation ? "lazy" : "strict");
+                *thread_creation ? "lazy" : "strict");
     return SUCCESS;
 }
 
