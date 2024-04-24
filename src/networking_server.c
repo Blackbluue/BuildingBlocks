@@ -31,6 +31,7 @@ struct server {
     hash_table_t *services;
     threadpool_t *pool;
     pthread_t self;
+    pthread_rwlock_t running_lock;
     size_t monitor;
     sigset_t oldset;
 };
@@ -93,6 +94,7 @@ static server_t *init_resources(size_t max_services, int *err) {
         DEBUG_PRINT("init_server: threadpool_create failed\n");
         return NULL;
     }
+    pthread_rwlock_init(&server->running_lock, NULL);
     return server;
 }
 
@@ -204,6 +206,7 @@ static int run_single(struct service_info *srv, void *unused) {
     DEBUG_PRINT("\ton thread %lX: running service %s\n", pthread_self(),
                 srv->name);
 
+    pthread_rwlock_rdlock(&srv->server->running_lock);
     int err = SUCCESS;
     bool keep_running = true;
     while (keep_running) {
@@ -256,6 +259,7 @@ static int run_single(struct service_info *srv, void *unused) {
         DEBUG_PRINT("\ton thread %lX: closing client\n\n\n", pthread_self());
         close(client_sock);
     }
+    pthread_rwlock_unlock(&srv->server->running_lock);
     return err;
 }
 
@@ -412,11 +416,19 @@ server_t *init_server(size_t max_services, int *err) {
 int destroy_server(server_t *server) {
     if (server != NULL) {
         DEBUG_PRINT("destroy_server\n");
-        // TODO: check if server is still running
-        hash_table_destroy(&server->services);
+        // cant acquire the write lock until all readers are done
+        pthread_rwlock_wrlock(&server->running_lock);
+        // all services completed once lock acquired
+
         // signal the monitor thread to stop
         threadpool_signal(server->pool, server->monitor, CONTROL_SIGNAL_1);
         threadpool_destroy(server->pool, SHUTDOWN_GRACEFUL);
+
+        hash_table_destroy(&server->services);
+
+        pthread_rwlock_unlock(&server->running_lock);
+        pthread_rwlock_destroy(&server->running_lock);
+
         pthread_sigmask(SIG_SETMASK, &server->oldset, NULL);
         set_control_handler(SIG_DFL);
         free(server);
