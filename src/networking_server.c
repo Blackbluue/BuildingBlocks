@@ -193,11 +193,9 @@ static int create_socket(struct addrinfo *result, int connections, int *sock,
  * @brief Run a single service.
  *
  * @param srv - The service to run.
- * @param unused - Unused argument.
  * @return int - 0 on success, non-zero on failure.
  */
-static int run_single(struct service_info *srv, void *unused) {
-    (void)unused;
+static int run_single(struct service_info *srv) {
     if (srv == NULL) {
         // hash table lookup failed
         DEBUG_PRINT("\ton thread %lX: service not found\n", pthread_self());
@@ -282,7 +280,7 @@ static int run_each(const char *name, struct service_info **srv,
         return SUCCESS;
     }
     DEBUG_PRINT("adding service %s to pool\n", name);
-    int err = threadpool_add_work(pool, (ROUTINE)run_single, *srv, NULL);
+    int err = threadpool_add_work(pool, (ROUTINE)run_single, *srv);
     if (err != SUCCESS) {
         DEBUG_PRINT("run_each: error adding work for service %s\n", name);
     }
@@ -298,11 +296,9 @@ static int run_each(const char *name, struct service_info **srv,
  * signal.
  *
  * @param server - The server object.
- * @param unused - Unused argument.
  * @return Always returns 0.
  */
-static int signal_monitor(server_t *server, void *unused) {
-    (void)unused;
+static int signal_monitor(server_t *server) {
     DEBUG_PRINT("Signal Monitor: thread %lX\n", pthread_self());
     // block all signals for the thread
     sigset_t all_set;
@@ -380,8 +376,8 @@ static int setup_monitor(server_t *server) {
     pthread_sigmask(SIG_SETMASK, &all_set, &server->oldset);
     // create a thread to monitor signals
     // TODO: this may need to be a dedicated thread instead of a worker
-    int res = threadpool_add_work(server->pool, (ROUTINE)signal_monitor, server,
-                                  NULL);
+    int res =
+        threadpool_add_work(server->pool, (ROUTINE)signal_monitor, server);
     if (res != SUCCESS) {
         DEBUG_PRINT("setup_monitor: error adding signal monitor\n");
         return res;
@@ -406,7 +402,7 @@ server_t *init_server(size_t max_services, int *err) {
     if (res != SUCCESS) {
         set_err(err, res);
         destroy_server(server);
-        DEBUG_PRINT("init_server: setup_monitor failed\n");
+        DEBUG_PRINT("setup_monitor failed\n");
         return NULL;
     }
     DEBUG_PRINT("server initialized\n");
@@ -560,13 +556,13 @@ cleanup: // if jumped directly here, function succeeded
 int register_service(server_t *server, const char *name, service_f service,
                      int flags) {
     if (server == NULL || name == NULL || service == NULL) {
-        DEBUG_PRINT("register_service: server, name, or service is NULL\n");
+        DEBUG_PRINT("server, name, or service is NULL\n");
         return EINVAL;
     }
     DEBUG_PRINT("registering service %s\n", name);
     struct service_info *srv = hash_table_lookup(server->services, name);
     if (srv == NULL) {
-        DEBUG_PRINT("register_service: service %s not found\n", name);
+        DEBUG_PRINT("service %s not found\n", name);
         return ENOENT;
     }
     srv->service = service;
@@ -576,16 +572,16 @@ int register_service(server_t *server, const char *name, service_f service,
 
 int run_service(server_t *server, const char *name) {
     if (server == NULL || name == NULL) {
-        DEBUG_PRINT("run_service: server or name is NULL\n");
+        DEBUG_PRINT("server or name is NULL\n");
         return EINVAL;
     }
     // run_single will handle the missing service error
-    return run_single(hash_table_lookup(server->services, name), server->pool);
+    return run_single(hash_table_lookup(server->services, name));
 }
 
 int run_server(server_t *server) {
     if (server == NULL) {
-        DEBUG_PRINT("run_server: server is NULL\n");
+        DEBUG_PRINT("server is NULL\n");
         return EINVAL;
     }
 
@@ -593,7 +589,7 @@ int run_server(server_t *server) {
     int err = hash_table_iterate(server->services, (ACT_TABLE_F)run_each,
                                  server->pool);
     if (err != SUCCESS) {
-        DEBUG_PRINT("run_server: error running services\n");
+        DEBUG_PRINT("error running services\n");
         return err;
     }
     DEBUG_PRINT("waiting for services to finish\n");

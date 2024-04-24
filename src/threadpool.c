@@ -15,7 +15,6 @@
 struct task_t {
     ROUTINE action;
     void *arg;
-    void *arg2;
 };
 
 struct thread {
@@ -114,7 +113,6 @@ static threadpool_t *init_thread_info(threadpool_t *pool, int *err) {
         info->index = i;
         info->action = NULL;
         info->arg = NULL;
-        info->arg2 = NULL;
         info->status = STOPPED;
         info->error = SUCCESS;
     }
@@ -245,7 +243,7 @@ static void *thread_task(void *arg) {
         pthread_mutex_unlock(&self->info_lock);
         DEBUG_PRINT("\ton thread %lX: Work dequeued\n", pthread_self());
         pthread_rwlock_rdlock(&pool->running_lock);
-        int err = self->task->action(self->task->arg, self->task->arg2);
+        int err = self->task->action(self->task->arg);
         pthread_rwlock_unlock(&pool->running_lock);
         pthread_mutex_lock(&self->info_lock);
         self->error = err;
@@ -306,10 +304,9 @@ static int start_new_thread(threadpool_t *pool) {
  * @param pool pointer to threadpool_t
  * @param action pointer to function to be performed
  * @param arg pointer to argument for action
- * @param arg2 pointer to second argument for action
  * @return int 0 if successful, otherwise error code
  */
-static int add_task(threadpool_t *pool, ROUTINE action, void *arg, void *arg2) {
+static int add_task(threadpool_t *pool, ROUTINE action, void *arg) {
     struct task_t *task = malloc(sizeof(*task));
     if (task == NULL) {
         queue_c_unlock(pool->queue);
@@ -319,7 +316,6 @@ static int add_task(threadpool_t *pool, ROUTINE action, void *arg, void *arg2) {
     }
     task->action = action;
     task->arg = arg;
-    task->arg2 = arg2;
     int res = queue_c_enqueue(pool->queue, task);
     if (res != SUCCESS) {
         queue_c_unlock(pool->queue);
@@ -406,8 +402,7 @@ threadpool_t *threadpool_create(threadpool_attr_t *attr, int *err) {
     return pool;
 }
 
-int threadpool_add_work(threadpool_t *pool, ROUTINE action, void *arg,
-                        void *arg2) {
+int threadpool_add_work(threadpool_t *pool, ROUTINE action, void *arg) {
     DEBUG_PRINT("\ton thread %lX: Adding work to threadpool\n", pthread_self());
     if (pool == NULL || action == NULL) {
         DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
@@ -417,8 +412,7 @@ int threadpool_add_work(threadpool_t *pool, ROUTINE action, void *arg,
     // timeout ignored if TIMED_WAIT is not set
     if (pool->block_on_add == BLOCK_ON_ADD_ENABLED &&
         pool->timed_wait == TIMED_WAIT_ENABLED) {
-        return threadpool_timed_add_work(pool, action, arg, arg2,
-                                         pool->default_wait);
+        return threadpool_timed_add_work(pool, action, arg, pool->default_wait);
     } else if (pool->block_on_add) {
         DEBUG_PRINT("\ton thread %lX: ...Blocking on add\n", pthread_self());
         while (queue_c_is_full(pool->queue)) {
@@ -434,11 +428,11 @@ int threadpool_add_work(threadpool_t *pool, ROUTINE action, void *arg,
     }
 
     DEBUG_PRINT("\ton thread %lX: Adding task to queue\n", pthread_self());
-    return add_task(pool, action, arg, arg2);
+    return add_task(pool, action, arg);
 }
 
 int threadpool_timed_add_work(threadpool_t *pool, ROUTINE action, void *arg,
-                              void *arg2, time_t timeout) {
+                              time_t timeout) {
     DEBUG_PRINT("\ton thread %lX: Adding work to threadpool with timeout\n",
                 pthread_self());
     if (pool == NULL || action == NULL || timeout <= 0) {
@@ -457,7 +451,7 @@ int threadpool_timed_add_work(threadpool_t *pool, ROUTINE action, void *arg,
     }
 
     DEBUG_PRINT("\ton thread %lX: Adding task to queue\n", pthread_self());
-    return add_task(pool, action, arg, arg2);
+    return add_task(pool, action, arg);
 }
 
 int threadpool_thread_status(threadpool_t *pool, size_t thread_idx,
@@ -476,7 +470,6 @@ int threadpool_thread_status(threadpool_t *pool, size_t thread_idx,
     info->index = thread_idx;
     info->action = thread->task->action;
     info->arg = thread->task->arg;
-    info->arg2 = thread->task->arg2;
     info->status = thread->status;
     info->error = thread->error;
     pthread_mutex_unlock(&thread->info_lock);
