@@ -12,6 +12,15 @@
 
 #define SUCCESS 0
 
+// casting for pthread start routine
+typedef void *(*THRD)(void *);
+
+typedef enum {
+    UNSPECIFIED,
+    WORKER,
+    DEDICATED,
+} task_type;
+
 struct task_t {
     ROUTINE action;
     void *arg;
@@ -25,6 +34,8 @@ struct thread {
     thread_status status;
     int error;
     pthread_cond_t error_cond;
+    task_type type;
+    pthread_cond_t type_cond;
 };
 
 struct threadpool_t {
@@ -66,6 +77,7 @@ static void free_pool(threadpool_t *pool) {
     for (size_t i = 0; i < pool->max_threads; i++) {
         struct thread *thread = &pool->threads[i];
         pthread_cond_destroy(&thread->error_cond);
+        pthread_cond_destroy(&thread->type_cond);
         pthread_mutex_destroy(&thread->info_lock);
         if (thread->task != NULL) {
             free(thread->task);
@@ -108,6 +120,8 @@ static threadpool_t *init_thread_info(threadpool_t *pool, int *err) {
         thread->status = STOPPED;
         thread->error = SUCCESS;
         pthread_cond_init(&thread->error_cond, NULL);
+        thread->type = UNSPECIFIED;
+        pthread_cond_init(&thread->type_cond, NULL);
 
         struct thread_info *info = &pool->info[i];
         info->index = i;
@@ -194,12 +208,11 @@ static void wait_on_error(struct thread *self) {
 /**
  * @brief Perform a task for the threadpool.
  *
- * @param arg pointer to threadpool_t
+ * @param self pointer to thread
  * @return void* NULL
  */
-static void *thread_task(void *arg) {
+static void *thread_task(struct thread *self) {
     DEBUG_PRINT("Starting thread %lX\n", pthread_self());
-    struct thread *self = arg;
     threadpool_t *pool = self->pool;
     set_status(self, IDLE);
     for (;;) {
@@ -256,6 +269,25 @@ static void *thread_task(void *arg) {
     }
 }
 
+static void *task_coordinator(struct thread *self) {
+    pthread_mutex_lock(&self->info_lock);
+    while (self->type == UNSPECIFIED) {
+        pthread_cond_wait(&self->type_cond, &self->info_lock);
+    }
+    task_type type = self->type;
+    pthread_mutex_unlock(&self->info_lock);
+    switch (type) {
+    case WORKER:
+        // perform work from queue
+        return thread_task(self);
+    case DEDICATED:
+        // perform dedicated task
+        return NULL;
+    default:
+        return NULL;
+    }
+}
+
 /**
  * @brief Start a new thread.
  *
@@ -274,14 +306,27 @@ static int start_new_thread(threadpool_t *pool) {
         struct thread *thread = &pool->threads[i];
         pthread_mutex_lock(&thread->info_lock);
         switch (thread->status) {
+        case STARTING:
+            if (thread->type == UNSPECIFIED) {
+                // only signal the thread to start if it is not already starting
+                DEBUG_PRINT("\tWake thread %zu with id %lX\n", i, thread->id);
+                thread->type = WORKER;
+                pthread_cond_signal(&thread->type_cond);
+                return SUCCESS;
+            }
+            // keep looking
+            break;
         case STOPPED:
             thread->status = STARTING;
-            res = pthread_create(&thread->id, NULL, thread_task, thread);
+            thread->type = WORKER;
+            res = pthread_create(&thread->id, NULL, (THRD)task_coordinator,
+                                 thread);
             if (res == SUCCESS) {
                 DEBUG_PRINT("\tStart thread %zu with id %lX\n", i, thread->id);
                 pool->num_threads++;
             } else {
                 thread->status = STOPPED;
+                thread->type = UNSPECIFIED;
             }
             pthread_mutex_unlock(&thread->info_lock);
             return res;
@@ -359,11 +404,13 @@ static int restart_thread(struct thread *thread) {
         break;
     case STOPPED: // thread is not running
         thread->status = STARTING;
-        res = pthread_create(&thread->id, NULL, thread_task, thread);
+        thread->type = WORKER;
+        res = pthread_create(&thread->id, NULL, (THRD)task_coordinator, thread);
         if (res == SUCCESS) {
             DEBUG_PRINT("\tRestarted thread %lX\n", thread->id);
         } else {
             thread->status = STOPPED;
+            thread->type = UNSPECIFIED;
         }
         break;
     default:
@@ -387,7 +434,8 @@ threadpool_t *threadpool_create(threadpool_attr_t *attr, int *err) {
         for (size_t i = 0; i < pool->max_threads; i++) {
             struct thread *thread = &pool->threads[i];
             thread->status = STARTING;
-            int res = pthread_create(&thread->id, NULL, thread_task, thread);
+            int res = pthread_create(&thread->id, NULL, (THRD)task_coordinator,
+                                     thread);
             if (res != SUCCESS) {
                 threadpool_destroy(pool, SHUTDOWN_GRACEFUL);
                 set_err(err, res);
