@@ -299,6 +299,57 @@ static void *task_coordinator(struct thread *self) {
 }
 
 /**
+ * @brief Lock an idle thread.
+ *
+ * @param pool pointer to threadpool_t
+ * @param thread_idx pointer to thread index
+ * @retval 0 if successful
+ * @retval EAGAIN if no threads available
+ */
+static int lock_idle(threadpool_t *pool, size_t *thread_idx) {
+    // TODO: lock a thread
+    return EAGAIN;
+}
+
+/**
+ * @brief Lock a stopped thread.
+ *
+ * @param pool pointer to threadpool_t
+ * @param thread_idx pointer to thread index
+ * @retval 0 if successful
+ * @retval EAGAIN if no threads available
+ */
+static int lock_stopped(threadpool_t *pool, size_t *thread_idx) {
+    int locked = EAGAIN;
+    if (pool != NULL) {
+        for (size_t i = 0; i < pool->max_threads; i++) {
+            struct thread *thread = &pool->threads[i];
+            pthread_mutex_lock(&thread->info_lock);
+            if (thread->status == STOPPED) {
+                thread->status = LOCKED;
+                int res = pthread_create(&thread->id, NULL,
+                                         (THRD)task_coordinator, thread);
+                if (res == SUCCESS) {
+                    DEBUG_PRINT("\tLocking thread %lX\n", thread->id);
+                    if (thread_idx != NULL) {
+                        *thread_idx = i;
+                    }
+                    pthread_mutex_unlock(&thread->info_lock);
+                    locked = SUCCESS;
+                    break;
+                } else {
+                    DEBUG_PRINT("\tFailed to start/lock thread %zu\n", i);
+                    thread->status = STOPPED;
+                    thread->type = UNSPECIFIED;
+                }
+            }
+            pthread_mutex_unlock(&thread->info_lock);
+        }
+    }
+    return locked;
+}
+
+/**
  * @brief Start a new thread.
  *
  * If the threadpool is not at capacity, a new thread will be started.
@@ -518,33 +569,25 @@ int threadpool_lock_thread(threadpool_t *pool, size_t *thread_idx) {
         return EINVAL;
     }
     int locked = EAGAIN;
-
-    // look for stopped threads if none are idle
-    for (size_t i = 0; i < pool->max_threads; i++) {
-        struct thread *thread = &pool->threads[i];
-        pthread_mutex_lock(&thread->info_lock);
-        if (thread->status == STOPPED) {
-            thread->status = LOCKED;
-            int res = pthread_create(&thread->id, NULL, (THRD)task_coordinator,
-                                     thread);
-            if (res == SUCCESS) {
-                DEBUG_PRINT("\tLocking thread %lX\n", thread->id);
-                if (thread_idx != NULL) {
-                    *thread_idx = i;
-                }
-                pthread_mutex_unlock(&thread->info_lock);
-                locked = SUCCESS;
-                break;
-            } else {
-                DEBUG_PRINT("\tFailed to start/lock thread %zu\n", i);
-                thread->status = STOPPED;
-                thread->type = UNSPECIFIED;
-            }
+    // if strict, most threads should be idle
+    // if lazy, most threads should be stopped
+    if (pool->thread_creation == THREAD_CREATE_STRICT) {
+        // prioritize idle threads
+        locked = lock_idle(pool, thread_idx);
+        if (locked == EAGAIN) {
+            // look for stopped threads if none are idle
+            locked = lock_stopped(pool, thread_idx);
         }
-        pthread_mutex_unlock(&thread->info_lock);
+    } else {
+        // prioritize stopped threads
+        locked = lock_stopped(pool, thread_idx);
+        if (locked == EAGAIN) {
+            // look for idle threads if none are stopped
+            locked = lock_idle(pool, thread_idx);
+        }
     }
-
-    DEBUG_PRINT("\ton thread %lX: No threads available\n", pthread_self());
+    DEBUG_PRINT("\ton thread %lX: Locking %s\n", pthread_self(),
+                locked == SUCCESS ? "successful" : "failed");
     return locked;
 }
 
