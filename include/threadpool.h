@@ -7,6 +7,7 @@
 
 typedef enum thread_status {
     STOPPED,    // thread is not running
+    LOCKED,     // thread is locked and cannot be used until unlocked
     STARTING,   // thread is starting
     IDLE,       // thread is waiting for work
     RUNNING,    // thread is performing work
@@ -124,6 +125,25 @@ int threadpool_add_work(threadpool_t *pool, ROUTINE action, void *arg);
  */
 int threadpool_timed_add_work(threadpool_t *pool, ROUTINE action, void *arg,
                               time_t timeout);
+
+/**
+ * @brief Lock an idle or stopped thread in the threadpool.
+ *
+ * The function will attempt to lock an idle or stopped thread in the
+ * threadpool. A locked thread will not be able to execute any tasks until it is
+ * unlocked. The index of the locked thread will be stored in the optional
+ * thread_idx argument.
+ *
+ * Possible error codes:
+ *      EINVAL: pool is NULL
+ *      EAGAIN: No lockable threads available
+ *
+ *
+ * @param pool The threadpool to lock the thread in.
+ * @param thread_idx Where to store the index of the locked thread.
+ * @return int 0 on success, non-zero on failure.
+ */
+int threadpool_lock_thread(threadpool_t *pool, size_t *thread_idx);
 
 /**
  * @brief Get the information of a thread in the threadpool.
