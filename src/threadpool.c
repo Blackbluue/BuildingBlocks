@@ -27,6 +27,7 @@ struct task_t {
 };
 
 struct thread {
+    size_t index;
     pthread_t id;
     threadpool_t *pool;
     struct task_t *task;
@@ -114,6 +115,7 @@ static threadpool_t *init_thread_info(threadpool_t *pool, int *err) {
     for (size_t i = 0; i < pool->max_threads; i++) {
         DEBUG_PRINT("\tInitializing thread info %zu\n", i);
         struct thread *thread = &pool->threads[i];
+        thread->index = i;
         thread->pool = pool;
         thread->task = NULL;
         pthread_mutex_init(&thread->info_lock, NULL);
