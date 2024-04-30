@@ -150,6 +150,23 @@ int threadpool_timed_add_work(threadpool_t *pool, ROUTINE action, void *arg,
 int threadpool_lock_thread(threadpool_t *pool, size_t *thread_idx);
 
 /**
+ * @brief Unlock a locked thread in the threadpool.
+ *
+ * The function will attempt to unlock a locked thread in the threadpool. The
+ * thread with the given index will be unlocked and able to execute tasks again.
+ * Attempting to unlock a thread that is not locked will be a silently ignored.
+ *
+ * Possible error codes:
+ *      EINVAL: pool is NULL
+ *      ENOENT: thread_id is not valid
+ *
+ * @param pool The threadpool to unlock the thread in.
+ * @param thread_idx The index of the thread to unlock.
+ * @return int 0 on success, non-zero on failure.
+ */
+int threadpool_unlock_thread(threadpool_t *pool, size_t thread_idx);
+
+/**
  * @brief Get the information of a thread in the threadpool.
  *
  * The function will return the information of the thread with the given

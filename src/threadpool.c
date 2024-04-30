@@ -640,6 +640,26 @@ int threadpool_lock_thread(threadpool_t *pool, size_t *thread_idx) {
     return locked;
 }
 
+int threadpool_unlock_thread(threadpool_t *pool, size_t thread_idx) {
+    if (pool == NULL) {
+        DEBUG_PRINT("\ton thread %lX: pool is null\n", pthread_self());
+        return EINVAL;
+    } else if (thread_idx >= pool->max_threads) {
+        DEBUG_PRINT("\ton thread %lX: %zu is not a valid thread\n",
+                    pthread_self(), thread_idx);
+        return ENOENT;
+    }
+    struct thread *thread = &pool->threads[thread_idx];
+    pthread_mutex_lock(&thread->info_lock);
+    if (thread->status == LOCKED) {
+        thread->status = STARTING;
+        DEBUG_PRINT("\ton thread %lX: Unlocked thread %zu\n", pthread_self(),
+                    thread_idx);
+    }
+    pthread_mutex_unlock(&thread->info_lock);
+    return SUCCESS;
+}
+
 int threadpool_thread_status(threadpool_t *pool, size_t thread_idx,
                              struct thread_info *info) {
     DEBUG_PRINT("\ton thread %lX: Getting thread status\n", pthread_self());
