@@ -17,12 +17,6 @@
 // casting for pthread start routine
 typedef void *(*THRD)(void *);
 
-typedef enum {
-    UNSPECIFIED,
-    WORKER,
-    DEDICATED,
-} task_type;
-
 struct task_t {
     ROUTINE action;
     void *arg;
@@ -138,6 +132,7 @@ static threadpool_t *init_thread_info(threadpool_t *pool, int *err) {
         info->action = NULL;
         info->arg = NULL;
         info->status = STOPPED;
+        info->type = UNSPECIFIED;
         info->error = SUCCESS;
     }
     DEBUG_PRINT("\tThreadpool initialized\n");
@@ -320,6 +315,15 @@ static void dedicated_task(struct thread *self) {
     DEBUG_PRINT("\ton thread %lX: Work complete\n", pthread_self());
 }
 
+/**
+ * @brief Task coordinator for the thread.
+ *
+ * The thread will wait for a task type to be assigned to it. Either worker or
+ * dedicated.
+ *
+ * @param self pointer to thread
+ * @return void* NULL
+ */
 static void *task_coordinator(struct thread *self) {
     DEBUG_PRINT("Starting thread %lX\n", pthread_self());
     for (;;) {
@@ -735,6 +739,7 @@ int threadpool_thread_status(threadpool_t *pool, size_t thread_idx,
     info->action = thread->task->action;
     info->arg = thread->task->arg;
     info->status = thread->status;
+    info->type = thread->type;
     info->error = thread->error;
     pthread_mutex_unlock(&thread->info_lock);
     DEBUG_PRINT("\ton thread %lX: Thread %zu status: %d\n", pthread_self(),

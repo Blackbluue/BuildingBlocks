@@ -5,7 +5,7 @@
 
 /* DATA */
 
-typedef enum thread_status {
+typedef enum {
     STOPPED,    // thread is not running
     LOCKED,     // thread is locked and cannot be used until unlocked
     STARTING,   // thread is starting
@@ -14,6 +14,12 @@ typedef enum thread_status {
     BLOCKED,    // thread is blocked
     DESTROYING, // thread is being destroyed
 } thread_status;
+
+typedef enum {
+    UNSPECIFIED,
+    WORKER,
+    DEDICATED,
+} task_type;
 
 enum shutdown_flags {
     NO_SHUTDOWN,       // do not shutdown the threadpool
@@ -44,6 +50,7 @@ struct thread_info {
     ROUTINE action;       // routine to execute
     void *arg;            // routine argument
     thread_status status; // thread status
+    task_type type;       // task type
     int error;            // error code
 };
 
