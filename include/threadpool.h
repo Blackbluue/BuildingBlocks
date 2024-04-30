@@ -167,6 +167,35 @@ int threadpool_lock_thread(threadpool_t *pool, size_t *thread_idx);
 int threadpool_unlock_thread(threadpool_t *pool, size_t thread_idx);
 
 /**
+ * @brief Add a new dedicated task to the threadpool.
+ *
+ * The task will be added as a dedicated task in the threadpool. Dedicated tasks
+ * are tasks that are assigned to a specific thread in the threadpool; the
+ * thread must first be locked before it can be assigned a dedicated task. The
+ * thread will execute the task only a single time. Dedicated tasks are not
+ * added to the task queue and will not be executed by any other thread in the
+ * threadpool.
+ *
+ * Dedicated tasks ignore the block_on_error flag; they will always return to
+ * a locked state after the task retuns with the return status saved to the
+ * thread info, regardless of the return value.
+ *
+ * Possible error codes:
+ *      EINVAL: pool or action is NULL
+ *      ENOENT: thread_id is not valid
+ *      ENOMEM: memory allocation failed
+ *      EAGAIN: thread is not locked
+ *
+ * @param pool The threadpool to add the task to.
+ * @param action The routine to be executed by the threadpool.
+ * @param arg The argument to be passed to the routine.
+ * @param thread_idx The index of the thread that will execute the task.
+ * @return int 0 on success, non-zero on failure.
+ */
+int threadpool_add_dedicated(threadpool_t *pool, ROUTINE action, void *arg,
+                             size_t thread_idx);
+
+/**
  * @brief Get the information of a thread in the threadpool.
  *
  * The function will return the information of the thread with the given

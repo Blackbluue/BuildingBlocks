@@ -223,10 +223,9 @@ static void wait_on_error(struct thread *self) {
  * @brief Perform a task for the threadpool.
  *
  * @param self pointer to thread
- * @return void* NULL
  */
-static void *thread_task(struct thread *self) {
-    DEBUG_PRINT("Starting thread %lX\n", pthread_self());
+static void thread_task(struct thread *self) {
+    DEBUG_PRINT("Starting worker %lX\n", pthread_self());
     threadpool_t *pool = self->pool;
     set_status(self, IDLE);
     for (;;) {
@@ -240,7 +239,7 @@ static void *thread_task(struct thread *self) {
                             pthread_self());
                 queue_c_unlock(pool->queue);
                 set_status(self, STOPPED);
-                return NULL;
+                return;
             } else if (err == EAGAIN) {
                 // check if thread lock requested
                 pthread_mutex_lock(&pool->pool_lock);
@@ -253,7 +252,7 @@ static void *thread_task(struct thread *self) {
                     pool->locked_thread = self->index;
                     pthread_cond_signal(&pool->lock_cond);
                     pthread_mutex_unlock(&pool->pool_lock);
-                    return NULL;
+                    return;
                 }
                 pthread_mutex_unlock(&pool->pool_lock);
             }
@@ -267,7 +266,7 @@ static void *thread_task(struct thread *self) {
                         pthread_self());
             queue_c_unlock(pool->queue);
             set_status(self, DESTROYING);
-            return NULL;
+            return;
         }
 
         DEBUG_PRINT("\ton thread %lX: ..Performing work\n", pthread_self());
@@ -298,7 +297,31 @@ static void *thread_task(struct thread *self) {
     }
 }
 
+/**
+ * @brief Perform a dedicated task for the threadpool.
+ *
+ * @param self pointer to thread
+ */
+static void dedicated_task(struct thread *self) {
+    DEBUG_PRINT("Starting dedicated %lX\n", pthread_self());
+    set_status(self, RUNNING);
+
+    DEBUG_PRINT("\ton thread %lX: ..Performing work\n", pthread_self());
+    // perform work
+    int err = self->task->action(self->task->arg);
+    pthread_mutex_lock(&self->info_lock);
+    self->error = err;
+    free(self->task);
+    self->task = NULL;
+    // reset status to locked. application can check on the error then
+    self->status = LOCKED;
+    self->type = UNSPECIFIED;
+    pthread_mutex_unlock(&self->info_lock);
+    DEBUG_PRINT("\ton thread %lX: Work complete\n", pthread_self());
+}
+
 static void *task_coordinator(struct thread *self) {
+    DEBUG_PRINT("Starting thread %lX\n", pthread_self());
     for (;;) {
         pthread_mutex_lock(&self->info_lock);
         while (self->type == UNSPECIFIED) {
@@ -313,9 +336,9 @@ static void *task_coordinator(struct thread *self) {
             break;
         case DEDICATED:
             // perform dedicated task
-            // TODO: implement dedicated task
-            return NULL;
-        default:
+            dedicated_task(self);
+            break;
+        default: // error in type, exit thread
             return NULL;
         }
         pthread_mutex_lock(&self->info_lock);
@@ -658,6 +681,41 @@ int threadpool_unlock_thread(threadpool_t *pool, size_t thread_idx) {
     }
     pthread_mutex_unlock(&thread->info_lock);
     return SUCCESS;
+}
+
+int threadpool_add_dedicated(threadpool_t *pool, ROUTINE action, void *arg,
+                             size_t thread_idx) {
+    if (pool == NULL || action == NULL) {
+        DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
+        return EINVAL;
+    } else if (thread_idx >= pool->max_threads) {
+        DEBUG_PRINT("\ton thread %lX: %zu is not a valid thread\n",
+                    pthread_self(), thread_idx);
+        return ENOENT;
+    }
+
+    int res = EAGAIN;
+    struct thread *thread = &pool->threads[thread_idx];
+    pthread_mutex_lock(&thread->info_lock);
+    if (thread->status == LOCKED) {
+        thread->task = malloc(sizeof(*thread->task));
+        if (thread->task == NULL) {
+            res = ENOMEM;
+            goto cleanup;
+        }
+        thread->task->action = action;
+        thread->task->arg = arg;
+        thread->type = DEDICATED;
+        pthread_cond_broadcast(&thread->type_cond);
+        res = SUCCESS;
+    }
+
+cleanup:
+    DEBUG_PRINT("\ton thread %lX: Dedicated thread %zu is %s started\n",
+                pthread_self(), thread_idx,
+                res == SUCCESS ? "successfully" : "unsuccessfully");
+    pthread_mutex_unlock(&thread->info_lock);
+    return res;
 }
 
 int threadpool_thread_status(threadpool_t *pool, size_t thread_idx,
