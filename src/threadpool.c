@@ -5,12 +5,14 @@
 #include <errno.h>
 #include <pthread.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
 /* DATA */
 
 #define SUCCESS 0
+#define LOCK_WAIT_TIMEOUT 3
 
 // casting for pthread start routine
 typedef void *(*THRD)(void *);
@@ -43,9 +45,13 @@ struct threadpool_t {
     struct thread *threads;
     struct thread_info *info;
     pthread_rwlock_t running_lock;
+    pthread_mutex_t pool_lock;
     queue_c_t *queue;
     size_t num_threads;
     size_t max_threads;
+    bool lock_requested;
+    size_t locked_thread;
+    pthread_cond_t lock_cond;
     int shutdown;
     int timed_wait;
     int block_on_add;
@@ -87,6 +93,8 @@ static void free_pool(threadpool_t *pool) {
     free(pool->threads);
     free(pool->info);
     pthread_rwlock_destroy(&pool->running_lock);
+    pthread_mutex_destroy(&pool->pool_lock);
+    pthread_cond_destroy(&pool->lock_cond);
     queue_c_destroy(&pool->queue);
     free(pool);
 }
@@ -176,6 +184,10 @@ static threadpool_t *init_pool(threadpool_attr_t *attr, int *err) {
 
     // initialize mutexes and condition variables
     pthread_rwlock_init(&pool->running_lock, NULL);
+    pthread_mutex_init(&pool->pool_lock, NULL);
+    pthread_cond_init(&pool->lock_cond, NULL);
+    pool->lock_requested = false;
+    pool->locked_thread = 0;
     pool->num_threads = 0;
     pool->shutdown = NO_SHUTDOWN;
 
@@ -223,12 +235,27 @@ static void *thread_task(struct thread *self) {
         while (queue_c_is_empty(pool->queue) && pool->shutdown == NO_SHUTDOWN) {
             int err = queue_c_wait_for_not_empty(pool->queue);
             if (!(err == SUCCESS || err == EAGAIN)) {
-                // EAGAIN returned if threadpool is being gracefully destroyed
+                // EAGAIN returned if queue wait is manually canceled
                 DEBUG_PRINT("\ton thread %lX: Error waiting for work\n",
                             pthread_self());
                 queue_c_unlock(pool->queue);
                 set_status(self, STOPPED);
                 return NULL;
+            } else if (err == EAGAIN) {
+                // check if thread lock requested
+                pthread_mutex_lock(&pool->pool_lock);
+                if (pool->lock_requested) {
+                    pthread_mutex_lock(&self->info_lock);
+                    self->status = LOCKED;
+                    self->type = UNSPECIFIED;
+                    pthread_mutex_unlock(&self->info_lock);
+                    pool->lock_requested = false;
+                    pool->locked_thread = self->index;
+                    pthread_cond_signal(&pool->lock_cond);
+                    pthread_mutex_unlock(&pool->pool_lock);
+                    return NULL;
+                }
+                pthread_mutex_unlock(&pool->pool_lock);
             }
         }
 
@@ -309,8 +336,28 @@ static void *task_coordinator(struct thread *self) {
  * @retval EAGAIN if no threads available
  */
 static int lock_idle(threadpool_t *pool, size_t *thread_idx) {
-    // TODO: lock a thread
-    return EAGAIN;
+    int locked = EAGAIN;
+    if (pool != NULL) {
+        pthread_mutex_lock(&pool->pool_lock);
+        pool->lock_requested = true;
+        // wake all threads, ask 1 to lock
+        queue_c_cancel_wait(pool->queue);
+        struct timespec abstime = {time(NULL) + LOCK_WAIT_TIMEOUT, 0};
+        // locked thread will set lock_requested to false
+        while (pool->lock_requested == true) {
+            pthread_cond_timedwait(&pool->lock_cond, &pool->pool_lock,
+                                   &abstime);
+        }
+        // if lock requested is false, thread is locked
+        if (pool->lock_requested == false) {
+            if (thread_idx != NULL) {
+                *thread_idx = pool->locked_thread;
+            }
+            locked = SUCCESS;
+        }
+        pthread_mutex_unlock(&pool->pool_lock);
+    }
+    return locked;
 }
 
 /**

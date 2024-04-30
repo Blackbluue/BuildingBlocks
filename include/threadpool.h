@@ -134,6 +134,10 @@ int threadpool_timed_add_work(threadpool_t *pool, ROUTINE action, void *arg,
  * unlocked. The index of the locked thread will be stored in the optional
  * thread_idx argument.
  *
+ * @note If an attempt to lock threads is made from multiple threads, the
+ * behavior is undefined. The application should ensure that only one thread
+ * is attempting to lock threads at a time.
+ *
  * Possible error codes:
  *      EINVAL: pool is NULL
  *      EAGAIN: No lockable threads available
