@@ -30,7 +30,7 @@ struct service_info {
 struct server {
     hash_table_t *services;
     threadpool_t *pool;
-    pthread_t self;
+    pthread_t main;
     pthread_rwlock_t running_lock;
     size_t monitor;
     sigset_t oldset;
@@ -310,7 +310,6 @@ static int signal_monitor(server_t *server) {
         sigwait(&all_set, &sig);
         DEBUG_PRINT("\ton Signal Monitor thread: caught signal '%s'\n",
                     strsignal(sig));
-        // TODO: might be able to remove this check if using dedicated thread
         if (sig == CONTROL_SIGNAL_1) {
             DEBUG_PRINT(
                 "\ton Signal Monitor thread: received control signal\n");
@@ -323,7 +322,7 @@ static int signal_monitor(server_t *server) {
         // causes threads to block
         threadpool_signal_all(server->pool, CONTROL_SIGNAL_2);
         // in case running single service without threads
-        pthread_kill(server->self, CONTROL_SIGNAL_2);
+        pthread_kill(server->main, CONTROL_SIGNAL_2);
         // unblocks all threads, causing threadpool to go idle
         threadpool_refresh(server->pool);
     }
@@ -375,17 +374,19 @@ static int setup_monitor(server_t *server) {
     sigdelset(&all_set, CONTROL_SIGNAL_2); // allow signal monitor to interrupt
     pthread_sigmask(SIG_SETMASK, &all_set, &server->oldset);
     // create a thread to monitor signals
-    // TODO: this may need to be a dedicated thread instead of a worker
-    int res =
-        threadpool_add_work(server->pool, (ROUTINE)signal_monitor, server);
+    int res = threadpool_lock_thread(server->pool, &server->monitor);
+    if (res != SUCCESS) {
+        DEBUG_PRINT("setup_monitor: error adding signal monitor\n");
+        return res;
+    }
+    res = threadpool_add_dedicated(server->pool, (ROUTINE)signal_monitor,
+                                   server, server->monitor);
     if (res != SUCCESS) {
         DEBUG_PRINT("setup_monitor: error adding signal monitor\n");
         return res;
     }
     set_control_handler(empty_handler);
-    server->self = pthread_self();
-    // TODO: don't hardcode this. make the monitor a dedicated thread
-    server->monitor = 0;
+    server->main = pthread_self();
     return res;
 }
 
