@@ -308,11 +308,17 @@ static void dedicated_task(struct thread *self) {
     self->error = err;
     free(self->task);
     self->task = NULL;
-    // reset status to locked. application can check on the error then
-    self->status = LOCKED;
     self->type = UNSPECIFIED;
-    pthread_mutex_unlock(&self->info_lock);
     DEBUG_PRINT("\ton thread %lX: Work complete\n", pthread_self());
+    // check if threadpool is shutting down
+    if (self->pool->shutdown != NO_SHUTDOWN) {
+        DEBUG_PRINT("\ton thread %lX: Thread shutting down\n", pthread_self());
+        self->status = DESTROYING;
+    } else {
+        // reset status to locked. application can check on the error then
+        self->status = LOCKED;
+    }
+    pthread_mutex_unlock(&self->info_lock);
 }
 
 /**
@@ -326,11 +332,21 @@ static void dedicated_task(struct thread *self) {
  */
 static void *task_coordinator(struct thread *self) {
     DEBUG_PRINT("Starting thread %lX\n", pthread_self());
+
+    threadpool_t *pool = self->pool;
     for (;;) {
         pthread_mutex_lock(&self->info_lock);
-        while (self->type == UNSPECIFIED) {
+        while (self->type == UNSPECIFIED && pool->shutdown == NO_SHUTDOWN) {
             pthread_cond_wait(&self->type_cond, &self->info_lock);
         }
+        // check if threadpool is shutting down
+        if (pool->shutdown != NO_SHUTDOWN) {
+            self->status = DESTROYING;
+            pthread_mutex_unlock(&self->info_lock);
+            DEBUG_PRINT("Destroying thread %lX\n", pthread_self());
+            return NULL;
+        }
+
         task_type type = self->type;
         pthread_mutex_unlock(&self->info_lock);
         switch (type) {
@@ -345,9 +361,11 @@ static void *task_coordinator(struct thread *self) {
         default: // error in type, exit thread
             return NULL;
         }
+        DEBUG_PRINT("Thread %lX: Checking for destruction\n", pthread_self());
         pthread_mutex_lock(&self->info_lock);
         if (self->status == DESTROYING) {
             pthread_mutex_unlock(&self->info_lock);
+            DEBUG_PRINT("Destroying thread %lX\n", pthread_self());
             return NULL;
         }
         pthread_mutex_unlock(&self->info_lock);
@@ -710,7 +728,7 @@ int threadpool_add_dedicated(threadpool_t *pool, ROUTINE action, void *arg,
         thread->task->action = action;
         thread->task->arg = arg;
         thread->type = DEDICATED;
-        pthread_cond_broadcast(&thread->type_cond);
+        pthread_cond_signal(&thread->type_cond);
         res = SUCCESS;
     }
 
@@ -940,15 +958,28 @@ int threadpool_destroy(threadpool_t *pool, int flag) {
     if (flag == SHUTDOWN_GRACEFUL) {
         threadpool_wait(pool);
     }
-    // wake up all threads
+    // wake up all threads, then allow them to end on their own
     pool->shutdown = flag;
     queue_c_cancel_wait(pool->queue);
     for (size_t i = 0; i < pool->max_threads; i++) {
         struct thread *thread = &pool->threads[i];
-        if (thread->status == STOPPED) {
+        pthread_mutex_lock(&thread->info_lock);
+        switch (thread->status) {
+        case STOPPED:
             // skip threads that are not running
             continue;
+        case STARTING:
+        case LOCKED:
+            // wake up starting/locked threads
+            DEBUG_PRINT("\ton thread %lX: Unblocking thread %zu with id %lX\n",
+                        pthread_self(), i, thread->id);
+            pthread_cond_signal(&thread->type_cond);
+            break;
+        default:
+            break;
         }
+        pthread_mutex_unlock(&thread->info_lock);
+
         if (flag == SHUTDOWN_FORCEFUL) {
             // will be ignored if thread is already cancelled
             DEBUG_PRINT("\ton thread %lX: Cancelling thread %zu with id %lX\n",
