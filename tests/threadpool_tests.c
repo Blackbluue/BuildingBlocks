@@ -253,6 +253,7 @@ void test_threadpool_run_tasks() {
     // finish
     CU_ASSERT_EQUAL(threadpool_timed_wait(pool, TIMEOUT * tasks), SUCCESS);
     // Confirm that all tasks were completed
+    fprintf(stderr, "\ttasks: %d\tdone: %d\n", tasks, done);
     CU_ASSERT_EQUAL(done, tasks);
 
     teardown_test(&pool);
@@ -286,6 +287,7 @@ void test_threadpool_shutdown() {
     tasks = start_tasks(pool, &done);
     pthread_mutex_unlock(&lock);
     teardown_test(&pool);
+    fprintf(stderr, "\ttasks: %d\tdone: %d\n", tasks, done);
     CU_ASSERT_EQUAL(done, tasks);
     fprintf(stderr, "test_threadpool_shutdown done\n\n");
 }
