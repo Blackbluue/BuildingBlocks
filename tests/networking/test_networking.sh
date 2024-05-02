@@ -17,7 +17,7 @@ if [[ ${running} -ne 0 ]]; then
 fi
 
 # Start the client
-valgrind ${client}
+valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ${client}
 result=$?
 
 # Kill the server
