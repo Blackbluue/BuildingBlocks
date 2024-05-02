@@ -50,4 +50,13 @@ struct counter_packet {
 int send_response(struct packet *pkt, struct sockaddr *addr, socklen_t addrlen,
                   int client_sock);
 
+/**
+ * @brief Count the number of times a character is repeated in a string.
+ *
+ * @param string - The string to process.
+ * @param character - The character that is repeated the most.
+ * @param count - The number of times the character is repeated.
+ */
+void get_highest(char *string, char *character, uint16_t *count);
+
 #endif /* UTILS_H */

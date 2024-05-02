@@ -1,4 +1,4 @@
-#define _POSIX_C_SOURCE 200112L
+#define _DEFAULT_SOURCE
 #include "networking_client.h"
 #include "utils.h"
 #include <CUnit/Basic.h>
@@ -6,6 +6,7 @@
 #include <netdb.h>
 #include <pthread.h>
 #include <signal.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #define SUCCESS 0
@@ -13,11 +14,23 @@
 #define TIMEOUT TO_DEFAULT * 5
 #define TEST_COUNT 5
 #define PORT_STR_LEN 6
-
-#define NUM(VAL) #VAL
-#define STR(VAL) NUM(VAL)
+#define ALPHABET_LEN 26
+#define RAND_BUF_SIZE 64
+#define MIN_STR_LEN 15
 
 static void exit_handler(int sig) { (void)sig; }
+
+static char rand_letter(struct random_data *rdata) {
+    int32_t letter;
+    random_r(rdata, &letter);
+    return 'a' + (letter % ALPHABET_LEN);
+}
+
+static size_t rand_str_len(struct random_data *rdata) {
+    int32_t num;
+    random_r(rdata, &num);
+    return num % (MAX_STR_LEN - MIN_STR_LEN) + MIN_STR_LEN;
+}
 
 void allow_graceful_exit(void) {
     struct sigaction action;
@@ -31,23 +44,33 @@ int init_suite1(void) { return SUCCESS; }
 
 int clean_suite1(void) { return SUCCESS; }
 
-long test_ltr_count(int server_sock) {
-    // TODO: add randomness to test
+long test_ltr_count(int server_sock, struct random_data *rdata) {
     // send a message to the server
-    uint16_t count = 9;
-    char expected_response = 'o'; // TODO: set this to the expected response
-    char *string = "pneumonoultramicroscopicsilicovolcanoconiosis";
+    uint16_t len = rand_str_len(rdata);
+    char *string = calloc(len + 1, sizeof(*string));
+    if (string == NULL) {
+        return FAILURE;
+    }
+    for (size_t i = 0; i < len; i++) {
+        string[i] = rand_letter(rdata);
+    }
+
+    char expected;
+    uint16_t count;
+    get_highest(string, &expected, &count);
+    fprintf(stderr, "test_ltr_count->request string: %s\n", string);
+    fprintf(stderr, "test_ltr_count->request expected: '%c' <-> %hu\n",
+            expected, count);
+
     struct counter_packet request = {0};
     snprintf(request.string, sizeof(request.string) - 1, "%s", string);
-    fprintf(stderr, "test_ltr_count->request string: %s\n", request.string);
-    fprintf(stderr, "test_ltr_count->request expected: '%c' <-> %hu\n",
-            expected_response, count);
 
     long thread_err =
         write_pkt_data(server_sock, &request, sizeof(request), RQU_COUNT);
     if (thread_err != SUCCESS) {
         fprintf(stderr, "test_ltr_count->write_pkt_data: %s\n",
                 strerror(thread_err));
+        free(string);
         return thread_err;
     }
 
@@ -77,7 +100,7 @@ long test_ltr_count(int server_sock) {
     struct counter_packet *response = pkt->data;
     fprintf(stderr, "test_ltr_count->response: '%c' <-> %hu\n",
             response->character, response->count);
-    if (response->count != count || response->character != expected_response) {
+    if (response->count != count || response->character != expected) {
         fprintf(stderr,
                 "test_ltr_count->recv_pkt_data: unexpected data values\n");
         thread_err = FAILURE;
@@ -85,15 +108,23 @@ long test_ltr_count(int server_sock) {
     }
 
 cleanup:
+    free(string);
     free_packet(pkt);
     return thread_err;
 }
 
-long test_repeat(int server_sock) {
-    // TODO: add randomness to test
+long test_repeat(int server_sock, struct random_data *rdata) {
     // send a message to the server
-    uint16_t count = 5;
-    char letter = 'a';
+    uint16_t count = rand_str_len(rdata);
+    char letter = rand_letter(rdata);
+    char *expected = calloc(count + 1, sizeof(*expected));
+    if (expected == NULL) {
+        return FAILURE;
+    }
+    memset(expected, letter, count);
+    fprintf(stderr, "test_repeat->request letter <-> count: '%c' <-> %hu\n",
+            letter, count);
+    fprintf(stderr, "test_repeat->request expected: %s\n", expected);
     struct counter_packet request = {
         .count = count,
         .character = letter,
@@ -104,6 +135,7 @@ long test_repeat(int server_sock) {
     if (thread_err != SUCCESS) {
         fprintf(stderr, "test_repeat->write_pkt_data: %s\n",
                 strerror(thread_err));
+        free(expected);
         return thread_err;
     }
 
@@ -130,10 +162,8 @@ long test_repeat(int server_sock) {
         goto cleanup;
     }
     struct counter_packet *response = pkt->data;
-    // TODO: set this to the expected response
-    char *expected_response = "aaaaa";
-    int cmp_res =
-        strncmp(response->string, expected_response, strlen(response->string));
+    fprintf(stderr, "test_repeat->response: %s\n", response->string);
+    int cmp_res = strncmp(response->string, expected, strlen(response->string));
     if (response->count != count || cmp_res != SUCCESS) {
         fprintf(stderr, "test_repeat->recv_pkt_data: unexpected data values\n");
         thread_err = FAILURE;
@@ -141,6 +171,7 @@ long test_repeat(int server_sock) {
     }
 
 cleanup:
+    free(expected);
     free_packet(pkt);
     return thread_err;
 }
@@ -172,14 +203,20 @@ void *thread_test(void *arg) {
         return (void *)FAILURE;
     }
 
+    // random seed set from sever socket number
+    struct random_data rdata = {0};
+    char statebuf[RAND_BUF_SIZE];
+    initstate_r(time(NULL) + server_sock, statebuf, RAND_BUF_SIZE, &rdata);
+
+    // run tests
     long thread_err = SUCCESS;
     for (int i = 0; i < TEST_COUNT; i++) {
-        if ((thread_err = test_repeat(server_sock)) != SUCCESS) {
+        if ((thread_err = test_repeat(server_sock, &rdata)) != SUCCESS) {
             fprintf(stderr, "repeat test %d failed on port %s\n", i, port);
             break;
         }
         fprintf(stderr, "repeat test %d passed on port %s\n", i, port);
-        if ((thread_err = test_ltr_count(server_sock)) != SUCCESS) {
+        if ((thread_err = test_ltr_count(server_sock, &rdata)) != SUCCESS) {
             fprintf(stderr, "count test %d failed on port %s\n", i, port);
             break;
         }

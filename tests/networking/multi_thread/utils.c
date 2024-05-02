@@ -16,22 +16,6 @@
 
 static size_t alpha_idx(char c) { return c - 'a'; }
 
-static void get_highest(char *string, char *character, uint16_t *count) {
-    char letters[ALPHABET_LEN] = {0};
-    char highest = string[0];
-    for (size_t i = 0; i < strlen(string); i++) {
-        char cur_letter = tolower((unsigned char)string[i]);
-        size_t idx = alpha_idx(cur_letter);
-        letters[idx]++;
-        if (letters[idx] > letters[alpha_idx(highest)]) {
-            highest = cur_letter;
-        }
-    }
-
-    *character = highest;
-    *count = letters[alpha_idx(highest)];
-}
-
 static int count_letters(const struct packet *pkt, int sock) {
     struct counter_packet *req = pkt->data;
     get_highest(req->string, &req->character, &req->count);
@@ -62,4 +46,20 @@ int send_response(struct packet *pkt, struct sockaddr *addr, socklen_t addrlen,
     default:
         return write_pkt_data(client_sock, NULL, 0, SVR_INVALID);
     }
+}
+
+void get_highest(char *string, char *character, uint16_t *count) {
+    char letters[ALPHABET_LEN] = {0};
+    char highest = string[0];
+    for (size_t i = 0; i < strlen(string); i++) {
+        char cur_letter = tolower((unsigned char)string[i]);
+        size_t idx = alpha_idx(cur_letter);
+        letters[idx]++;
+        if (letters[idx] > letters[alpha_idx(highest)]) {
+            highest = cur_letter;
+        }
+    }
+
+    *character = highest;
+    *count = letters[alpha_idx(highest)];
 }
