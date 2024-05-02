@@ -34,10 +34,14 @@ int clean_suite1(void) { return SUCCESS; }
 long test_ltr_count(int server_sock) {
     // TODO: add randomness to test
     // send a message to the server
-    uint16_t count = 2;
-    char *string = "hello";
+    uint16_t count = 9;
+    char expected_response = 'o'; // TODO: set this to the expected response
+    char *string = "pneumonoultramicroscopicsilicovolcanoconiosis";
     struct counter_packet request = {0};
     snprintf(request.string, sizeof(request.string) - 1, "%s", string);
+    fprintf(stderr, "test_ltr_count->request string: %s\n", request.string);
+    fprintf(stderr, "test_ltr_count->request expected: '%c' <-> %hu\n",
+            expected_response, count);
 
     long thread_err =
         write_pkt_data(server_sock, &request, sizeof(request), RQU_COUNT);
@@ -71,7 +75,8 @@ long test_ltr_count(int server_sock) {
         goto cleanup;
     }
     struct counter_packet *response = pkt->data;
-    char expected_response = 'l'; // TODO: set this to the expected response
+    fprintf(stderr, "test_ltr_count->response: '%c' <-> %hu\n",
+            response->character, response->count);
     if (response->count != count || response->character != expected_response) {
         fprintf(stderr,
                 "test_ltr_count->recv_pkt_data: unexpected data values\n");
