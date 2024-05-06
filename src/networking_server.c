@@ -397,6 +397,13 @@ static int run_all(hash_table_t *services) {
                 }
                 fcntl(sess->client.client_sock, F_SETFL, O_NONBLOCK);
                 DEBUG_PRINT("\tclient accepted\n");
+            } else if (pfds[i].revents & POLLERR) {
+                // error specific to this service socket.
+                // unsure of which error code to return, may change later
+                err = EAGAIN;
+                keep_running = false;
+                DEBUG_PRINT("\tserver socket error\n");
+                break;
             }
         }
     }
