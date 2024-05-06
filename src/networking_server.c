@@ -325,11 +325,11 @@ static int build_pfds(hash_table_t *services, struct pollfd **pfds,
     int err;
     // wrapped array lists are just to easily append to the end of the array
     lists.poll_list =
-        arr_list_wrap(NULL, NULL, sizeof(**pfds), size, (void **)pfds, &err);
+        arr_list_wrap(NULL, NULL, size, sizeof(**pfds), (void **)pfds, &err);
     if (lists.poll_list == NULL) {
         return err;
     }
-    lists.srvs_list = arr_list_wrap(NULL, NULL, sizeof(**services_cpy), size,
+    lists.srvs_list = arr_list_wrap(NULL, NULL, size, sizeof(**services_cpy),
                                     (void **)services_cpy, &err);
     if (lists.srvs_list == NULL) {
         arr_list_delete(lists.poll_list);
