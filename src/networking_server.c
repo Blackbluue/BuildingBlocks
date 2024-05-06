@@ -20,9 +20,17 @@
 
 #define SUCCESS 0
 #define FAILURE -1
+#define INFINITE_POLL -1
+
 struct lists {
     arr_list_t *poll_list;
     arr_list_t *srvs_list;
+};
+
+struct client_info {
+    int client_sock;
+    struct sockaddr_storage addr;
+    socklen_t addrlen;
 };
 
 struct service_info {
@@ -31,6 +39,11 @@ struct service_info {
     service_f service;
     int sock;
     server_t *server;
+};
+
+struct session {
+    struct client_info client;
+    struct service_info srv;
 };
 
 struct server {
@@ -354,8 +367,38 @@ static int run_all(hash_table_t *services) {
 
     bool keep_running = true;
     while (keep_running) {
-        // FOR TESTING PURPOSES ONLY
-        keep_running = false;
+        int ready = poll(pfds, size, INFINITE_POLL);
+        if (ready == FAILURE) {
+            err = errno;
+            DEBUG_PRINT("\tpoll error: %s\n", strerror(errno));
+            break;
+        }
+
+        for (ssize_t i = 0; i < size; i++) {
+            if (pfds[i].revents & POLLIN) {
+                // accept incoming request
+                struct session *sess = malloc(sizeof(*sess));
+                if (sess == NULL) {
+                    err = errno;
+                    keep_running = false;
+                    DEBUG_PRINT("\tclient malloc error: %s\n", strerror(errno));
+                    break;
+                }
+                memcpy(&sess->srv, &services_cpy[i], sizeof(services_cpy[i]));
+                DEBUG_PRINT("\taccepting client\n");
+                sess->client.client_sock =
+                    accept(pfds[i].fd, (struct sockaddr *)&sess->client.addr,
+                           &sess->client.addrlen);
+                if (sess->client.client_sock == FAILURE) {
+                    err = errno;
+                    keep_running = false;
+                    DEBUG_PRINT("\taccept error: %s\n", strerror(errno));
+                    break;
+                }
+                fcntl(sess->client.client_sock, F_SETFL, O_NONBLOCK);
+                DEBUG_PRINT("\tclient accepted\n");
+            }
+        }
     }
 
     free(pfds);
