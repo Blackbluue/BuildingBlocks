@@ -209,6 +209,56 @@ static int create_socket(struct addrinfo *result, int connections, int *sock,
 }
 
 /**
+ * @brief Handle a request from the client.
+ *
+ * @param session - The session object.
+ * @return int - 0 on success, non-zero on failure.
+ */
+static int handle_request(struct session *session) {
+    if (session == NULL) {
+        return EINVAL;
+    }
+
+    bool handle_client = true;
+    int err;
+    while (handle_client) {
+        struct packet *pkt =
+            recv_pkt_data(session->client.client_sock, TO_INFINITE, &err);
+        if (pkt == NULL) {
+            handle_client = false; // drop the client
+            switch (err) {
+            case EWOULDBLOCK:  // no data available
+            case ENODATA:      // client disconnected
+            case ETIMEDOUT:    // client timed out
+            case EINVAL:       // invalid packet
+                err = 0;       // clear error
+                continue;      // don't close the server
+            case EINTR:        // signal interrupt
+                err = SUCCESS; // no error
+                // fall through
+            default: // other errors
+                continue;
+            }
+        }
+        DEBUG_PRINT("\ton thread %lX: packet successfully received\n",
+                    pthread_self());
+
+        err = session->srv.service(
+            pkt, (struct sockaddr *)&session->client.addr,
+            session->client.addrlen, session->client.client_sock);
+        if (err != SUCCESS) {
+            handle_client = false;
+        }
+        DEBUG_PRINT("\ton thread %lX: packet successfully processed\n\n",
+                    pthread_self());
+        free_packet(pkt);
+    }
+    DEBUG_PRINT("\ton thread %lX: closing client\n\n\n", pthread_self());
+    close(session->client.client_sock);
+    return err;
+}
+
+/**
  * @brief Run a single service.
  *
  * @param srv - The service to run.
@@ -240,41 +290,19 @@ static int run_single(struct service_info *srv) {
         fcntl(client_sock, F_SETFL, O_NONBLOCK);
         DEBUG_PRINT("\ton thread %lX: client accepted\n", pthread_self());
 
-        bool handle_client = true;
-        while (handle_client) {
-            struct packet *pkt = recv_pkt_data(client_sock, TO_INFINITE, &err);
-            if (pkt == NULL) {
-                handle_client = false; // drop the client
-                switch (err) {
-                case EWOULDBLOCK:  // no data available
-                case ENODATA:      // client disconnected
-                case ETIMEDOUT:    // client timed out
-                case EINVAL:       // invalid packet
-                    err = 0;       // clear error
-                    continue;      // don't close the server
-                case EINTR:        // signal interrupt
-                    err = SUCCESS; // no error
-                    // fall through
-                default:                  // other errors
-                    keep_running = false; // close the server
-                    continue;
-                }
-            }
-            DEBUG_PRINT("\ton thread %lX: packet successfully received\n",
-                        pthread_self());
-
-            err = srv->service(pkt, (struct sockaddr *)&addr, addrlen,
-                               client_sock);
-            if (err != SUCCESS) {
-                keep_running = false;
-                handle_client = false;
-            }
-            DEBUG_PRINT("\ton thread %lX: packet successfully processed\n\n",
-                        pthread_self());
-            free_packet(pkt);
+        struct session sess = {
+            .client =
+                {
+                    .client_sock = client_sock,
+                    .addr = addr,
+                    .addrlen = addrlen,
+                },
+            .srv = *srv,
+        };
+        err = handle_request(&sess);
+        if (err != SUCCESS) {
+            keep_running = false;
         }
-        DEBUG_PRINT("\ton thread %lX: closing client\n\n\n", pthread_self());
-        close(client_sock);
     }
     pthread_rwlock_unlock(&srv->server->running_lock);
     return err;
@@ -397,6 +425,13 @@ static int run_all(hash_table_t *services, threadpool_t *pool) {
                 }
                 fcntl(sess->client.client_sock, F_SETFL, O_NONBLOCK);
                 DEBUG_PRINT("\tclient accepted\n");
+
+                err = threadpool_add_work(pool, (ROUTINE)handle_request, sess);
+                if (err != SUCCESS) {
+                    keep_running = false;
+                    DEBUG_PRINT("\terror adding work to threadpool\n");
+                    break;
+                }
             } else if (pfds[i].revents & POLLERR ||
                        pfds[i].revents & POLL_HUP ||
                        pfds[i].revents & POLLNVAL) {
@@ -742,13 +777,4 @@ int run_server(server_t *server) {
 
     DEBUG_PRINT("starting services\n");
     return run_all(server->services, server->pool);
-    // int err = hash_table_iterate(server->services, (ACT_TABLE_F)run_each,
-    //                              server->pool);
-    // if (err != SUCCESS) {
-    //     DEBUG_PRINT("error running services\n");
-    //     return err;
-    // }
-    // DEBUG_PRINT("waiting for services to finish\n");
-    // err = threadpool_wait(server->pool);
-    // return err == EAGAIN ? EINTR : err;
 }
