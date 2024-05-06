@@ -327,6 +327,7 @@ static int build_pfds(hash_table_t *services, struct pollfd **pfds,
     lists.poll_list =
         arr_list_wrap(NULL, NULL, size, sizeof(**pfds), (void **)pfds, &err);
     if (lists.poll_list == NULL) {
+        // err != SUCCESS
         return err;
     }
     lists.srvs_list = arr_list_wrap(NULL, NULL, size, sizeof(**services_cpy),
@@ -349,11 +350,10 @@ static int build_pfds(hash_table_t *services, struct pollfd **pfds,
  * @param services - The services to run.
  * @return int - 0 on success, non-zero on failure.
  */
-static int run_all(hash_table_t *services) {
+static int run_all(hash_table_t *services, threadpool_t *pool) {
     if (services == NULL) {
         return EINVAL;
     }
-    DEBUG_PRINT("running all services\n");
 
     ssize_t size;
     hash_table_query(services, QUERY_SIZE, &size);
@@ -739,13 +739,14 @@ int run_server(server_t *server) {
     }
 
     DEBUG_PRINT("starting services\n");
-    int err = hash_table_iterate(server->services, (ACT_TABLE_F)run_each,
-                                 server->pool);
-    if (err != SUCCESS) {
-        DEBUG_PRINT("error running services\n");
-        return err;
-    }
-    DEBUG_PRINT("waiting for services to finish\n");
-    err = threadpool_wait(server->pool);
-    return err == EAGAIN ? EINTR : err;
+    return run_all(server->services, server->pool);
+    // int err = hash_table_iterate(server->services, (ACT_TABLE_F)run_each,
+    //                              server->pool);
+    // if (err != SUCCESS) {
+    //     DEBUG_PRINT("error running services\n");
+    //     return err;
+    // }
+    // DEBUG_PRINT("waiting for services to finish\n");
+    // err = threadpool_wait(server->pool);
+    // return err == EAGAIN ? EINTR : err;
 }
