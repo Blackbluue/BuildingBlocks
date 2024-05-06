@@ -1,11 +1,13 @@
 #define _POSIX_C_SOURCE 200809L
 #include "networking_server.h"
+#include "array_list.h"
 #include "buildingblocks.h"
 #include "hash_table.h"
 #include "threadpool.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
+#include <poll.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -258,6 +260,83 @@ static int run_single(struct service_info *srv) {
         close(client_sock);
     }
     pthread_rwlock_unlock(&srv->server->running_lock);
+    return err;
+}
+
+/**
+ * @brief Add the service to the poll list.
+ *
+ * @param unused - The key of the service, unused.
+ * @param srv - The service to add.
+ * @param list - The list to add the service to.
+ * @return int - 0 on success, non-zero on failure.
+ */
+static int add_polls(const char *unused, struct service_info **srv,
+                     arr_list_t *list) {
+    (void)unused;
+    ssize_t size;
+    arr_list_query(list, QUERY_SIZE, &size);
+    struct pollfd pfd = {
+        .fd = (*srv)->sock,
+        .events = POLLIN,
+    };
+    return arr_list_insert(list, &pfd, size);
+}
+
+/**
+ * @brief Build the poll list.
+ *
+ * The array pointed to by pfds must be NULL upon entry to this function.
+ * It will be allocated and must be freed by the caller.
+ *
+ * @param services - The services to build the poll list from.
+ * @param pfds - The poll list to be created.
+ * @param size - The size of the poll list.
+ * @return int - 0 on success, non-zero on failure.
+ */
+static int build_pfds(hash_table_t *services, struct pollfd **pfds,
+                      size_t size) {
+    int err;
+    // wrapped array list is just to easily append to the end of the array
+    arr_list_t *list =
+        arr_list_wrap(NULL, NULL, sizeof(**pfds), size, (void **)pfds, &err);
+    if (list == NULL) {
+        return err;
+    }
+
+    err = hash_table_iterate(services, (ACT_TABLE_F)add_polls, list);
+    // always delete the wrapper; it's no longer needed
+    arr_list_delete(list);
+    return err;
+}
+
+/**
+ * @brief Run all services.
+ *
+ * @param services - The services to run.
+ * @return int - 0 on success, non-zero on failure.
+ */
+static int run_all(hash_table_t *services) {
+    if (services == NULL) {
+        return EINVAL;
+    }
+    DEBUG_PRINT("running all services\n");
+
+    ssize_t size;
+    hash_table_query(services, QUERY_SIZE, &size);
+    struct pollfd *pfds = NULL;
+    int err = build_pfds(services, &pfds, size);
+    if (err != SUCCESS) {
+        return err;
+    }
+
+    bool keep_running = true;
+    while (keep_running) {
+        // FOR TESTING PURPOSES ONLY
+        keep_running = false;
+    }
+
+    free(pfds);
     return err;
 }
 
