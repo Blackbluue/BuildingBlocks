@@ -20,6 +20,10 @@
 
 #define SUCCESS 0
 #define FAILURE -1
+struct lists {
+    arr_list_t *poll_list;
+    arr_list_t *srvs_list;
+};
 
 struct service_info {
     char *name;
@@ -264,49 +268,65 @@ static int run_single(struct service_info *srv) {
 }
 
 /**
- * @brief Add the service to the poll list.
+ * @brief Add the service to the poll and services lists.
+ *
+ * Must be added to both lists at the same time so that their indices match.
  *
  * @param unused - The key of the service, unused.
  * @param srv - The service to add.
- * @param list - The list to add the service to.
+ * @param lists - The poll/service lists to add the service to.
  * @return int - 0 on success, non-zero on failure.
  */
 static int add_polls(const char *unused, struct service_info **srv,
-                     arr_list_t *list) {
+                     struct lists *lists) {
     (void)unused;
     ssize_t size;
-    arr_list_query(list, QUERY_SIZE, &size);
+    arr_list_query(lists->poll_list, QUERY_SIZE, &size);
     struct pollfd pfd = {
         .fd = (*srv)->sock,
         .events = POLLIN,
     };
-    return arr_list_insert(list, &pfd, size);
+    int err = arr_list_insert(lists->poll_list, &pfd, size);
+    if (err) {
+        return err;
+    }
+    return arr_list_insert(lists->srvs_list, *srv, size);
 }
 
 /**
  * @brief Build the poll list.
  *
- * The array pointed to by pfds must be NULL upon entry to this function.
- * It will be allocated and must be freed by the caller.
+ * The arrays pointed to by pfds and services_cpy must be NULL upon entry to
+ * this function. They will be allocated and must be freed by the caller. Must
+ * be added to both lists at the same time so that their indices match.
  *
  * @param services - The services to build the poll list from.
  * @param pfds - The poll list to be created.
+ * @param services_cpy - The services list to be created.
  * @param size - The size of the poll list.
  * @return int - 0 on success, non-zero on failure.
  */
 static int build_pfds(hash_table_t *services, struct pollfd **pfds,
-                      size_t size) {
+                      struct service_info **services_cpy, size_t size) {
+    struct lists lists;
     int err;
-    // wrapped array list is just to easily append to the end of the array
-    arr_list_t *list =
+    // wrapped array lists are just to easily append to the end of the array
+    lists.poll_list =
         arr_list_wrap(NULL, NULL, sizeof(**pfds), size, (void **)pfds, &err);
-    if (list == NULL) {
+    if (lists.poll_list == NULL) {
+        return err;
+    }
+    lists.srvs_list = arr_list_wrap(NULL, NULL, sizeof(**services_cpy), size,
+                                    (void **)services_cpy, &err);
+    if (lists.srvs_list == NULL) {
+        arr_list_delete(lists.poll_list);
         return err;
     }
 
-    err = hash_table_iterate(services, (ACT_TABLE_F)add_polls, list);
-    // always delete the wrapper; it's no longer needed
-    arr_list_delete(list);
+    err = hash_table_iterate(services, (ACT_TABLE_F)add_polls, &lists);
+    // always delete the wrappers; they are no longer needed
+    arr_list_delete(lists.srvs_list);
+    arr_list_delete(lists.poll_list);
     return err;
 }
 
@@ -325,8 +345,10 @@ static int run_all(hash_table_t *services) {
     ssize_t size;
     hash_table_query(services, QUERY_SIZE, &size);
     struct pollfd *pfds = NULL;
-    int err = build_pfds(services, &pfds, size);
+    struct service_info *services_cpy = NULL;
+    int err = build_pfds(services, &pfds, &services_cpy, size);
     if (err != SUCCESS) {
+        DEBUG_PRINT("error building poll list: %s\n", strerror(err));
         return err;
     }
 
@@ -337,6 +359,7 @@ static int run_all(hash_table_t *services) {
     }
 
     free(pfds);
+    free(services_cpy);
     return err;
 }
 
