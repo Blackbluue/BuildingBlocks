@@ -360,7 +360,7 @@ static int run_all(hash_table_t *services, threadpool_t *pool) {
     struct pollfd *pfds = NULL;
     struct service_info *services_cpy = NULL;
     int err = build_pfds(services, &pfds, &services_cpy, size);
-    if (err != SUCCESS) {
+    if (pfds == NULL || services_cpy == NULL) {
         DEBUG_PRINT("error building poll list: %s\n", strerror(err));
         return err;
     }
@@ -397,7 +397,9 @@ static int run_all(hash_table_t *services, threadpool_t *pool) {
                 }
                 fcntl(sess->client.client_sock, F_SETFL, O_NONBLOCK);
                 DEBUG_PRINT("\tclient accepted\n");
-            } else if (pfds[i].revents & POLLERR) {
+            } else if (pfds[i].revents & POLLERR ||
+                       pfds[i].revents & POLL_HUP ||
+                       pfds[i].revents & POLLNVAL) {
                 // error specific to this service socket.
                 // unsure of which error code to return, may change later
                 err = EAGAIN;
