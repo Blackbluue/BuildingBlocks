@@ -253,6 +253,7 @@ static int handle_request(struct session *session) {
     }
     DEBUG_PRINT("\ton thread %lX: closing client\n\n\n", pthread_self());
     close(session->client.client_sock);
+    free(session);
     return err;
 }
 
@@ -688,15 +689,19 @@ int run_service(server_t *server, const char *name) {
     DEBUG_PRINT("\trunning service %s\n", srv->name);
 
     int err = SUCCESS;
-    bool keep_running = true;
-    while (keep_running) {
-        struct session sess;
-        sess.srv = *srv;
-        struct client_info *client = &sess.client;
+    while (true) {
+        struct session *sess = malloc(sizeof(*sess));
+        if (sess == NULL) {
+            err = errno;
+            DEBUG_PRINT("\tsession malloc error: %s\n", strerror(errno));
+            break;
+        }
+        sess->srv = *srv;
+        struct client_info *client = &sess->client;
         client->addrlen = sizeof(client->addr);
         DEBUG_PRINT("\twaiting for client\n");
         client->client_sock = accept(
-            sess.srv.sock, (struct sockaddr *)&client->addr, &client->addrlen);
+            sess->srv.sock, (struct sockaddr *)&client->addr, &client->addrlen);
         if (client->client_sock == FAILURE) {
             err = errno;
             DEBUG_PRINT("\taccept error: %s\n", strerror(errno));
@@ -705,9 +710,10 @@ int run_service(server_t *server, const char *name) {
         fcntl(client->client_sock, F_SETFL, O_NONBLOCK);
         DEBUG_PRINT("\tclient accepted\n");
 
-        err = handle_request(&sess);
+        err = threadpool_add_work(server->pool, (ROUTINE)handle_request, sess);
         if (err != SUCCESS) {
-            keep_running = false;
+            DEBUG_PRINT("\terror adding work to threadpool\n");
+            break;
         }
     }
     return err;
