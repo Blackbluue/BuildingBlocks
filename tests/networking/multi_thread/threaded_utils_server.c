@@ -1,8 +1,14 @@
 #define _DEFAULT_SOURCE
 #include "threaded_utils_server.h"
+#include "buildingblocks.h"
+#include <errno.h>
 #include <netdb.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#ifdef DEBUG
+#include <pthread.h>
+#endif
 
 /* DATA */
 
@@ -42,37 +48,72 @@ static int repeat_letters(const struct packet *pkt, int sock) {
 }
 
 /**
- * @brief Send a response packet to the client.
+ * @brief Handle a client session.
  *
- * Processes a packet sent from a client, and sends a crafted response packet
- * back. The response is based on the packet received from the client. The
- * response is sent in a packet with a header containing the length of the
- * serialized data. The other end should use recv_pkt_data to receive the data.
+ * Read packets sent from a client, and sends crafted response packets back. The
+ * response is based on the packet received from the client. The response is
+ * sent in a packet with a header containing the length of the serialized data.
+ * The other end should use recv_pkt_data to receive the data.
  *
- * Possible errors:
- * - EINVAL: pkt is NULL
  * The function may also fail and set errno for any of the errors specified for
  * the routines open(2) and write_pkt_data(3)
  *
- * @param pkt - The packet to process.
  * @param client - The client information.
  * @return int - 0 on success, non-zero on failure.
  */
-static int send_response(struct packet *pkt, struct client_info *client) {
+static int send_response(struct client_info *client) {
     char host[NI_MAXHOST];
     char serv[NI_MAXSERV];
     if (getnameinfo((struct sockaddr *)&client->addr, client->addrlen, host,
                     sizeof(host), serv, sizeof(serv), NO_FLAGS) == SUCCESS) {
         fprintf(stderr, "host=%s, serv=%s\n", host, serv);
     }
-    switch (pkt->hdr->data_type) {
-    case RQU_COUNT:
-        return count_letters(pkt, client->client_sock);
-    case RQU_REPEAT:
-        return repeat_letters(pkt, client->client_sock);
-    default:
-        return write_pkt_data(client->client_sock, NULL, 0, SVR_INVALID);
+
+    int err;
+    bool handle_client = true;
+    int sock = client->client_sock;
+    while (handle_client) {
+        struct packet *pkt = recv_pkt_data(sock, TO_INFINITE, &err);
+        if (pkt == NULL) {
+            // an error here always closes client connection
+            handle_client = false;
+            switch (err) {
+            case EWOULDBLOCK: // no data available
+            case ENODATA:     // client disconnected
+            case ETIMEDOUT:   // client timed out
+            case EINVAL:      // invalid packet
+                // send response to client
+                write_pkt_data(sock, NULL, 0, SVR_INVALID);
+                continue;
+            case EINTR:        // signal interrupt
+                err = SUCCESS; // no error
+                // fall through
+            default: // other errors
+                continue;
+            }
+        }
+#ifdef DEBUG
+        DEBUG_PRINT("\ton thread %lX: packet successfully received\n",
+                    pthread_self());
+#endif
+
+        switch (pkt->hdr->data_type) {
+        case RQU_COUNT:
+            err = count_letters(pkt, client->client_sock);
+            break;
+        case RQU_REPEAT:
+            err = repeat_letters(pkt, client->client_sock);
+            break;
+        default:
+            err = write_pkt_data(client->client_sock, NULL, 0, SVR_INVALID);
+            break;
+        }
+        free_packet(pkt);
+        if (err != SUCCESS) {
+            handle_client = false;
+        }
     }
+    return err;
 }
 
 /* PUBLIC FUNCTIONS */

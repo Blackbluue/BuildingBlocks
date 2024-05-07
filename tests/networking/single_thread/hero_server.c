@@ -7,10 +7,15 @@
 #include <stdbool.h>
 #include <string.h>
 #include <sys/stat.h>
+#ifdef DEBUG
+#include <pthread.h>
+#endif
 
 /* DATA */
 
+#define SUCCESS 0
 #define FAILURE -1
+
 #define FILE_READ_FLAGS O_RDONLY | O_NONBLOCK
 #define FILE_WRITE_FLAGS O_WRONLY | O_CREAT | O_APPEND
 #define FILE_MODE S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH
@@ -102,17 +107,50 @@ void allow_graceful_exit(void) {
     sigaction(SIGTERM, &action, NULL);
 }
 
-int send_response(struct packet *pkt, struct client_info *client) {
-    if (pkt == NULL) {
-        return EINVAL;
-    }
+int send_response(struct client_info *client) {
+    int err;
+    bool handle_client = true;
+    int sock = client->client_sock;
+    while (handle_client) {
+        struct packet *pkt = recv_pkt_data(sock, TO_INFINITE, &err);
+        if (pkt == NULL) {
+            // an error here always closes client connection
+            handle_client = false;
+            switch (err) {
+            case EWOULDBLOCK: // no data available
+            case ENODATA:     // client disconnected
+            case ETIMEDOUT:   // client timed out
+            case EINVAL:      // invalid packet
+                // send response to client
+                write_pkt_data(sock, NULL, 0, SVR_INVALID);
+                continue;
+            case EINTR:        // signal interrupt
+                err = SUCCESS; // no error
+                // fall through
+            default: // other errors
+                continue;
+            }
+        }
+#ifdef DEBUG
+        DEBUG_PRINT("\ton thread %lX: packet successfully received\n",
+                    pthread_self());
+#endif
 
-    switch (pkt->hdr->data_type) {
-    case RQU_GET_HRO:
-        return load_hero(pkt, client->client_sock);
-    case RQU_STR_HRO:
-        return write_pkt_data(client->client_sock, NULL, 0, save_hero(pkt));
-    default:
-        return write_pkt_data(client->client_sock, NULL, 0, SVR_INVALID);
+        switch (pkt->hdr->data_type) {
+        case RQU_GET_HRO:
+            err = load_hero(pkt, sock);
+            break;
+        case RQU_STR_HRO:
+            err = write_pkt_data(sock, NULL, 0, save_hero(pkt));
+            break;
+        default:
+            err = write_pkt_data(sock, NULL, 0, SVR_INVALID);
+            break;
+        }
+        free_packet(pkt);
+        if (err != SUCCESS) {
+            handle_client = false;
+        }
     }
+    return err;
 }

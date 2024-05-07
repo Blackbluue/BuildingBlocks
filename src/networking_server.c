@@ -209,42 +209,13 @@ static int handle_request(struct session *session) {
         return EINVAL;
     }
 
-    bool handle_client = true;
-    int err;
-    while (handle_client) {
-        struct packet *pkt =
-            recv_pkt_data(session->client.client_sock, TO_INFINITE, &err);
-        if (pkt == NULL) {
-            handle_client = false; // drop the client
-            switch (err) {
-            case EWOULDBLOCK:  // no data available
-            case ENODATA:      // client disconnected
-            case ETIMEDOUT:    // client timed out
-            case EINVAL:       // invalid packet
-                err = 0;       // clear error
-                continue;      // don't close the server
-            case EINTR:        // signal interrupt
-                err = SUCCESS; // no error
-                // fall through
-            default: // other errors
-                continue;
-            }
-        }
-        DEBUG_PRINT("\ton thread %lX: packet successfully received\n",
-                    pthread_self());
+    DEBUG_PRINT("\ton thread %lX: begin client session\n\n", pthread_self());
+    session->srv.service(&session->client);
+    DEBUG_PRINT("\ton thread %lX: session complete\n\n", pthread_self());
 
-        err = session->srv.service(pkt, &session->client);
-        if (err != SUCCESS) {
-            handle_client = false;
-        }
-        DEBUG_PRINT("\ton thread %lX: packet successfully processed\n\n",
-                    pthread_self());
-        free_packet(pkt);
-    }
-    DEBUG_PRINT("\ton thread %lX: closing client\n\n\n", pthread_self());
     close(session->client.client_sock);
     free(session);
-    return err;
+    return SUCCESS;
 }
 
 /**
@@ -275,7 +246,7 @@ static int accept_request(threadpool_t *pool, struct service_info *srv,
         DEBUG_PRINT("\taccept error: %s\n", strerror(errno));
         return err;
     }
-    fcntl(client->client_sock, F_SETFL, O_NONBLOCK);
+    // fcntl(client->client_sock, F_SETFL, O_NONBLOCK);
     DEBUG_PRINT("\tclient accepted\n");
 
     return threadpool_add_work(pool, (ROUTINE)handle_request, sess);
