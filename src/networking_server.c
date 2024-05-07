@@ -77,39 +77,37 @@ static void free_service(struct service_info *srv) {
  * @return server_t* - The server object on success, NULL on failure.
  */
 static server_t *init_resources(size_t max_services, int *err) {
-    if (max_services == 0 || max_services > MAX_THREADS - 1) {
-        // minus 1 to account for the signal monitor thread
+    if (max_services == 0) {
         set_err(err, EINVAL);
-        DEBUG_PRINT("init_resources: max_services is invalid '%zu\n",
-                    max_services);
+        DEBUG_PRINT("max_services is invalid '%zu\n", max_services);
         return NULL;
     }
     server_t *server = malloc(sizeof(*server));
     if (server == NULL) {
         set_err(err, errno);
-        DEBUG_PRINT("init_server: malloc failed\n");
+        DEBUG_PRINT("malloc failed\n");
         return NULL;
     }
     server->services =
         hash_table_init(max_services, (FREE_F)free_service, (CMP_F)strcmp, err);
     if (server->services == NULL) {
         free(server);
-        DEBUG_PRINT("init_server: hash_table_init failed\n");
+        DEBUG_PRINT("hash_table_init failed\n");
         return NULL;
     }
 
     // create a threadpool with the maximum number of threads, created lazily
+    // threads will be created for each session/request as needed
     threadpool_attr_t attr;
     threadpool_attr_init(&attr);
-    // plus 1 to account for the signal monitor thread
-    threadpool_attr_set_thread_count(&attr, max_services + 1);
+    threadpool_attr_set_thread_count(&attr, MAX_THREADS);
     threadpool_attr_set_thread_creation(&attr, THREAD_CREATE_LAZY);
     server->pool = threadpool_create(&attr, err);
     threadpool_attr_destroy(&attr);
     if (server->pool == NULL) {
         hash_table_destroy(&server->services);
         free(server);
-        DEBUG_PRINT("init_server: threadpool_create failed\n");
+        DEBUG_PRINT("threadpool_create failed\n");
         return NULL;
     }
     return server;
