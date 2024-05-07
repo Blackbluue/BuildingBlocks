@@ -258,6 +258,40 @@ static int handle_request(struct session *session) {
 }
 
 /**
+ * @brief Accept a new request from the client.
+ *
+ * @param pool - The threadpool object.
+ * @param srv - The service object.
+ * @param sock - The socket to accept the client from.
+ * @return int - 0 on success, non-zero on failure.
+ */
+static int accept_request(threadpool_t *pool, struct service_info *srv,
+                          int sock) {
+    int err;
+    // the session object will be freed by the handle_request function
+    struct session *sess = malloc(sizeof(*sess));
+    if (sess == NULL) {
+        err = errno;
+        DEBUG_PRINT("\tsession malloc error\n");
+        return err;
+    }
+    sess->srv = *srv;
+    struct client_info *client = &sess->client;
+    DEBUG_PRINT("\taccepting client\n");
+    client->client_sock =
+        accept(sock, (struct sockaddr *)&client->addr, &client->addrlen);
+    if (client->client_sock == FAILURE) {
+        err = errno;
+        DEBUG_PRINT("\taccept error: %s\n", strerror(errno));
+        return err;
+    }
+    fcntl(client->client_sock, F_SETFL, O_NONBLOCK);
+    DEBUG_PRINT("\tclient accepted\n");
+
+    return threadpool_add_work(pool, (ROUTINE)handle_request, sess);
+}
+
+/**
  * @brief Add the service to the poll and services lists.
  *
  * Must be added to both lists at the same time so that their indices match.
@@ -610,35 +644,12 @@ int run_service(server_t *server, const char *name) {
     }
     DEBUG_PRINT("\trunning service %s\n", srv->name);
 
-    int err = SUCCESS;
     while (true) {
-        struct session *sess = malloc(sizeof(*sess));
-        if (sess == NULL) {
-            err = errno;
-            DEBUG_PRINT("\tsession malloc error: %s\n", strerror(errno));
-            break;
-        }
-        sess->srv = *srv;
-        struct client_info *client = &sess->client;
-        client->addrlen = sizeof(client->addr);
-        DEBUG_PRINT("\twaiting for client\n");
-        client->client_sock = accept(
-            sess->srv.sock, (struct sockaddr *)&client->addr, &client->addrlen);
-        if (client->client_sock == FAILURE) {
-            err = errno;
-            DEBUG_PRINT("\taccept error: %s\n", strerror(errno));
-            break;
-        }
-        fcntl(client->client_sock, F_SETFL, O_NONBLOCK);
-        DEBUG_PRINT("\tclient accepted\n");
-
-        err = threadpool_add_work(server->pool, (ROUTINE)handle_request, sess);
+        int err = accept_request(server->pool, srv, srv->sock);
         if (err != SUCCESS) {
-            DEBUG_PRINT("\terror adding work to threadpool\n");
-            break;
+            return err;
         }
     }
-    return err;
 }
 
 int run_server(server_t *server) {
@@ -668,40 +679,15 @@ int run_server(server_t *server) {
         }
 
         for (ssize_t i = 0; i < size; i++) {
+            struct pollfd *pfd = &pfds[i];
             if (pfds[i].revents & POLLIN) {
-                // accept incoming request
-                struct session *sess = malloc(sizeof(*sess));
-                if (sess == NULL) {
-                    err = errno;
-                    keep_running = false;
-                    DEBUG_PRINT("\tsession malloc error\n");
-                    break;
-                }
-                sess->srv = services_cpy[i];
-                struct client_info *client = &sess->client;
-                DEBUG_PRINT("\taccepting client\n");
-                client->client_sock =
-                    accept(pfds[i].fd, (struct sockaddr *)&client->addr,
-                           &client->addrlen);
-                if (client->client_sock == FAILURE) {
-                    err = errno;
-                    keep_running = false;
-                    DEBUG_PRINT("\taccept error: %s\n", strerror(errno));
-                    break;
-                }
-                fcntl(client->client_sock, F_SETFL, O_NONBLOCK);
-                DEBUG_PRINT("\tclient accepted\n");
-
-                err = threadpool_add_work(server->pool, (ROUTINE)handle_request,
-                                          sess);
+                err = accept_request(server->pool, &services_cpy[i], pfd->fd);
                 if (err != SUCCESS) {
                     keep_running = false;
-                    DEBUG_PRINT("\terror adding work to threadpool\n");
                     break;
                 }
-            } else if (pfds[i].revents & POLLERR ||
-                       pfds[i].revents & POLL_HUP ||
-                       pfds[i].revents & POLLNVAL) {
+            } else if (pfd->revents & POLLERR || pfd->revents & POLL_HUP ||
+                       pfd->revents & POLLNVAL) {
                 // error specific to this service socket.
                 // unsure of which error code to return, may change later
                 err = EAGAIN;
