@@ -42,13 +42,10 @@ struct counter_packet {
  * the routines open(2) and write_pkt_data(3)
  *
  * @param pkt - The packet to process.
- * @param addr - Unused.
- * @param addrlen - Unused.
- * @param client_sock - The socket descriptor.
+ * @param client - The client information.
  * @return int - 0 on success, non-zero on failure.
  */
-int send_response(struct packet *pkt, struct sockaddr *addr, socklen_t addrlen,
-                  int client_sock);
+int send_response(struct packet *pkt, struct client_info *client);
 
 /**
  * @brief Count the number of times a character is repeated in a string.

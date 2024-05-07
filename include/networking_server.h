@@ -26,8 +26,7 @@ struct client_info {
 
 typedef struct server server_t;
 
-typedef int (*service_f)(struct packet *pkt, struct sockaddr *addr,
-                         socklen_t addrlen, int client_sock);
+typedef int (*service_f)(struct packet *pkt, struct client_info *client);
 
 /* FUNCTIONS */
 

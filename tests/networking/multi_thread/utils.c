@@ -30,21 +30,20 @@ static int repeat_letters(const struct packet *pkt, int sock) {
 
 /* PUBLIC FUNCTIONS */
 
-int send_response(struct packet *pkt, struct sockaddr *addr, socklen_t addrlen,
-                  int client_sock) {
+int send_response(struct packet *pkt, struct client_info *client) {
     char host[NI_MAXHOST];
     char serv[NI_MAXSERV];
-    if (getnameinfo(addr, addrlen, host, sizeof(host), serv, sizeof(serv),
-                    NO_FLAGS) == SUCCESS) {
+    if (getnameinfo((struct sockaddr *)&client->addr, client->addrlen, host,
+                    sizeof(host), serv, sizeof(serv), NO_FLAGS) == SUCCESS) {
         fprintf(stderr, "host=%s, serv=%s\n", host, serv);
     }
     switch (pkt->hdr->data_type) {
     case RQU_COUNT:
-        return count_letters(pkt, client_sock);
+        return count_letters(pkt, client->client_sock);
     case RQU_REPEAT:
-        return repeat_letters(pkt, client_sock);
+        return repeat_letters(pkt, client->client_sock);
     default:
-        return write_pkt_data(client_sock, NULL, 0, SVR_INVALID);
+        return write_pkt_data(client->client_sock, NULL, 0, SVR_INVALID);
     }
 }
 

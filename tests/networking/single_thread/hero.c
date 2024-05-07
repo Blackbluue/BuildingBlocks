@@ -109,20 +109,17 @@ ssize_t hero_size(const struct hero *hero) {
     return sizeof(*hero) - sizeof(hero->name) + strlen(hero->name) + 1;
 }
 
-int send_response(struct packet *pkt, struct sockaddr *addr, socklen_t addrlen,
-                  int client_sock) {
-    (void)addr;
-    (void)addrlen;
+int send_response(struct packet *pkt, struct client_info *client) {
     if (pkt == NULL) {
         return EINVAL;
     }
 
     switch (pkt->hdr->data_type) {
     case RQU_GET_HRO:
-        return load_hero(pkt, client_sock);
+        return load_hero(pkt, client->client_sock);
     case RQU_STR_HRO:
-        return write_pkt_data(client_sock, NULL, 0, save_hero(pkt));
+        return write_pkt_data(client->client_sock, NULL, 0, save_hero(pkt));
     default:
-        return write_pkt_data(client_sock, NULL, 0, SVR_INVALID);
+        return write_pkt_data(client->client_sock, NULL, 0, SVR_INVALID);
     }
 }

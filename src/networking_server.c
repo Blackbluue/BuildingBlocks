@@ -233,9 +233,7 @@ static int handle_request(struct session *session) {
         DEBUG_PRINT("\ton thread %lX: packet successfully received\n",
                     pthread_self());
 
-        err = session->srv.service(
-            pkt, (struct sockaddr *)&session->client.addr,
-            session->client.addrlen, session->client.client_sock);
+        err = session->srv.service(pkt, &session->client);
         if (err != SUCCESS) {
             handle_client = false;
         }
