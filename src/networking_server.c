@@ -322,85 +322,6 @@ static int build_pfds(hash_table_t *services, struct pollfd **pfds,
 }
 
 /**
- * @brief Run all services.
- *
- * @param services - The services to run.
- * @return int - 0 on success, non-zero on failure.
- */
-static int run_all(hash_table_t *services, threadpool_t *pool) {
-    if (services == NULL) {
-        return EINVAL;
-    }
-
-    ssize_t size;
-    hash_table_query(services, QUERY_SIZE, &size);
-    struct pollfd *pfds = NULL;
-    struct service_info *services_cpy = NULL;
-    int err = build_pfds(services, &pfds, &services_cpy, size);
-    if (pfds == NULL || services_cpy == NULL) {
-        DEBUG_PRINT("error building poll list: %s\n", strerror(err));
-        return err;
-    }
-
-    bool keep_running = true;
-    while (keep_running) {
-        int ready = poll(pfds, size, INFINITE_POLL);
-        if (ready == FAILURE) {
-            err = errno;
-            DEBUG_PRINT("\tpoll error: %s\n", strerror(errno));
-            break;
-        }
-
-        for (ssize_t i = 0; i < size; i++) {
-            if (pfds[i].revents & POLLIN) {
-                // accept incoming request
-                struct session *sess = malloc(sizeof(*sess));
-                if (sess == NULL) {
-                    err = errno;
-                    keep_running = false;
-                    DEBUG_PRINT("\tsession malloc error\n");
-                    break;
-                }
-                sess->srv = services_cpy[i];
-                struct client_info *client = &sess->client;
-                DEBUG_PRINT("\taccepting client\n");
-                client->client_sock =
-                    accept(pfds[i].fd, (struct sockaddr *)&client->addr,
-                           &client->addrlen);
-                if (client->client_sock == FAILURE) {
-                    err = errno;
-                    keep_running = false;
-                    DEBUG_PRINT("\taccept error: %s\n", strerror(errno));
-                    break;
-                }
-                fcntl(client->client_sock, F_SETFL, O_NONBLOCK);
-                DEBUG_PRINT("\tclient accepted\n");
-
-                err = threadpool_add_work(pool, (ROUTINE)handle_request, sess);
-                if (err != SUCCESS) {
-                    keep_running = false;
-                    DEBUG_PRINT("\terror adding work to threadpool\n");
-                    break;
-                }
-            } else if (pfds[i].revents & POLLERR ||
-                       pfds[i].revents & POLL_HUP ||
-                       pfds[i].revents & POLLNVAL) {
-                // error specific to this service socket.
-                // unsure of which error code to return, may change later
-                err = EAGAIN;
-                keep_running = false;
-                DEBUG_PRINT("\tserver socket error\n");
-                break;
-            }
-        }
-    }
-
-    free(pfds);
-    free(services_cpy);
-    return err;
-}
-
-/**
  * @brief Signal monitor thread.
  *
  * This function is used to monitor signals sent to the process. When a signal
@@ -726,6 +647,72 @@ int run_server(server_t *server) {
         return EINVAL;
     }
 
-    DEBUG_PRINT("starting services\n");
-    return run_all(server->services, server->pool);
+    DEBUG_PRINT("running all services\n");
+    ssize_t size;
+    hash_table_query(server->services, QUERY_SIZE, &size);
+    struct pollfd *pfds = NULL;
+    struct service_info *services_cpy = NULL;
+    int err = build_pfds(server->services, &pfds, &services_cpy, size);
+    if (pfds == NULL || services_cpy == NULL) {
+        DEBUG_PRINT("error building poll list: %s\n", strerror(err));
+        return err;
+    }
+
+    bool keep_running = true;
+    while (keep_running) {
+        int ready = poll(pfds, size, INFINITE_POLL);
+        if (ready == FAILURE) {
+            err = errno;
+            DEBUG_PRINT("\tpoll error: %s\n", strerror(errno));
+            break;
+        }
+
+        for (ssize_t i = 0; i < size; i++) {
+            if (pfds[i].revents & POLLIN) {
+                // accept incoming request
+                struct session *sess = malloc(sizeof(*sess));
+                if (sess == NULL) {
+                    err = errno;
+                    keep_running = false;
+                    DEBUG_PRINT("\tsession malloc error\n");
+                    break;
+                }
+                sess->srv = services_cpy[i];
+                struct client_info *client = &sess->client;
+                DEBUG_PRINT("\taccepting client\n");
+                client->client_sock =
+                    accept(pfds[i].fd, (struct sockaddr *)&client->addr,
+                           &client->addrlen);
+                if (client->client_sock == FAILURE) {
+                    err = errno;
+                    keep_running = false;
+                    DEBUG_PRINT("\taccept error: %s\n", strerror(errno));
+                    break;
+                }
+                fcntl(client->client_sock, F_SETFL, O_NONBLOCK);
+                DEBUG_PRINT("\tclient accepted\n");
+
+                err = threadpool_add_work(server->pool, (ROUTINE)handle_request,
+                                          sess);
+                if (err != SUCCESS) {
+                    keep_running = false;
+                    DEBUG_PRINT("\terror adding work to threadpool\n");
+                    break;
+                }
+            } else if (pfds[i].revents & POLLERR ||
+                       pfds[i].revents & POLL_HUP ||
+                       pfds[i].revents & POLLNVAL) {
+                // error specific to this service socket.
+                // unsure of which error code to return, may change later
+                err = EAGAIN;
+                keep_running = false;
+                DEBUG_PRINT("\tserver socket error\n");
+                break;
+            }
+        }
+    }
+
+    free(pfds);
+    free(services_cpy);
+    return err;
 }
