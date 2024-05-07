@@ -1,7 +1,7 @@
 #ifndef HERO_H
 #define HERO_H
 
-#include "networking_client.h"
+#include "networking_server.h"
 #include <stdint.h>
 #include <unistd.h>
 

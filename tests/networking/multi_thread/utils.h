@@ -1,7 +1,7 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include "networking_client.h"
+#include "networking_server.h"
 
 /* DATA */
 

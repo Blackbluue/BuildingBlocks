@@ -27,12 +27,6 @@ struct lists {
     arr_list_t *srvs_list;
 };
 
-struct client_info {
-    int client_sock;
-    struct sockaddr_storage addr;
-    socklen_t addrlen;
-};
-
 struct service_info {
     char *name;
     int flags;

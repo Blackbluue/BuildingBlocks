@@ -11,7 +11,23 @@
 // Used internally to control the server. Applications should not use this.
 #define CONTROL_SIGNAL_2 SIGRTMIN + 2
 
+/**
+ * @brief Client information.
+ *
+ * @param client_sock - the client socket
+ * @param addr - the client address
+ * @param addrlen - the length of the address
+ */
+struct client_info {
+    int client_sock;              // client socket
+    struct sockaddr_storage addr; // client address
+    socklen_t addrlen;            // length of the address
+};
+
 typedef struct server server_t;
+
+typedef int (*service_f)(struct packet *pkt, struct sockaddr *addr,
+                         socklen_t addrlen, int client_sock);
 
 /* FUNCTIONS */
 

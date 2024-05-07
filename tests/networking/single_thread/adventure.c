@@ -1,6 +1,5 @@
 #define _POSIX_C_SOURCE 200112L
 #include "hero.h"
-#include "networking_server.h"
 #include <errno.h>
 #include <netdb.h>
 #include <signal.h>
