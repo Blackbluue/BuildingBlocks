@@ -358,21 +358,22 @@ static int run_all(hash_table_t *services, threadpool_t *pool) {
                 if (sess == NULL) {
                     err = errno;
                     keep_running = false;
-                    DEBUG_PRINT("\tclient malloc error: %s\n", strerror(errno));
+                    DEBUG_PRINT("\tsession malloc error\n");
                     break;
                 }
-                memcpy(&sess->srv, &services_cpy[i], sizeof(services_cpy[i]));
+                sess->srv = services_cpy[i];
+                struct client_info *client = &sess->client;
                 DEBUG_PRINT("\taccepting client\n");
-                sess->client.client_sock =
-                    accept(pfds[i].fd, (struct sockaddr *)&sess->client.addr,
-                           &sess->client.addrlen);
-                if (sess->client.client_sock == FAILURE) {
+                client->client_sock =
+                    accept(pfds[i].fd, (struct sockaddr *)&client->addr,
+                           &client->addrlen);
+                if (client->client_sock == FAILURE) {
                     err = errno;
                     keep_running = false;
                     DEBUG_PRINT("\taccept error: %s\n", strerror(errno));
                     break;
                 }
-                fcntl(sess->client.client_sock, F_SETFL, O_NONBLOCK);
+                fcntl(client->client_sock, F_SETFL, O_NONBLOCK);
                 DEBUG_PRINT("\tclient accepted\n");
 
                 err = threadpool_add_work(pool, (ROUTINE)handle_request, sess);
