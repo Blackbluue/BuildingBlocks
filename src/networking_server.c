@@ -451,32 +451,6 @@ static int run_all(hash_table_t *services, threadpool_t *pool) {
 }
 
 /**
- * @brief Run each service in the server.
- *
- * @param name - The name of the service.
- * @param srv - The service to run.
- * @param pool - The threadpool to run the service in.
- * @return int - 0 on success, non-zero on failure.
- */
-static int run_each(const char *name, struct service_info **srv,
-                    threadpool_t *pool) {
-    if (name == NULL || srv == NULL || *srv == NULL || pool == NULL) {
-        DEBUG_PRINT("run_each: service %s has invalid arguments\n", name);
-        return EINVAL;
-    } else if ((*srv)->service == NULL) {
-        // skip services without a service function
-        DEBUG_PRINT("run_each: service %s has no service function\n", name);
-        return SUCCESS;
-    }
-    DEBUG_PRINT("adding service %s to pool\n", name);
-    int err = threadpool_add_work(pool, (ROUTINE)run_single, *srv);
-    if (err != SUCCESS) {
-        DEBUG_PRINT("run_each: error adding work for service %s\n", name);
-    }
-    return err;
-}
-
-/**
  * @brief Signal monitor thread.
  *
  * This function is used to monitor signals sent to the process. When a signal
