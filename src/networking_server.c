@@ -257,54 +257,6 @@ static int handle_request(struct session *session) {
 }
 
 /**
- * @brief Run a single service.
- *
- * @param srv - The service to run.
- * @return int - 0 on success, non-zero on failure.
- */
-static int run_single(struct service_info *srv) {
-    if (srv == NULL) {
-        // hash table lookup failed
-        DEBUG_PRINT("\ton thread %lX: service not found\n", pthread_self());
-        return ENOENT;
-    }
-    DEBUG_PRINT("\ton thread %lX: running service %s\n", pthread_self(),
-                srv->name);
-
-    int err = SUCCESS;
-    bool keep_running = true;
-    while (keep_running) {
-        struct sockaddr_storage addr;
-        socklen_t addrlen = sizeof(addr);
-        DEBUG_PRINT("\ton thread %lX: waiting for client\n", pthread_self());
-        int client_sock = accept(srv->sock, (struct sockaddr *)&addr, &addrlen);
-        if (client_sock == FAILURE) {
-            err = errno;
-            DEBUG_PRINT("\ton thread %lX: accept error: %s\n", pthread_self(),
-                        strerror(errno));
-            break;
-        }
-        fcntl(client_sock, F_SETFL, O_NONBLOCK);
-        DEBUG_PRINT("\ton thread %lX: client accepted\n", pthread_self());
-
-        struct session sess = {
-            .client =
-                {
-                    .client_sock = client_sock,
-                    .addr = addr,
-                    .addrlen = addrlen,
-                },
-            .srv = *srv,
-        };
-        err = handle_request(&sess);
-        if (err != SUCCESS) {
-            keep_running = false;
-        }
-    }
-    return err;
-}
-
-/**
  * @brief Add the service to the poll and services lists.
  *
  * Must be added to both lists at the same time so that their indices match.
@@ -728,8 +680,37 @@ int run_service(server_t *server, const char *name) {
         DEBUG_PRINT("server or name is NULL\n");
         return EINVAL;
     }
-    // run_single will handle the missing service error
-    return run_single(hash_table_lookup(server->services, name));
+    struct service_info *srv = hash_table_lookup(server->services, name);
+    if (srv == NULL) {
+        DEBUG_PRINT("\tservice not found\n");
+        return ENOENT;
+    }
+    DEBUG_PRINT("\trunning service %s\n", srv->name);
+
+    int err = SUCCESS;
+    bool keep_running = true;
+    while (keep_running) {
+        struct session sess;
+        sess.srv = *srv;
+        struct client_info *client = &sess.client;
+        client->addrlen = sizeof(client->addr);
+        DEBUG_PRINT("\twaiting for client\n");
+        client->client_sock = accept(
+            sess.srv.sock, (struct sockaddr *)&client->addr, &client->addrlen);
+        if (client->client_sock == FAILURE) {
+            err = errno;
+            DEBUG_PRINT("\taccept error: %s\n", strerror(errno));
+            break;
+        }
+        fcntl(client->client_sock, F_SETFL, O_NONBLOCK);
+        DEBUG_PRINT("\tclient accepted\n");
+
+        err = handle_request(&sess);
+        if (err != SUCCESS) {
+            keep_running = false;
+        }
+    }
+    return err;
 }
 
 int run_server(server_t *server) {
