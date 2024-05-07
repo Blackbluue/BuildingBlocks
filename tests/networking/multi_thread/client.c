@@ -1,6 +1,6 @@
 #define _DEFAULT_SOURCE
 #include "networking_client.h"
-#include "utils.h"
+#include "threaded_utils.h"
 #include <CUnit/Basic.h>
 #include <CUnit/CUnit.h>
 #include <netdb.h>
