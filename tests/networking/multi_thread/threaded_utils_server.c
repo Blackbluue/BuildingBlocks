@@ -151,7 +151,7 @@ int add_counter(server_t *server, const char *name, const char *port) {
         }
         return FAILURE;
     }
-    err = register_service(server, name, send_response, NO_FLAGS);
+    err = register_service(server, name, send_response, THREADED_SESSIONS);
     if (err) {
         fprintf(stderr, "register_server: %s\n", strerror(err));
         return FAILURE;

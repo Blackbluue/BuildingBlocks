@@ -11,6 +11,10 @@
 // Used internally to control the server. Applications should not use this.
 #define CONTROL_SIGNAL_2 SIGRTMIN + 2
 
+enum service_flags {
+    THREADED_SESSIONS = 1 << 0, // Run each client session in a separate thread
+};
+
 /**
  * @brief Client information.
  *
@@ -129,11 +133,13 @@ int open_unix_socket(server_t *server, const char *name, const char *path,
  * Registers a service with the server at the given name. A socket with the
  * given name must be opened before registering a service.
  *
+ * The flags parameter is a bitmask of the service flags.
+ * Possible flags:
+ * - THREADED_SESSIONS: Run each client session in a separate thread.
+ *
  * Possible errors:
  * - EINVAL: server, name, or service is NULL
  * - ENOENT: The socket with the given name does not exist
- *
- * @note The flags are currently unused and ignored.
  *
  * @param server - the server to register the service with.
  * @param name - the name of the service.
@@ -169,6 +175,10 @@ int run_service(server_t *server, const char *name);
  * Runs the server, accepting incoming connections and running the designated
  * services. The function will block while running the server; it will return
  * when it encounters a network error or when all services terminate.
+ *
+ * If any of the services was registered without the THREADED_SESSIONS flag, the
+ * server will run that service in the main thread when it receives a
+ * client connection.
  *
  * Possible errors:
  * - EINVAL: server is NULL.

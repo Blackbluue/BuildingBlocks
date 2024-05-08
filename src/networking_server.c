@@ -243,13 +243,19 @@ static int accept_request(threadpool_t *pool, struct service_info *srv,
         accept(sock, (struct sockaddr *)&client.addr, &client.addrlen);
     if (client.client_sock == FAILURE) {
         err = errno;
+        free(sess);
         DEBUG_PRINT("\taccept error: %s\n", strerror(errno));
         return err;
     }
     memcpy(&sess->client, &client, sizeof(client));
     DEBUG_PRINT("\tclient accepted\n");
 
-    return threadpool_add_work(pool, (ROUTINE)handle_request, sess);
+    // run the service in a separate thread if the flag is set
+    if (srv->flags & THREADED_SESSIONS) {
+        return threadpool_add_work(pool, (ROUTINE)handle_request, sess);
+    } else {
+        return handle_request(sess);
+    }
 }
 
 /**
