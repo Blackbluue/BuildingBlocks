@@ -230,23 +230,23 @@ static int accept_request(threadpool_t *pool, struct service_info *srv,
                           int sock) {
     int err;
     // the session object will be freed by the handle_request function
-    struct session *sess = malloc(sizeof(*sess));
+    struct session *sess = calloc(1, sizeof(*sess));
     if (sess == NULL) {
         err = errno;
         DEBUG_PRINT("\tsession malloc error\n");
         return err;
     }
     sess->srv = *srv;
-    struct client_info *client = &sess->client;
+    struct client_info client = {0};
     DEBUG_PRINT("\taccepting client\n");
-    client->client_sock =
-        accept(sock, (struct sockaddr *)&client->addr, &client->addrlen);
-    if (client->client_sock == FAILURE) {
+    client.client_sock =
+        accept(sock, (struct sockaddr *)&client.addr, &client.addrlen);
+    if (client.client_sock == FAILURE) {
         err = errno;
         DEBUG_PRINT("\taccept error: %s\n", strerror(errno));
         return err;
     }
-    // fcntl(client->client_sock, F_SETFL, O_NONBLOCK);
+    memcpy(&sess->client, &client, sizeof(client));
     DEBUG_PRINT("\tclient accepted\n");
 
     return threadpool_add_work(pool, (ROUTINE)handle_request, sess);
