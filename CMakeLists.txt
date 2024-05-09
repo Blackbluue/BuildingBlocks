@@ -28,6 +28,12 @@ set(CMAKE_C_COMPILER gcc)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
+set(SSL_DIR /usr/local/ssl)
+set(OPENSSL_ROOT_DIR ${SSL_DIR}/lib64)
+include(FindOpenSSL)
+find_package(OpenSSL REQUIRED)
+include_directories(${SSL_DIR}/include)
+
 set(SOURCES "")
 
 ### DATA STRUCTURES ###
