@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <netdb.h>
 #include <openssl/bio.h>
+#include <openssl/err.h>
 #include <poll.h>
 #include <pthread.h>
 #include <signal.h>
@@ -32,7 +33,7 @@ struct service_info {
     char *name;
     int flags;
     service_f service;
-    BIO *bio;
+    BIO *accept_bio;
     int sock;
     server_t *server;
 };
@@ -52,6 +53,12 @@ struct server {
 
 /* PRIVATE FUNCTIONS */
 
+static void DEBUG_PRINT_SSL(void) {
+#ifdef DEBUG
+    ERR_print_errors_fp(stderr);
+#endif
+}
+
 /**
  * @brief Free a service object.
  *
@@ -59,9 +66,7 @@ struct server {
  */
 static void free_service(struct service_info *srv) {
     free(srv->name);
-    if (srv->sock != FAILURE) {
-        close(srv->sock);
-    }
+    BIO_free(srv->accept_bio);
     free(srv);
 }
 
@@ -144,60 +149,6 @@ static int new_service(server_t *server, const char *name,
     }
     (*srv)->server = server;
     return SUCCESS;
-}
-
-/**
- * @brief Create an inet socket object.
- *
- * @param result - the result of getaddrinfo.
- * @param connections - the maximum number of connections.
- * @param sock - the socket to be created.
- * @param err_type - the type of error that occurred.
- * @return int - 0 on success, non-zero on failure.
- */
-static int create_socket(struct addrinfo *result, int connections, int *sock,
-                         int *err_type) {
-    int err = FAILURE;
-    for (struct addrinfo *res_ptr = result; res_ptr != NULL;
-         res_ptr = res_ptr->ai_next) {
-        *sock = socket(res_ptr->ai_family, res_ptr->ai_socktype,
-                       res_ptr->ai_protocol);
-        if (*sock == FAILURE) { // error caught at the end of the loop
-            err = errno;
-            set_err(err_type, SOCK);
-            DEBUG_PRINT("socket error: %s\n", strerror(err));
-            continue;
-        }
-
-        int optval = 1;
-        setsockopt(*sock, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
-        if (bind(*sock, res_ptr->ai_addr, res_ptr->ai_addrlen) == SUCCESS) {
-            if (res_ptr->ai_socktype == SOCK_STREAM ||
-                res_ptr->ai_socktype == SOCK_SEQPACKET) {
-                if (listen(*sock, connections) == SUCCESS) {
-                    err = SUCCESS; // success, exit loop
-                    break;
-                } else { // error caught at the end of the loop
-                    err = errno;
-                    set_err(err_type, LISTEN);
-                    close(*sock);
-                    *sock = FAILURE;
-                    DEBUG_PRINT("listen error: %s\n", strerror(err));
-                    continue;
-                }
-            } else {           // don't attempt to listen
-                err = SUCCESS; // success, exit loop
-                break;
-            }
-        } else { // error caught at the end of the loop
-            err = errno;
-            set_err(err_type, BIND);
-            close(*sock);
-            *sock = FAILURE;
-            DEBUG_PRINT("bind error: %s\n", strerror(err));
-        }
-    }
-    return err;
 }
 
 /**
@@ -465,6 +416,8 @@ int destroy_server(server_t *server) {
 
 int open_inet_socket(server_t *server, const char *name, const char *port,
                      const networking_attr_t *attr, int *err_type) {
+    // attributes not used with OpenSSL, but kept in signature for compatibility
+    (void)attr;
     if (server == NULL || port == NULL || name == NULL) {
         set_err(err_type, SYS);
         DEBUG_PRINT("server, name, or port is NULL\n");
@@ -478,57 +431,39 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
         return err;
     }
 
-    if (attr == NULL) {
-        // use default values
-        DEBUG_PRINT("using default attributes\n");
-        networking_attr_t def_attr;
-        attr = &def_attr;
-        init_attr((networking_attr_t *)attr);
-    }
-    int socktype;
-    int family;
-    size_t connections;
-    network_attr_get_socktype(attr, &socktype);
-    network_attr_get_family(attr, &family);
-    network_attr_get_max_connections(attr, &connections);
-
-    struct addrinfo hints = {
-        .ai_family = family,
-        .ai_socktype = socktype,
-        .ai_flags = AI_PASSIVE | AI_V4MAPPED,
-        .ai_protocol = 0,
-    };
-
-    struct addrinfo *result = NULL;
-    err = getaddrinfo(NULL, port, &hints, &result);
-    if (err != SUCCESS) {
-        if (err == EAI_SYSTEM) {
-            err = errno;
-            set_err(err_type, SYS);
-            DEBUG_PRINT("getaddrinfo error: %s\n", strerror(err));
-        } else {
-            set_err(err_type, GAI);
-            DEBUG_PRINT("getaddrinfo error: %s\n", gai_strerror(err));
-        }
+    if ((srv->accept_bio = BIO_new_accept(port)) == NULL) {
+        set_err(err_type, SYS);
+        err = FAILURE; // TODO: don't know what to use for error
+        DEBUG_PRINT("BIO_new_accept failed\n");
+        DEBUG_PRINT_SSL();
         goto error;
     }
 
-    err = create_socket(result, connections, &srv->sock, err_type);
-    if (err == SUCCESS) {
-        DEBUG_PRINT("inet socket created\n");
-        goto cleanup;
+    BIO_set_nbio_accept(srv->accept_bio, true);
+    BIO_set_bind_mode(srv->accept_bio, BIO_BIND_REUSEADDR);
+    if (BIO_do_accept(srv->accept_bio) <= SUCCESS) {
+        set_err(err_type, SYS);
+        err = FAILURE; // TODO: don't know what to use for error
+        DEBUG_PRINT("BIO_do_accept failed\n");
+        DEBUG_PRINT_SSL();
+        goto error;
     }
-    // only get here if no address worked
+
+    BIO_get_fd(srv->accept_bio, &srv->sock);
+    DEBUG_PRINT("inet socket created\n");
+    goto cleanup;
+
+    // only get here if BIO was not created
 error:
     hash_table_remove(server->services, srv->name);
     free_service(srv);
 cleanup:
-    freeaddrinfo(result);
     return err;
 }
 
 int open_unix_socket(server_t *server, const char *name, const char *path,
                      const networking_attr_t *attr) {
+    // TODO:convert raw unix socket to OpenSSL BIO object
     if (server == NULL || name == NULL || path == NULL) {
         DEBUG_PRINT("server, name, or path is NULL\n");
         return EINVAL;
