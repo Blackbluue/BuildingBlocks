@@ -223,11 +223,9 @@ static int handle_request(struct session *session) {
  *
  * @param pool - The threadpool object.
  * @param srv - The service object.
- * @param sock - The socket to accept the client from.
  * @return int - 0 on success, non-zero on failure.
  */
-static int accept_request(threadpool_t *pool, struct service_info *srv,
-                          int sock) {
+static int accept_request(threadpool_t *pool, struct service_info *srv) {
     int err;
     // the session object will be freed by the handle_request function
     struct session *sess = calloc(1, sizeof(*sess));
@@ -240,7 +238,7 @@ static int accept_request(threadpool_t *pool, struct service_info *srv,
     struct client_info client = {0};
     DEBUG_PRINT("\taccepting client\n");
     client.client_sock =
-        accept(sock, (struct sockaddr *)&client.addr, &client.addrlen);
+        accept(srv->sock, (struct sockaddr *)&client.addr, &client.addrlen);
     if (client.client_sock == FAILURE) {
         err = errno;
         free(sess);
@@ -612,7 +610,7 @@ int run_service(server_t *server, const char *name) {
     DEBUG_PRINT("\trunning service %s\n", srv->name);
 
     while (true) {
-        int err = accept_request(server->pool, srv, srv->sock);
+        int err = accept_request(server->pool, srv);
         if (err != SUCCESS) {
             return err;
         }
@@ -648,7 +646,7 @@ int run_server(server_t *server) {
         for (ssize_t i = 0; i < size; i++) {
             struct pollfd *pfd = &pfds[i];
             if (pfds[i].revents & POLLIN) {
-                err = accept_request(server->pool, &services_cpy[i], pfd->fd);
+                err = accept_request(server->pool, &services_cpy[i]);
                 if (err != SUCCESS) {
                     keep_running = false;
                     break;
