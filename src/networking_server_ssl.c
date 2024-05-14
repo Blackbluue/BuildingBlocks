@@ -190,14 +190,14 @@ static int accept_request(threadpool_t *pool, struct service_info *srv) {
     sess->srv = *srv;
     struct client_info client = {0};
     DEBUG_PRINT("\taccepting client\n");
-    client.client_sock =
-        accept(srv->sock, (struct sockaddr *)&client.addr, &client.addrlen);
-    if (client.client_sock == FAILURE) {
-        err = errno;
+    if (BIO_do_accept(srv->accept_bio) <= SUCCESS) {
+        DEBUG_PRINT("Error accepting connection\n");
+        DEBUG_PRINT_SSL();
         free(sess);
-        DEBUG_PRINT("\taccept error: %s\n", strerror(errno));
-        return err;
+        return FAILURE; // TODO: don't know what to use for error
     }
+    BIO *client_bio = BIO_pop(srv->accept_bio);
+    BIO_get_fd(client_bio, &client.client_sock);
     memcpy(&sess->client, &client, sizeof(client));
     DEBUG_PRINT("\tclient accepted\n");
 
