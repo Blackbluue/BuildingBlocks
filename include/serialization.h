@@ -17,11 +17,11 @@ enum err_type {
     CONN,   // connect error
 };
 
-typedef enum {
+enum io_info_type {
     FILE_IO,     // file i/o, used for reading and writing files
     ACCEPT_IO,   // accept i/o, used for accepting network connections
     CONNECTED_IO // connect i/o, an existing network connection
-} io_type_t;
+};
 
 typedef struct io_info io_info_t;
 
@@ -47,7 +47,7 @@ struct pollio {
  * @param err - Where to store the error code.
  * @return io_info_t* - The io_info object.
  */
-io_info_t *new_io_info(int fd, io_type_t type, int *err);
+io_info_t *new_io_info(int fd, int type, int *err);
 
 /**
  * @brief Create a new io_info object for file operations.
@@ -82,6 +82,18 @@ io_info_t *new_accept_io_info(const char *port, int *err, int *err_type);
  * @param io_info - The io_info object to free.
  */
 void free_io_info(io_info_t *io_info);
+
+/**
+ * @brief Get the file descriptor from an io_info object.
+ *
+ * Note that the file descriptor is not duplicated, so it should not be closed
+ * until the io_info object is freed.
+ *
+ * @param io_info - The io_info object.
+ * @param type - Where to store the type of i/o. Can be NULL.
+ * @return int - The file descriptor.
+ */
+int io_info_fd(io_info_t *io_info, int *type);
 
 /**
  * @brief Wrapper for poll(2) that uses io_info objects.

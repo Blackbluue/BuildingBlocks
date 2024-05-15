@@ -18,7 +18,7 @@
 #define FAILURE -1
 
 struct io_info {
-    io_type_t type;
+    int type;
     int fd;
     BIO *bio;
 };
@@ -33,7 +33,7 @@ static void DEBUG_PRINT_SSL(void) {
 
 /* PUBLIC FUNCTIONS*/
 
-io_info_t *new_io_info(int fd, io_type_t type, int *err) {
+io_info_t *new_io_info(int fd, int type, int *err) {
     if (fd < 0) {
         set_err(err, EINVAL);
         return NULL;
@@ -131,6 +131,11 @@ void free_io_info(io_info_t *io_info) {
         BIO_free(io_info->bio);
         free(io_info);
     }
+}
+
+int io_info_fd(io_info_t *io_info, int *type) {
+    set_err(type, io_info->type);
+    return io_info->fd;
 }
 
 int poll_io_info(struct pollio *ios, nfds_t nfds, int timeout) {

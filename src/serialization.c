@@ -20,7 +20,7 @@
 #define MAX_CONNECTIONS 4096
 
 struct io_info {
-    io_type_t type;
+    int type;
     bool close_on_free;
     int fd;
     struct sockaddr_storage addr;
@@ -77,7 +77,7 @@ static int create_socket(struct addrinfo *result, int *sock, int *err_type) {
 
 /* PUBLIC FUNCTIONS*/
 
-io_info_t *new_io_info(int fd, io_type_t type, int *err) {
+io_info_t *new_io_info(int fd, int type, int *err) {
     io_info_t *io_info = calloc(1, sizeof(*io_info));
     if (io_info == NULL) {
         set_err(err, ENOMEM);
@@ -159,6 +159,11 @@ void free_io_info(io_info_t *io_info) {
         }
         free(io_info);
     }
+}
+
+int io_info_fd(io_info_t *io_info, int *type) {
+    set_err(type, io_info->type);
+    return io_info->fd;
 }
 
 int poll_io_info(struct pollio *ios, nfds_t nfds, int timeout) {
