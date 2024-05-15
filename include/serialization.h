@@ -17,6 +17,12 @@ enum err_type {
     CONN,   // connect error
 };
 
+typedef enum {
+    FILE_IO,     // file i/o, used for reading and writing files
+    ACCEPT_IO,   // accept i/o, used for accepting network connections
+    CONNECTED_IO // connect i/o, an existing network connection
+} io_type_t;
+
 typedef struct io_info io_info_t;
 
 struct pollio {
@@ -28,7 +34,26 @@ struct pollio {
 /* FUNCTIONS */
 
 /**
+ * @brief Create a new io_info object.
+ *
+ * The type of the object will determine the type of i/o that can be performed.
+ * The file descriptor will be stored in the io_info object. Note that in this
+ * case, the file descriptor will by default not be closed when the io_info
+ * object is freed, unlike when the object is created from one of the other
+ * dedicated functions.
+ *
+ * @param fd - The file descriptor.
+ * @param type - The type of i/o.
+ * @param err - Where to store the error code.
+ * @return io_info_t* - The io_info object.
+ */
+io_info_t *new_io_info(int fd, io_type_t type, int *err);
+
+/**
  * @brief Create a new io_info object for file operations.
+ *
+ * The underlying file descriptor will be closed when the io_info object is
+ * freed.
  *
  * @param filename - The name of the file.
  * @param flags - The flags for opening the file.
@@ -42,6 +67,8 @@ io_info_t *new_file_io_info(const char *filename, int flags, mode_t mode,
 /**
  * @brief Create a new io_info object for accepting network connections.
  *
+ * Any underlying socket will be closed when the io_info object is freed.
+ *
  * @param port - The port to listen on.
  * @param err - Where to store the error code.
  * @param err_type - Where to store the error type.
@@ -51,8 +78,6 @@ io_info_t *new_accept_io_info(const char *port, int *err, int *err_type);
 
 /**
  * @brief Free an io_info object.
- *
- * Any underlying file descriptors or sockets will also be closed.
  *
  * @param io_info - The io_info object to free.
  */

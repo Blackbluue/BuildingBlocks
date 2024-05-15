@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -19,6 +20,8 @@
 #define MAX_CONNECTIONS 4096
 
 struct io_info {
+    io_type_t type;
+    bool close_on_free;
     int fd;
     struct sockaddr_storage addr;
     socklen_t addr_len;
@@ -74,6 +77,18 @@ static int create_socket(struct addrinfo *result, int *sock, int *err_type) {
 
 /* PUBLIC FUNCTIONS*/
 
+io_info_t *new_io_info(int fd, io_type_t type, int *err) {
+    io_info_t *io_info = calloc(1, sizeof(*io_info));
+    if (io_info == NULL) {
+        set_err(err, ENOMEM);
+        return NULL;
+    }
+    io_info->fd = fd;
+    io_info->type = type;
+    io_info->close_on_free = false;
+    return io_info;
+}
+
 io_info_t *new_file_io_info(const char *filename, int flags, mode_t mode,
                             int *err) {
     io_info_t *io_info = malloc(sizeof(*io_info));
@@ -87,6 +102,8 @@ io_info_t *new_file_io_info(const char *filename, int flags, mode_t mode,
         free(io_info);
         return NULL;
     }
+    io_info->type = FILE_IO;
+    io_info->close_on_free = true;
     return io_info;
 }
 
@@ -120,7 +137,8 @@ io_info_t *new_accept_io_info(const char *port, int *err, int *err_type) {
 
     loc_err = create_socket(result, &io_info->fd, err_type);
     if (loc_err == SUCCESS) {
-        DEBUG_PRINT("inet socket created\n");
+        io_info->type = ACCEPT_IO;
+        io_info->close_on_free = true;
         goto cleanup;
     }
 
@@ -136,7 +154,9 @@ cleanup:
 
 void free_io_info(io_info_t *io_info) {
     if (io_info != NULL) {
-        close(io_info->fd);
+        if (io_info->close_on_free) {
+            close(io_info->fd);
+        }
         free(io_info);
     }
 }
@@ -174,6 +194,8 @@ io_info_t *io_accept(io_info_t *io_info, int *err) {
         free(new_info);
         return NULL;
     }
+    new_info->type = CONNECTED_IO;
+    new_info->close_on_free = true;
     return new_info;
 }
 

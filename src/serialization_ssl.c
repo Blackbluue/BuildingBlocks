@@ -18,6 +18,7 @@
 #define FAILURE -1
 
 struct io_info {
+    io_type_t type;
     int fd;
     BIO *bio;
 };
@@ -31,6 +32,42 @@ static void DEBUG_PRINT_SSL(void) {
 }
 
 /* PUBLIC FUNCTIONS*/
+
+io_info_t *new_io_info(int fd, io_type_t type, int *err) {
+    if (fd < 0) {
+        set_err(err, EINVAL);
+        return NULL;
+    }
+    io_info_t *io_info = calloc(1, sizeof(*io_info));
+    if (io_info == NULL) {
+        set_err(err, ENOMEM);
+        return NULL;
+    }
+    switch (type) {
+    case FILE_IO:
+        io_info->bio = BIO_new(BIO_s_fd());
+        break;
+    case ACCEPT_IO:
+        io_info->bio = BIO_new(BIO_s_accept());
+        break;
+    case CONNECTED_IO:
+        io_info->bio = BIO_new(BIO_s_connect());
+        break;
+    default:
+        set_err(err, EINVAL);
+        free(io_info);
+        return NULL;
+    }
+    if (io_info->bio == NULL) {
+        set_err(err, FAILURE); // TODO: don't know what to use for error
+        free(io_info);
+        return NULL;
+    }
+    BIO_set_fd(io_info->bio, io_info->fd, BIO_NOCLOSE);
+    io_info->fd = fd;
+    io_info->type = type;
+    return io_info;
+}
 
 io_info_t *new_file_io_info(const char *filename, int flags, mode_t mode,
                             int *err) {
@@ -52,6 +89,7 @@ io_info_t *new_file_io_info(const char *filename, int flags, mode_t mode,
         free(io_info);
         return NULL;
     }
+    io_info->type = FILE_IO;
     return io_info;
 }
 
@@ -83,8 +121,8 @@ io_info_t *new_accept_io_info(const char *port, int *err, int *err_type) {
     }
     BIO_set_close(io_info->bio, BIO_CLOSE);
     BIO_get_fd(io_info->bio, &io_info->fd);
+    io_info->type = ACCEPT_IO;
 
-    DEBUG_PRINT("inet socket created\n");
     return io_info;
 }
 
@@ -116,8 +154,8 @@ int poll_io_info(struct pollio *ios, nfds_t nfds, int timeout) {
 }
 
 io_info_t *io_accept(io_info_t *io_info, int *err) {
-    io_info_t *new_io_info = malloc(sizeof(*new_io_info));
-    if (new_io_info == NULL) {
+    io_info_t *new_info = malloc(sizeof(*new_info));
+    if (new_info == NULL) {
         set_err(err, ENOMEM);
         return NULL;
     }
@@ -126,17 +164,17 @@ io_info_t *io_accept(io_info_t *io_info, int *err) {
         set_err(err, FAILURE); // TODO: don't know what to use for error
         DEBUG_PRINT("Error accepting connection\n");
         DEBUG_PRINT_SSL();
-        free(new_io_info);
+        free(new_info);
         return NULL;
     }
 
-    new_io_info->bio = BIO_pop(io_info->bio);
-    BIO_set_nbio_accept(new_io_info->bio, true);
-    BIO_set_close(new_io_info->bio, BIO_CLOSE);
-    BIO_get_fd(new_io_info->bio, &new_io_info->fd);
-    DEBUG_PRINT("new connection accepted\n");
+    new_info->bio = BIO_pop(io_info->bio);
+    BIO_set_nbio_accept(new_info->bio, true);
+    BIO_set_close(new_info->bio, BIO_CLOSE);
+    BIO_get_fd(new_info->bio, &new_info->fd);
+    new_info->type = CONNECTED_IO;
 
-    return new_io_info;
+    return new_info;
 }
 
 int read_exact(int fd, void *buff, size_t read_sz) {
