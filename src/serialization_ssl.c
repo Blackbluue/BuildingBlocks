@@ -81,10 +81,18 @@ io_info_t *new_accept_io_info(const char *port, int *err, int *err_type) {
         free(io_info);
         return NULL;
     }
+    BIO_set_close(io_info->bio, BIO_CLOSE);
     BIO_get_fd(io_info->bio, &io_info->fd);
 
     DEBUG_PRINT("inet socket created\n");
     return io_info;
+}
+
+void free_io_info(io_info_t *io_info) {
+    if (io_info != NULL) {
+        BIO_free(io_info->bio);
+        free(io_info);
+    }
 }
 
 int poll_io_info(struct pollio *ios, nfds_t nfds, int timeout) {

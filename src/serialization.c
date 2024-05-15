@@ -132,6 +132,13 @@ cleanup:
     return io_info;
 }
 
+void free_io_info(io_info_t *io_info) {
+    if (io_info != NULL) {
+        close(io_info->fd);
+        free(io_info);
+    }
+}
+
 int poll_io_info(struct pollio *ios, nfds_t nfds, int timeout) {
     struct pollfd *fds = malloc(nfds * sizeof(*fds));
     if (fds == NULL) {

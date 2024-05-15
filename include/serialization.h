@@ -50,6 +50,15 @@ io_info_t *new_file_io_info(const char *filename, int flags, mode_t mode,
 io_info_t *new_accept_io_info(const char *port, int *err, int *err_type);
 
 /**
+ * @brief Free an io_info object.
+ *
+ * Any underlying file descriptors or sockets will also be closed.
+ *
+ * @param io_info - The io_info object to free.
+ */
+void free_io_info(io_info_t *io_info);
+
+/**
  * @brief Wrapper for poll(2) that uses io_info objects.
  *
  * @param ios - The array of io_info objects.
