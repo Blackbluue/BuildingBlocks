@@ -115,6 +115,30 @@ int poll_io_info(struct pollio *ios, nfds_t nfds, int timeout) {
     return ret;
 }
 
+io_info_t *io_accept(io_info_t *io_info, int *err) {
+    io_info_t *new_io_info = malloc(sizeof(*new_io_info));
+    if (new_io_info == NULL) {
+        set_err(err, ENOMEM);
+        return NULL;
+    }
+
+    if (BIO_do_accept(io_info->bio) <= SUCCESS) {
+        set_err(err, FAILURE); // TODO: don't know what to use for error
+        DEBUG_PRINT("Error accepting connection\n");
+        DEBUG_PRINT_SSL();
+        free(new_io_info);
+        return NULL;
+    }
+
+    new_io_info->bio = BIO_pop(io_info->bio);
+    BIO_set_nbio_accept(new_io_info->bio, true);
+    BIO_set_close(new_io_info->bio, BIO_CLOSE);
+    BIO_get_fd(new_io_info->bio, &new_io_info->fd);
+    DEBUG_PRINT("new connection accepted\n");
+
+    return new_io_info;
+}
+
 int read_exact(int fd, void *buff, size_t read_sz) {
     uint8_t *buf_ptr = (uint8_t *)buff;
     size_t total_len = 0;

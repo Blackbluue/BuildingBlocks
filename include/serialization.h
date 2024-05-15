@@ -69,6 +69,15 @@ void free_io_info(io_info_t *io_info);
 int poll_io_info(struct pollio *ios, nfds_t nfds, int timeout);
 
 /**
+ * @brief Accept a new connection on a socket io_info.
+ *
+ * @param io_info - The io_info object to accept on.
+ * @param err - Where to store the error code.
+ * @return io_info_t* - The new io_info object.
+ */
+io_info_t *io_accept(io_info_t *io_info, int *err);
+
+/**
  * @brief Read a fixed amount of data from a file descriptor.
  *
  * If an error occurs, a non-zero error code will be returned

@@ -20,6 +20,8 @@
 
 struct io_info {
     int fd;
+    struct sockaddr_storage addr;
+    socklen_t addr_len;
 };
 
 /* PRIVATE FUNCTIONS*/
@@ -157,6 +159,22 @@ int poll_io_info(struct pollio *ios, nfds_t nfds, int timeout) {
     }
     free(fds);
     return ret;
+}
+
+io_info_t *io_accept(io_info_t *io_info, int *err) {
+    io_info_t *new_info = calloc(1, sizeof(*new_info));
+    if (new_info == NULL) {
+        set_err(err, ENOMEM);
+        return NULL;
+    }
+    new_info->fd = accept(io_info->fd, (struct sockaddr *)&new_info->addr,
+                          &new_info->addr_len);
+    if (new_info->fd == FAILURE) {
+        set_err(err, errno);
+        free(new_info);
+        return NULL;
+    }
+    return new_info;
 }
 
 int read_exact(int fd, void *buff, size_t read_sz) {
