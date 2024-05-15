@@ -132,6 +132,26 @@ cleanup:
     return io_info;
 }
 
+int poll_io_info(struct pollio *ios, nfds_t nfds, int timeout) {
+    struct pollfd *fds = malloc(nfds * sizeof(*fds));
+    if (fds == NULL) {
+        return errno;
+    }
+    for (nfds_t i = 0; i < nfds; i++) {
+        fds[i].fd = ios[i].io_info->fd;
+        fds[i].events = ios[i].events;
+    }
+    int ret = poll(fds, nfds, timeout);
+    if (ret < 0) {
+        ret = errno;
+    }
+    for (nfds_t i = 0; i < nfds; i++) {
+        ios[i].revents = fds[i].revents;
+    }
+    free(fds);
+    return ret;
+}
+
 int read_exact(int fd, void *buff, size_t read_sz) {
     uint8_t *buf_ptr = (uint8_t *)buff;
     size_t total_len = 0;

@@ -1,6 +1,7 @@
 #ifndef SERIALIZATION_H
 #define SERIALIZATION_H
 
+#include <poll.h>
 #include <stddef.h>
 #include <sys/types.h>
 
@@ -17,6 +18,12 @@ enum err_type {
 };
 
 typedef struct io_info io_info_t;
+
+struct pollio {
+    io_info_t *io_info; // i/o info
+    short events;       // requested events
+    short revents;      // returned events
+};
 
 /* FUNCTIONS */
 
@@ -41,6 +48,16 @@ io_info_t *new_file_io_info(const char *filename, int flags, mode_t mode,
  * @return io_info_t* - The io_info object.
  */
 io_info_t *new_accept_io_info(const char *port, int *err, int *err_type);
+
+/**
+ * @brief Wrapper for poll(2) that uses io_info objects.
+ *
+ * @param ios - The array of io_info objects.
+ * @param nfds - The number of io_info objects.
+ * @param timeout - The timeout in milliseconds.
+ * @return int - The return value of poll(2).
+ */
+int poll_io_info(struct pollio *ios, nfds_t nfds, int timeout);
 
 /**
  * @brief Read a fixed amount of data from a file descriptor.
