@@ -1,8 +1,8 @@
 #include "buildingblocks.h"
 #include "networking_utils.h"
-#include "serialization.h"
 #include <errno.h>
 #include <netdb.h>
+#include <openssl/ssl.h>
 #include <poll.h>
 #include <stdlib.h>
 #include <string.h>

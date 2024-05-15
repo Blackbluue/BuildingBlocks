@@ -2,8 +2,45 @@
 #define SERIALIZATION_H
 
 #include <stddef.h>
+#include <sys/types.h>
+
+/* DATA */
+
+// TODO: err_type syntax is ugly, need to find an alternative
+enum err_type {
+    SYS,    // system error
+    GAI,    // getaddrinfo error
+    SOCK,   // socket error
+    BIND,   // bind error
+    LISTEN, // listen error
+    CONN,   // connect error
+};
+
+typedef struct io_info io_info_t;
 
 /* FUNCTIONS */
+
+/**
+ * @brief Create a new io_info object for file operations.
+ *
+ * @param filename - The name of the file.
+ * @param flags - The flags for opening the file.
+ * @param mode - The mode for opening the file.
+ * @param err - Where to store the error code.
+ * @return io_info_t* - The io_info object.
+ */
+io_info_t *new_file_io_info(const char *filename, int flags, mode_t mode,
+                            int *err);
+
+/**
+ * @brief Create a new io_info object for accepting network connections.
+ *
+ * @param port - The port to listen on.
+ * @param err - Where to store the error code.
+ * @param err_type - Where to store the error type.
+ * @return io_info_t* - The io_info object.
+ */
+io_info_t *new_accept_io_info(const char *port, int *err, int *err_type);
 
 /**
  * @brief Read a fixed amount of data from a file descriptor.

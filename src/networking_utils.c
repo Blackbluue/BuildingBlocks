@@ -1,6 +1,5 @@
 #include "networking_utils.h"
 #include "buildingblocks.h"
-#include "serialization.h"
 #include <errno.h>
 #include <netdb.h>
 #include <poll.h>

@@ -18,7 +18,7 @@ endif()
 
 project(
     BuildingBlocks
-    VERSION 0.3.1
+    VERSION 0.3.2
     LANGUAGES "C"
     DESCRIPTION "A collection of data structures and algorithms"
 )
@@ -92,11 +92,11 @@ add_library(weighted_graph OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/weighted_graph
 target_link_libraries(weighted_graph buildingblocks queue_p queue linked_list hash_table)
 set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/weighted_graph.c)
 
-add_library(serialization OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/serialization.c)
-target_link_libraries(serialization buildingblocks)
-set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/serialization.c)
-
 if(OpenSSL_FOUND)
+    add_library(serialization OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/serialization_ssl.c)
+    target_link_libraries(serialization buildingblocks OpenSSL::SSL)
+    set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/serialization_ssl.c)
+
     add_library(networking_utils OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_utils_ssl.c)
     target_link_libraries(networking_utils buildingblocks OpenSSL::SSL)
     set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_utils_ssl.c)
@@ -109,6 +109,10 @@ if(OpenSSL_FOUND)
     target_link_libraries(networking_server buildingblocks networking_utils linked_list array_list hash_table threadpool OpenSSL::SSL)
     set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_server_ssl.c)
 else()
+    add_library(serialization OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/serialization.c)
+    target_link_libraries(serialization buildingblocks)
+    set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/serialization.c)
+
     add_library(networking_utils OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_utils.c)
     target_link_libraries(networking_utils buildingblocks)
     set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_utils.c)
