@@ -1,7 +1,6 @@
 #ifndef NETWORKING_UTILS_H
 #define NETWORKING_UTILS_H
 
-#include "networking_ssl.h"
 #include "networking_types.h"
 #include "serialization.h"
 #include <arpa/inet.h>
