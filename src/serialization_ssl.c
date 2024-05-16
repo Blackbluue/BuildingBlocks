@@ -1,7 +1,9 @@
+#define _DEFAULT_SOURCE
 #include "buildingblocks.h"
 #include "serialization.h"
 #include <errno.h>
 #include <fcntl.h>
+#include <netdb.h>
 #include <openssl/ssl.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -21,6 +23,8 @@ struct io_info {
     int type;
     int fd;
     BIO *bio;
+    const char *host;
+    const char *serv;
 };
 
 /* PRIVATE FUNCTIONS*/
@@ -43,29 +47,43 @@ io_info_t *new_io_info(int fd, int type, int *err) {
         set_err(err, ENOMEM);
         return NULL;
     }
-    switch (type) {
-    case FILE_IO:
-        io_info->bio = BIO_new(BIO_s_fd());
-        break;
+    io_info->fd = fd;
+    switch (io_info->type = type) {
     case ACCEPT_IO:
         io_info->bio = BIO_new(BIO_s_accept());
+        if (io_info->bio == NULL) {
+            set_err(err, FAILURE); // TODO: don't know what to use for error
+            goto error;
+        }
+        BIO_set_fd(io_info->bio, io_info->fd, BIO_NOCLOSE);
+        io_info->host = BIO_get_accept_name(io_info->bio);
+        io_info->serv = BIO_get_accept_port(io_info->bio);
         break;
     case CONNECTED_IO:
         io_info->bio = BIO_new(BIO_s_connect());
+        if (io_info->bio == NULL) {
+            set_err(err, FAILURE); // TODO: don't know what to use for error
+            goto error;
+        }
+        BIO_set_fd(io_info->bio, io_info->fd, BIO_NOCLOSE);
+        io_info->host = BIO_get_conn_hostname(io_info->bio);
+        io_info->serv = BIO_get_conn_port(io_info->bio);
+        break;
+    case FILE_IO:
+        io_info->bio = BIO_new(BIO_s_fd());
+        BIO_set_fd(io_info->bio, io_info->fd, BIO_NOCLOSE);
+        // files have no host or service
         break;
     default:
         set_err(err, EINVAL);
-        free(io_info);
-        return NULL;
+        goto error;
     }
-    if (io_info->bio == NULL) {
-        set_err(err, FAILURE); // TODO: don't know what to use for error
-        free(io_info);
-        return NULL;
-    }
-    BIO_set_fd(io_info->bio, io_info->fd, BIO_NOCLOSE);
-    io_info->fd = fd;
-    io_info->type = type;
+    goto cleanup;
+
+error:
+    free(io_info);
+    io_info = NULL;
+cleanup:
     return io_info;
 }
 
@@ -119,7 +137,9 @@ io_info_t *new_accept_io_info(const char *port, int *err, int *err_type) {
         free(io_info);
         return NULL;
     }
-    BIO_set_close(io_info->bio, BIO_CLOSE);
+    io_info->host = BIO_get_accept_name(io_info->bio);
+    io_info->serv = BIO_get_accept_port(io_info->bio);
+    (void)BIO_set_close(io_info->bio, BIO_CLOSE);
     BIO_get_fd(io_info->bio, &io_info->fd);
     io_info->type = ACCEPT_IO;
 
@@ -137,6 +157,10 @@ int io_info_fd(io_info_t *io_info, int *type) {
     set_err(type, io_info->type);
     return io_info->fd;
 }
+
+const char *io_info_host(io_info_t *io_info) { return io_info->host; }
+
+const char *io_info_serv(io_info_t *io_info) { return io_info->serv; }
 
 int poll_io_info(struct pollio *ios, nfds_t nfds, int timeout) {
     struct pollfd *fds = malloc(nfds * sizeof(*fds));
@@ -175,8 +199,10 @@ io_info_t *io_accept(io_info_t *io_info, int *err) {
 
     new_info->bio = BIO_pop(io_info->bio);
     BIO_set_nbio_accept(new_info->bio, true);
-    BIO_set_close(new_info->bio, BIO_CLOSE);
+    (void)BIO_set_close(new_info->bio, BIO_CLOSE);
     BIO_get_fd(new_info->bio, &new_info->fd);
+    new_info->host = BIO_get_conn_hostname(new_info->bio);
+    new_info->serv = BIO_get_conn_port(new_info->bio);
     new_info->type = CONNECTED_IO;
 
     return new_info;

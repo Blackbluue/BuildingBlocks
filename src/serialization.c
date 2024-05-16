@@ -1,4 +1,4 @@
-#define _POSIX_C_SOURCE 200809L
+#define _DEFAULT_SOURCE
 #include "serialization.h"
 #include "buildingblocks.h"
 #include <errno.h>
@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #ifdef DEBUG
@@ -25,6 +26,8 @@ struct io_info {
     int fd;
     struct sockaddr_storage addr;
     socklen_t addr_len;
+    char host[NI_MAXHOST];
+    char serv[NI_MAXSERV];
 };
 
 /* PRIVATE FUNCTIONS*/
@@ -33,17 +36,18 @@ struct io_info {
  * @brief Create an inet socket object.
  *
  * @param result - the result of getaddrinfo.
- * @param sock - the socket to be created.
+ * @param info - the io_info object to populate.
  * @param err_type - the type of error that occurred.
  * @return int - 0 on success, non-zero on failure.
  */
-static int create_socket(struct addrinfo *result, int *sock, int *err_type) {
+static int create_socket(struct addrinfo *result, io_info_t *info,
+                         int *err_type) {
     int err = FAILURE;
     for (struct addrinfo *res_ptr = result; res_ptr != NULL;
          res_ptr = res_ptr->ai_next) {
-        *sock = socket(res_ptr->ai_family, res_ptr->ai_socktype,
-                       res_ptr->ai_protocol);
-        if (*sock == FAILURE) { // error caught at the end of the loop
+        info->fd = socket(res_ptr->ai_family, res_ptr->ai_socktype,
+                          res_ptr->ai_protocol);
+        if (info->fd == FAILURE) { // error caught at the end of the loop
             err = errno;
             set_err(err_type, SOCK);
             DEBUG_PRINT("socket error: %s\n", strerror(err));
@@ -51,24 +55,26 @@ static int create_socket(struct addrinfo *result, int *sock, int *err_type) {
         }
 
         int optval = 1;
-        setsockopt(*sock, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
-        if (bind(*sock, res_ptr->ai_addr, res_ptr->ai_addrlen) == SUCCESS) {
-            if (listen(*sock, MAX_CONNECTIONS) == SUCCESS) {
+        setsockopt(info->fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+        if (bind(info->fd, res_ptr->ai_addr, res_ptr->ai_addrlen) == SUCCESS) {
+            if (listen(info->fd, MAX_CONNECTIONS) == SUCCESS) {
                 err = SUCCESS; // success, exit loop
+                memcpy(&info->addr, res_ptr->ai_addr, res_ptr->ai_addrlen);
+                info->addr_len = res_ptr->ai_addrlen;
                 break;
             } else { // error caught at the end of the loop
                 err = errno;
                 set_err(err_type, LISTEN);
-                close(*sock);
-                *sock = FAILURE;
+                close(info->fd);
+                info->fd = FAILURE;
                 DEBUG_PRINT("listen error: %s\n", strerror(err));
                 continue;
             }
         } else { // error caught at the end of the loop
             err = errno;
             set_err(err_type, BIND);
-            close(*sock);
-            *sock = FAILURE;
+            close(info->fd);
+            info->fd = FAILURE;
             DEBUG_PRINT("bind error: %s\n", strerror(err));
         }
     }
@@ -83,6 +89,34 @@ io_info_t *new_io_info(int fd, int type, int *err) {
         set_err(err, ENOMEM);
         return NULL;
     }
+    switch (type) {
+    case ACCEPT_IO:
+        // failing to get host address is not a fatal error
+        if (getsockname(fd, (struct sockaddr *)&io_info->addr,
+                        &io_info->addr_len) == SUCCESS) {
+            getnameinfo((struct sockaddr *)&io_info->addr, io_info->addr_len,
+                        io_info->host, NI_MAXHOST, io_info->serv, NI_MAXSERV,
+                        NI_NUMERICHOST | NI_NUMERICSERV);
+        }
+        break;
+    case CONNECTED_IO:
+        // failing to get peer address is not a fatal error
+        if (getpeername(fd, (struct sockaddr *)&io_info->addr,
+                        &io_info->addr_len) == SUCCESS) {
+            getnameinfo((struct sockaddr *)&io_info->addr, io_info->addr_len,
+                        io_info->host, NI_MAXHOST, io_info->serv, NI_MAXSERV,
+                        NI_NUMERICHOST | NI_NUMERICSERV);
+        }
+        break;
+    case FILE_IO:
+        // no extra work needed
+        break;
+    default:
+        // unknown type
+        set_err(err, EINVAL);
+        free(io_info);
+        return NULL;
+    }
     io_info->fd = fd;
     io_info->type = type;
     io_info->close_on_free = false;
@@ -91,7 +125,7 @@ io_info_t *new_io_info(int fd, int type, int *err) {
 
 io_info_t *new_file_io_info(const char *filename, int flags, mode_t mode,
                             int *err) {
-    io_info_t *io_info = malloc(sizeof(*io_info));
+    io_info_t *io_info = calloc(1, sizeof(*io_info));
     if (io_info == NULL) {
         set_err(err, ENOMEM);
         return NULL;
@@ -135,8 +169,11 @@ io_info_t *new_accept_io_info(const char *port, int *err, int *err_type) {
         goto error;
     }
 
-    loc_err = create_socket(result, &io_info->fd, err_type);
+    loc_err = create_socket(result, io_info, err_type);
     if (loc_err == SUCCESS) {
+        getnameinfo((struct sockaddr *)&io_info->addr, io_info->addr_len,
+                    io_info->host, NI_MAXHOST, io_info->serv, NI_MAXSERV,
+                    NI_NUMERICHOST | NI_NUMERICSERV);
         io_info->type = ACCEPT_IO;
         io_info->close_on_free = true;
         goto cleanup;
@@ -165,6 +202,10 @@ int io_info_fd(io_info_t *io_info, int *type) {
     set_err(type, io_info->type);
     return io_info->fd;
 }
+
+const char *io_info_host(io_info_t *io_info) { return io_info->host; }
+
+const char *io_info_serv(io_info_t *io_info) { return io_info->serv; }
 
 int poll_io_info(struct pollio *ios, nfds_t nfds, int timeout) {
     struct pollfd *fds = malloc(nfds * sizeof(*fds));
@@ -199,6 +240,9 @@ io_info_t *io_accept(io_info_t *io_info, int *err) {
         free(new_info);
         return NULL;
     }
+    getnameinfo((struct sockaddr *)&new_info->addr, new_info->addr_len,
+                new_info->host, NI_MAXHOST, new_info->serv, NI_MAXSERV,
+                NI_NUMERICHOST | NI_NUMERICSERV);
     new_info->type = CONNECTED_IO;
     new_info->close_on_free = true;
     return new_info;

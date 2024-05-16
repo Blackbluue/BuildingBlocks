@@ -96,6 +96,30 @@ void free_io_info(io_info_t *io_info);
 int io_info_fd(io_info_t *io_info, int *type);
 
 /**
+ * @brief Get the host address from an io_info object.
+ *
+ * For accept i/o objects, this will be the address of the server. For connect
+ * i/o objects, this will be the address of the client. For file i/o objects,
+ * this will return NULL.
+ *
+ * @param io_info - The io_info object.
+ * @return const char* - The host address.
+ */
+const char *io_info_host(io_info_t *io_info);
+
+/**
+ * @brief Get the service from an io_info object.
+ *
+ * For accept i/o objects, this will be the service of the server. For connect
+ * i/o objects, this will be the service of the client. For file i/o objects,
+ * this will return NULL.
+ *
+ * @param io_info - The io_info object.
+ * @return const char* - The service.
+ */
+const char *io_info_serv(io_info_t *io_info);
+
+/**
  * @brief Wrapper for poll(2) that uses io_info objects.
  *
  * @param ios - The array of io_info objects.
