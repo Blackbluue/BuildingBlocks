@@ -31,13 +31,13 @@ struct service_info {
     char *name;
     int flags;
     service_f service;
-    int sock;
+    io_info_t *accept_io;
     server_t *server;
 };
 
 struct session {
-    struct client_info client;
-    struct service_info srv;
+    io_info_t *client;
+    struct service_info *srv;
 };
 
 struct server {
@@ -57,9 +57,7 @@ struct server {
  */
 static void free_service(struct service_info *srv) {
     free(srv->name);
-    if (srv->sock != FAILURE) {
-        close(srv->sock);
-    }
+    free_io_info(srv->accept_io);
     free(srv);
 }
 
@@ -127,7 +125,6 @@ static int new_service(server_t *server, const char *name,
         DEBUG_PRINT("new_service: calloc failed\n");
         return ENOMEM;
     }
-    (*srv)->sock = FAILURE; // to signify the socket has not been created yet
     (*srv)->name = strdup(name);
     if ((*srv)->name == NULL) {
         free(*srv);
@@ -145,60 +142,6 @@ static int new_service(server_t *server, const char *name,
 }
 
 /**
- * @brief Create an inet socket object.
- *
- * @param result - the result of getaddrinfo.
- * @param connections - the maximum number of connections.
- * @param sock - the socket to be created.
- * @param err_type - the type of error that occurred.
- * @return int - 0 on success, non-zero on failure.
- */
-static int create_socket(struct addrinfo *result, int connections, int *sock,
-                         int *err_type) {
-    int err = FAILURE;
-    for (struct addrinfo *res_ptr = result; res_ptr != NULL;
-         res_ptr = res_ptr->ai_next) {
-        *sock = socket(res_ptr->ai_family, res_ptr->ai_socktype,
-                       res_ptr->ai_protocol);
-        if (*sock == FAILURE) { // error caught at the end of the loop
-            err = errno;
-            set_err(err_type, SOCK);
-            DEBUG_PRINT("socket error: %s\n", strerror(err));
-            continue;
-        }
-
-        int optval = 1;
-        setsockopt(*sock, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
-        if (bind(*sock, res_ptr->ai_addr, res_ptr->ai_addrlen) == SUCCESS) {
-            if (res_ptr->ai_socktype == SOCK_STREAM ||
-                res_ptr->ai_socktype == SOCK_SEQPACKET) {
-                if (listen(*sock, connections) == SUCCESS) {
-                    err = SUCCESS; // success, exit loop
-                    break;
-                } else { // error caught at the end of the loop
-                    err = errno;
-                    set_err(err_type, LISTEN);
-                    close(*sock);
-                    *sock = FAILURE;
-                    DEBUG_PRINT("listen error: %s\n", strerror(err));
-                    continue;
-                }
-            } else {           // don't attempt to listen
-                err = SUCCESS; // success, exit loop
-                break;
-            }
-        } else { // error caught at the end of the loop
-            err = errno;
-            set_err(err_type, BIND);
-            close(*sock);
-            *sock = FAILURE;
-            DEBUG_PRINT("bind error: %s\n", strerror(err));
-        }
-    }
-    return err;
-}
-
-/**
  * @brief Handle a request from the client.
  *
  * @param session - The session object.
@@ -210,10 +153,10 @@ static int handle_request(struct session *session) {
     }
 
     DEBUG_PRINT("\ton thread %lX: begin client session\n\n", pthread_self());
-    session->srv.service(&session->client);
+    session->srv->service(session->client);
     DEBUG_PRINT("\ton thread %lX: session complete\n\n", pthread_self());
 
-    close(session->client.client_sock);
+    free_io_info(session->client);
     free(session);
     return SUCCESS;
 }
@@ -234,18 +177,13 @@ static int accept_request(threadpool_t *pool, struct service_info *srv) {
         DEBUG_PRINT("\tsession malloc error\n");
         return err;
     }
-    sess->srv = *srv;
-    struct client_info client = {0};
+    sess->srv = srv;
     DEBUG_PRINT("\taccepting client\n");
-    client.client_sock =
-        accept(srv->sock, (struct sockaddr *)&client.addr, &client.addrlen);
-    if (client.client_sock == FAILURE) {
-        err = errno;
+    sess->client = io_accept(srv->accept_io, &err);
+    if (sess->client == NULL) {
         free(sess);
-        DEBUG_PRINT("\taccept error: %s\n", strerror(errno));
         return err;
     }
-    memcpy(&sess->client, &client, sizeof(client));
     DEBUG_PRINT("\tclient accepted\n");
 
     // run the service in a separate thread if the flag is set
@@ -271,11 +209,11 @@ static int add_polls(const char *unused, struct service_info **srv,
     (void)unused;
     ssize_t size;
     arr_list_query(lists->poll_list, QUERY_SIZE, &size);
-    struct pollfd pfd = {
-        .fd = (*srv)->sock,
+    struct pollio pio = {
+        .io_info = (*srv)->accept_io,
         .events = POLLIN,
     };
-    int err = arr_list_insert(lists->poll_list, &pfd, size);
+    int err = arr_list_insert(lists->poll_list, &pio, size);
     if (err) {
         return err;
     }
@@ -285,23 +223,23 @@ static int add_polls(const char *unused, struct service_info **srv,
 /**
  * @brief Build the poll list.
  *
- * The arrays pointed to by pfds and services_cpy must be NULL upon entry to
+ * The arrays pointed to by pios and services_cpy must be NULL upon entry to
  * this function. They will be allocated and must be freed by the caller. Must
  * be added to both lists at the same time so that their indices match.
  *
  * @param services - The services to build the poll list from.
- * @param pfds - The poll list to be created.
+ * @param pios - The poll list to be created.
  * @param services_cpy - The services list to be created.
  * @param size - The size of the poll list.
  * @return int - 0 on success, non-zero on failure.
  */
-static int build_pfds(hash_table_t *services, struct pollfd **pfds,
+static int build_pios(hash_table_t *services, struct pollio **pios,
                       struct service_info **services_cpy, size_t size) {
     struct lists lists;
     int err;
     // wrapped array lists are just to easily append to the end of the array
     lists.poll_list =
-        arr_list_wrap(NULL, NULL, size, sizeof(**pfds), (void **)pfds, &err);
+        arr_list_wrap(NULL, NULL, size, sizeof(**pios), (void **)pios, &err);
     if (lists.poll_list == NULL) {
         // err != SUCCESS
         return err;
@@ -461,6 +399,8 @@ int destroy_server(server_t *server) {
 
 int open_inet_socket(server_t *server, const char *name, const char *port,
                      const networking_attr_t *attr, int *err_type) {
+    // attributes not used with OpenSSL, but kept in signature for compatibility
+    (void)attr;
     if (server == NULL || port == NULL || name == NULL) {
         set_err(err_type, SYS);
         DEBUG_PRINT("server, name, or port is NULL\n");
@@ -474,57 +414,19 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
         return err;
     }
 
-    if (attr == NULL) {
-        // use default values
-        DEBUG_PRINT("using default attributes\n");
-        networking_attr_t def_attr;
-        attr = &def_attr;
-        init_attr((networking_attr_t *)attr);
-    }
-    int socktype;
-    int family;
-    size_t connections;
-    network_attr_get_socktype(attr, &socktype);
-    network_attr_get_family(attr, &family);
-    network_attr_get_max_connections(attr, &connections);
-
-    struct addrinfo hints = {
-        .ai_family = family,
-        .ai_socktype = socktype,
-        .ai_flags = AI_PASSIVE | AI_V4MAPPED,
-        .ai_protocol = 0,
-    };
-
-    struct addrinfo *result = NULL;
-    err = getaddrinfo(NULL, port, &hints, &result);
-    if (err != SUCCESS) {
-        if (err == EAI_SYSTEM) {
-            err = errno;
-            set_err(err_type, SYS);
-            DEBUG_PRINT("getaddrinfo error: %s\n", strerror(err));
-        } else {
-            set_err(err_type, GAI);
-            DEBUG_PRINT("getaddrinfo error: %s\n", gai_strerror(err));
-        }
-        goto error;
+    srv->accept_io = new_accept_io_info(port, &err, err_type);
+    if (srv->accept_io == NULL) {
+        hash_table_remove(server->services, srv->name);
+        free_service(srv);
     }
 
-    err = create_socket(result, connections, &srv->sock, err_type);
-    if (err == SUCCESS) {
-        DEBUG_PRINT("inet socket created\n");
-        goto cleanup;
-    }
-    // only get here if no address worked
-error:
-    hash_table_remove(server->services, srv->name);
-    free_service(srv);
-cleanup:
-    freeaddrinfo(result);
+    DEBUG_PRINT("inet socket created\n");
     return err;
 }
 
 int open_unix_socket(server_t *server, const char *name, const char *path,
                      const networking_attr_t *attr) {
+    // TODO:convert raw unix socket to OpenSSL BIO object
     if (server == NULL || name == NULL || path == NULL) {
         DEBUG_PRINT("server, name, or path is NULL\n");
         return EINVAL;
@@ -549,8 +451,9 @@ int open_unix_socket(server_t *server, const char *name, const char *path,
     network_attr_get_max_connections(attr, &connections);
 
     err = SUCCESS;
-    srv->sock = socket(AF_UNIX, socktype, 0);
-    if (srv->sock == FAILURE) {
+    int sock = socket(AF_UNIX, socktype, 0);
+    if (sock == FAILURE) {
+        err = errno;
         goto error;
     }
 
@@ -559,20 +462,25 @@ int open_unix_socket(server_t *server, const char *name, const char *path,
     };
     strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
 
-    if (bind(srv->sock, (struct sockaddr *)&addr, sizeof(addr)) == FAILURE) {
+    if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) == FAILURE) {
+        err = errno;
         goto error;
     }
 
     if (socktype == SOCK_STREAM || socktype == SOCK_SEQPACKET) {
-        if (listen(srv->sock, connections) == FAILURE) {
+        if (listen(sock, connections) == FAILURE) {
+            err = errno;
             goto error;
         }
+    }
+    srv->accept_io = new_io_info(sock, ACCEPT_IO, &err);
+    if (srv->accept_io == NULL) {
+        goto error;
     }
     DEBUG_PRINT("unix socket created\n");
     goto cleanup;
 
 error:
-    err = errno;
     DEBUG_PRINT("open_unix_socket: %s\n", strerror(err));
     hash_table_remove(server->services, srv->name);
     free_service(srv);
@@ -626,17 +534,17 @@ int run_server(server_t *server) {
     DEBUG_PRINT("running all services\n");
     ssize_t size;
     hash_table_query(server->services, QUERY_SIZE, &size);
-    struct pollfd *pfds = NULL;
+    struct pollio *pios = NULL;
     struct service_info *services_cpy = NULL;
-    int err = build_pfds(server->services, &pfds, &services_cpy, size);
-    if (pfds == NULL || services_cpy == NULL) {
+    int err = build_pios(server->services, &pios, &services_cpy, size);
+    if (pios == NULL || services_cpy == NULL) {
         DEBUG_PRINT("error building poll list: %s\n", strerror(err));
         return err;
     }
 
     bool keep_running = true;
     while (keep_running) {
-        int ready = poll(pfds, size, INFINITE_POLL);
+        int ready = poll_io_info(pios, size, INFINITE_POLL);
         if (ready == FAILURE) {
             err = errno;
             DEBUG_PRINT("\tpoll error: %s\n", strerror(errno));
@@ -644,8 +552,8 @@ int run_server(server_t *server) {
         }
 
         for (ssize_t i = 0; i < size; i++) {
-            struct pollfd *pfd = &pfds[i];
-            if (pfds[i].revents & POLLIN) {
+            struct pollio *pfd = &pios[i];
+            if (pios[i].revents & POLLIN) {
                 err = accept_request(server->pool, &services_cpy[i]);
                 if (err != SUCCESS) {
                     keep_running = false;
@@ -663,7 +571,7 @@ int run_server(server_t *server) {
         }
     }
 
-    free(pfds);
+    free(pios);
     free(services_cpy);
     return err;
 }

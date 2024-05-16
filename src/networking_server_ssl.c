@@ -7,8 +7,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
-#include <openssl/bio.h>
-#include <openssl/err.h>
 #include <poll.h>
 #include <pthread.h>
 #include <signal.h>
@@ -33,14 +31,13 @@ struct service_info {
     char *name;
     int flags;
     service_f service;
-    BIO *accept_bio;
-    int sock;
+    io_info_t *accept_io;
     server_t *server;
 };
 
 struct session {
-    struct client_info client;
-    struct service_info srv;
+    io_info_t *client;
+    struct service_info *srv;
 };
 
 struct server {
@@ -53,12 +50,6 @@ struct server {
 
 /* PRIVATE FUNCTIONS */
 
-static void DEBUG_PRINT_SSL(void) {
-#ifdef DEBUG
-    ERR_print_errors_fp(stderr);
-#endif
-}
-
 /**
  * @brief Free a service object.
  *
@@ -66,7 +57,7 @@ static void DEBUG_PRINT_SSL(void) {
  */
 static void free_service(struct service_info *srv) {
     free(srv->name);
-    BIO_free(srv->accept_bio);
+    free_io_info(srv->accept_io);
     free(srv);
 }
 
@@ -134,7 +125,6 @@ static int new_service(server_t *server, const char *name,
         DEBUG_PRINT("new_service: calloc failed\n");
         return ENOMEM;
     }
-    (*srv)->sock = FAILURE; // to signify the socket has not been created yet
     (*srv)->name = strdup(name);
     if ((*srv)->name == NULL) {
         free(*srv);
@@ -163,10 +153,10 @@ static int handle_request(struct session *session) {
     }
 
     DEBUG_PRINT("\ton thread %lX: begin client session\n\n", pthread_self());
-    session->srv.service(&session->client);
+    session->srv->service(session->client);
     DEBUG_PRINT("\ton thread %lX: session complete\n\n", pthread_self());
 
-    close(session->client.client_sock);
+    free_io_info(session->client);
     free(session);
     return SUCCESS;
 }
@@ -187,18 +177,13 @@ static int accept_request(threadpool_t *pool, struct service_info *srv) {
         DEBUG_PRINT("\tsession malloc error\n");
         return err;
     }
-    sess->srv = *srv;
-    struct client_info client = {0};
+    sess->srv = srv;
     DEBUG_PRINT("\taccepting client\n");
-    if (BIO_do_accept(srv->accept_bio) <= SUCCESS) {
-        DEBUG_PRINT("Error accepting connection\n");
-        DEBUG_PRINT_SSL();
+    sess->client = io_accept(srv->accept_io, &err);
+    if (sess->client == NULL) {
         free(sess);
-        return FAILURE; // TODO: don't know what to use for error
+        return err;
     }
-    BIO *client_bio = BIO_pop(srv->accept_bio);
-    BIO_get_fd(client_bio, &client.client_sock);
-    memcpy(&sess->client, &client, sizeof(client));
     DEBUG_PRINT("\tclient accepted\n");
 
     // run the service in a separate thread if the flag is set
@@ -224,11 +209,11 @@ static int add_polls(const char *unused, struct service_info **srv,
     (void)unused;
     ssize_t size;
     arr_list_query(lists->poll_list, QUERY_SIZE, &size);
-    struct pollfd pfd = {
-        .fd = (*srv)->sock,
+    struct pollio pio = {
+        .io_info = (*srv)->accept_io,
         .events = POLLIN,
     };
-    int err = arr_list_insert(lists->poll_list, &pfd, size);
+    int err = arr_list_insert(lists->poll_list, &pio, size);
     if (err) {
         return err;
     }
@@ -238,23 +223,23 @@ static int add_polls(const char *unused, struct service_info **srv,
 /**
  * @brief Build the poll list.
  *
- * The arrays pointed to by pfds and services_cpy must be NULL upon entry to
+ * The arrays pointed to by pios and services_cpy must be NULL upon entry to
  * this function. They will be allocated and must be freed by the caller. Must
  * be added to both lists at the same time so that their indices match.
  *
  * @param services - The services to build the poll list from.
- * @param pfds - The poll list to be created.
+ * @param pios - The poll list to be created.
  * @param services_cpy - The services list to be created.
  * @param size - The size of the poll list.
  * @return int - 0 on success, non-zero on failure.
  */
-static int build_pfds(hash_table_t *services, struct pollfd **pfds,
+static int build_pios(hash_table_t *services, struct pollio **pios,
                       struct service_info **services_cpy, size_t size) {
     struct lists lists;
     int err;
     // wrapped array lists are just to easily append to the end of the array
     lists.poll_list =
-        arr_list_wrap(NULL, NULL, size, sizeof(**pfds), (void **)pfds, &err);
+        arr_list_wrap(NULL, NULL, size, sizeof(**pios), (void **)pios, &err);
     if (lists.poll_list == NULL) {
         // err != SUCCESS
         return err;
@@ -429,33 +414,14 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
         return err;
     }
 
-    if ((srv->accept_bio = BIO_new_accept(port)) == NULL) {
-        set_err(err_type, SYS);
-        err = FAILURE; // TODO: don't know what to use for error
-        DEBUG_PRINT("BIO_new_accept failed\n");
-        DEBUG_PRINT_SSL();
-        goto error;
+    srv->accept_io = new_accept_io_info(port, &err, err_type);
+    if (srv->accept_io == NULL) {
+        hash_table_remove(server->services, srv->name);
+        free_service(srv);
     }
 
-    BIO_set_nbio_accept(srv->accept_bio, true);
-    BIO_set_bind_mode(srv->accept_bio, BIO_BIND_REUSEADDR);
-    if (BIO_do_accept(srv->accept_bio) <= SUCCESS) {
-        set_err(err_type, SYS);
-        err = FAILURE; // TODO: don't know what to use for error
-        DEBUG_PRINT("BIO_do_accept failed\n");
-        DEBUG_PRINT_SSL();
-        goto error;
-    }
-
-    BIO_get_fd(srv->accept_bio, &srv->sock);
-    DEBUG_PRINT("inet socket created\n");
-    goto cleanup;
-
-    // only get here if BIO was not created
-error:
-    hash_table_remove(server->services, srv->name);
-    free_service(srv);
-cleanup:
+    DEBUG_PRINT("inet socket creation %s\n",
+                srv->accept_io == NULL ? "failed" : "succeeded");
     return err;
 }
 
@@ -486,8 +452,9 @@ int open_unix_socket(server_t *server, const char *name, const char *path,
     network_attr_get_max_connections(attr, &connections);
 
     err = SUCCESS;
-    srv->sock = socket(AF_UNIX, socktype, 0);
-    if (srv->sock == FAILURE) {
+    int sock = socket(AF_UNIX, socktype, 0);
+    if (sock == FAILURE) {
+        err = errno;
         goto error;
     }
 
@@ -496,20 +463,25 @@ int open_unix_socket(server_t *server, const char *name, const char *path,
     };
     strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
 
-    if (bind(srv->sock, (struct sockaddr *)&addr, sizeof(addr)) == FAILURE) {
+    if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) == FAILURE) {
+        err = errno;
         goto error;
     }
 
     if (socktype == SOCK_STREAM || socktype == SOCK_SEQPACKET) {
-        if (listen(srv->sock, connections) == FAILURE) {
+        if (listen(sock, connections) == FAILURE) {
+            err = errno;
             goto error;
         }
+    }
+    srv->accept_io = new_io_info(sock, ACCEPT_IO, &err);
+    if (srv->accept_io == NULL) {
+        goto error;
     }
     DEBUG_PRINT("unix socket created\n");
     goto cleanup;
 
 error:
-    err = errno;
     DEBUG_PRINT("open_unix_socket: %s\n", strerror(err));
     hash_table_remove(server->services, srv->name);
     free_service(srv);
@@ -563,17 +535,17 @@ int run_server(server_t *server) {
     DEBUG_PRINT("running all services\n");
     ssize_t size;
     hash_table_query(server->services, QUERY_SIZE, &size);
-    struct pollfd *pfds = NULL;
+    struct pollio *pios = NULL;
     struct service_info *services_cpy = NULL;
-    int err = build_pfds(server->services, &pfds, &services_cpy, size);
-    if (pfds == NULL || services_cpy == NULL) {
+    int err = build_pios(server->services, &pios, &services_cpy, size);
+    if (pios == NULL || services_cpy == NULL) {
         DEBUG_PRINT("error building poll list: %s\n", strerror(err));
         return err;
     }
 
     bool keep_running = true;
     while (keep_running) {
-        int ready = poll(pfds, size, INFINITE_POLL);
+        int ready = poll_io_info(pios, size, INFINITE_POLL);
         if (ready == FAILURE) {
             err = errno;
             DEBUG_PRINT("\tpoll error: %s\n", strerror(errno));
@@ -581,8 +553,8 @@ int run_server(server_t *server) {
         }
 
         for (ssize_t i = 0; i < size; i++) {
-            struct pollfd *pfd = &pfds[i];
-            if (pfds[i].revents & POLLIN) {
+            struct pollio *pfd = &pios[i];
+            if (pios[i].revents & POLLIN) {
                 err = accept_request(server->pool, &services_cpy[i]);
                 if (err != SUCCESS) {
                     keep_running = false;
@@ -600,7 +572,7 @@ int run_server(server_t *server) {
         }
     }
 
-    free(pfds);
+    free(pios);
     free(services_cpy);
     return err;
 }

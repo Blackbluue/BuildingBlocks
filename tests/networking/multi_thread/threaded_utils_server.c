@@ -61,17 +61,13 @@ static int repeat_letters(const struct packet *pkt, int sock) {
  * @param client - The client information.
  * @return int - 0 on success, non-zero on failure.
  */
-static int send_response(struct client_info *client) {
-    char host[NI_MAXHOST];
-    char serv[NI_MAXSERV];
-    if (getnameinfo((struct sockaddr *)&client->addr, client->addrlen, host,
-                    sizeof(host), serv, sizeof(serv), NO_FLAGS) == SUCCESS) {
-        fprintf(stderr, "host=%s, serv=%s\n", host, serv);
-    }
+static int send_response(io_info_t *client) {
+    fprintf(stderr, "host=%s, serv=%s\n", io_info_host(client),
+            io_info_serv(client));
 
     int err;
     bool handle_client = true;
-    int sock = client->client_sock;
+    int sock = io_info_fd(client, NULL);
     while (handle_client) {
         struct packet *pkt = recv_pkt_data(sock, TO_INFINITE, &err);
         if (pkt == NULL) {
@@ -99,13 +95,13 @@ static int send_response(struct client_info *client) {
 
         switch (pkt->hdr->data_type) {
         case RQU_COUNT:
-            err = count_letters(pkt, client->client_sock);
+            err = count_letters(pkt, sock);
             break;
         case RQU_REPEAT:
-            err = repeat_letters(pkt, client->client_sock);
+            err = repeat_letters(pkt, sock);
             break;
         default:
-            err = write_pkt_data(client->client_sock, NULL, 0, SVR_INVALID);
+            err = write_pkt_data(sock, NULL, 0, SVR_INVALID);
             break;
         }
         free_packet(pkt);

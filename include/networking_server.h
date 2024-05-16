@@ -15,22 +15,9 @@ enum service_flags {
     THREADED_SESSIONS = 1 << 0, // Run each client session in a separate thread
 };
 
-/**
- * @brief Client information.
- *
- * @param client_sock - the client socket
- * @param addr - the client address
- * @param addrlen - the length of the address
- */
-struct client_info {
-    int client_sock;              // client socket
-    struct sockaddr_storage addr; // client address
-    socklen_t addrlen;            // length of the address
-};
-
 typedef struct server server_t;
 
-typedef int (*service_f)(struct client_info *client);
+typedef int (*service_f)(io_info_t *client);
 
 /* FUNCTIONS */
 

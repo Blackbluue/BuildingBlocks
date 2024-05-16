@@ -107,10 +107,10 @@ void allow_graceful_exit(void) {
     sigaction(SIGTERM, &action, NULL);
 }
 
-int send_response(struct client_info *client) {
+int send_response(io_info_t *client) {
     int err;
     bool handle_client = true;
-    int sock = client->client_sock;
+    int sock = io_info_fd(client, NULL);
     while (handle_client) {
         struct packet *pkt = recv_pkt_data(sock, TO_INFINITE, &err);
         if (pkt == NULL) {
