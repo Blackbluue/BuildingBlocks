@@ -420,7 +420,8 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
         free_service(srv);
     }
 
-    DEBUG_PRINT("inet socket created\n");
+    DEBUG_PRINT("inet socket creation %s\n",
+                srv->accept_io == NULL ? "failed" : "succeeded");
     return err;
 }
 
