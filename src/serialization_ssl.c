@@ -165,19 +165,23 @@ const char *io_info_serv(io_info_t *io_info) { return io_info->serv; }
 int poll_io_info(struct pollio *ios, nfds_t nfds, int timeout) {
     struct pollfd *fds = malloc(nfds * sizeof(*fds));
     if (fds == NULL) {
-        return errno;
+        return -errno;
     }
     for (nfds_t i = 0; i < nfds; i++) {
         fds[i].fd = ios[i].io_info->fd;
         fds[i].events = ios[i].events;
     }
     int ret = poll(fds, nfds, timeout);
-    if (ret < 0) {
-        ret = errno;
+    if (ret <= 0) {
+        if (ret < 0) {
+            ret = -errno;
+        }
+        goto cleanup;
     }
     for (nfds_t i = 0; i < nfds; i++) {
         ios[i].revents = fds[i].revents;
     }
+cleanup:
     free(fds);
     return ret;
 }

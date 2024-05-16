@@ -546,8 +546,12 @@ int run_server(server_t *server) {
     bool keep_running = true;
     while (keep_running) {
         int ready = poll_io_info(pios, size, INFINITE_POLL);
-        if (ready == FAILURE) {
-            err = errno;
+        if (ready <= 0) {
+            if (ready == 0) {
+                err = ETIMEDOUT;
+            } else {
+                err = -ready;
+            }
             DEBUG_PRINT("\tpoll error: %s\n", strerror(errno));
             break;
         }
