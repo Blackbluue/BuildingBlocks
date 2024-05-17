@@ -60,6 +60,8 @@ io_info_t *new_io_info(int fd, int type, int *err) {
         io_info->bio = BIO_new(BIO_s_accept());
         if (io_info->bio == NULL) {
             set_err(err, FAILURE); // TODO: don't know what to use for error
+            DEBUG_PRINT("BIO_new failed\n");
+            DEBUG_PRINT_SSL();
             goto error;
         }
         BIO_set_fd(io_info->bio, io_info->fd, BIO_NOCLOSE);
@@ -70,14 +72,27 @@ io_info_t *new_io_info(int fd, int type, int *err) {
         io_info->bio = BIO_new(BIO_s_connect());
         if (io_info->bio == NULL) {
             set_err(err, FAILURE); // TODO: don't know what to use for error
+            DEBUG_PRINT("BIO_new failed\n");
+            DEBUG_PRINT_SSL();
             goto error;
         }
-        BIO_set_fd(io_info->bio, io_info->fd, BIO_NOCLOSE);
+        if (BIO_set_fd(io_info->bio, io_info->fd, BIO_NOCLOSE) < 1) {
+            set_err(err, FAILURE); // TODO: don't know what to use for error
+            DEBUG_PRINT("BIO_set_fd failed\n");
+            DEBUG_PRINT_SSL();
+            goto error;
+        }
         io_info->host = BIO_get_conn_hostname(io_info->bio);
         io_info->serv = BIO_get_conn_port(io_info->bio);
         break;
     case FILE_IO:
         io_info->bio = BIO_new(BIO_s_fd());
+        if (io_info->bio == NULL) {
+            set_err(err, FAILURE); // TODO: don't know what to use for error
+            DEBUG_PRINT("BIO_new failed\n");
+            DEBUG_PRINT_SSL();
+            goto error;
+        }
         BIO_set_fd(io_info->bio, io_info->fd, BIO_NOCLOSE);
         // files have no host or service
         break;
@@ -88,6 +103,7 @@ io_info_t *new_io_info(int fd, int type, int *err) {
     goto cleanup;
 
 error:
+    BIO_free(io_info->bio);
     free(io_info);
     io_info = NULL;
 cleanup:
@@ -219,19 +235,22 @@ io_info_t *io_accept(io_info_t *io_info, int *err) {
     return new_info;
 }
 
-int read_exact(int fd, void *buff, size_t read_sz) {
+int read_exact(io_info_t *io_info, void *buff, size_t read_sz) {
     uint8_t *buf_ptr = (uint8_t *)buff;
     size_t total_len = 0;
-    ssize_t bytes_read;
+    size_t bytes_read = 0;
     DEBUG_PRINT("expecting %zu bytes\n", read_sz);
     do {
-        if ((bytes_read = read(fd, buf_ptr, read_sz)) < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        int ret = BIO_read_ex(io_info->bio, buf_ptr, read_sz, &bytes_read);
+        if (!ret) {
+            if (BIO_should_retry(io_info->bio)) {
                 // retry the read if the call would block
                 continue;
             }
-            DEBUG_PRINT("from call to read(2): %s\n", strerror(errno));
-            return errno;
+            // DEBUG_PRINT("from call to read(2): %s\n", strerror(errno));
+            DEBUG_PRINT("BIO_read_ex failed\n");
+            DEBUG_PRINT_SSL();
+            return FAILURE; // TODO: don't know what to use for error
         } else if (bytes_read == 0) {
             DEBUG_PRINT("from call to read(2): %s\n", strerror(ENODATA));
             return ENODATA;
@@ -244,14 +263,16 @@ int read_exact(int fd, void *buff, size_t read_sz) {
     return SUCCESS;
 }
 
-int write_all(int fd, const void *buf, size_t len) {
-    ssize_t bytes_written;
+int write_all(io_info_t *io_info, const void *buf, size_t len) {
+    size_t bytes_written;
     uint8_t *buf_ptr = (uint8_t *)buf;
     DEBUG_PRINT("writing %zu bytes total\n", len);
     while (len > 0) {
-        if ((bytes_written = write(fd, buf_ptr, len)) < 0) {
-            DEBUG_PRINT("from call to write(2): %s\n", strerror(errno));
-            return errno;
+        int ret = BIO_write_ex(io_info->bio, buf_ptr, len, &bytes_written);
+        if (!ret) {
+            DEBUG_PRINT("BIO_write_ex failed\n");
+            DEBUG_PRINT_SSL();
+            return FAILURE; // TODO: don't know what to use for error
         }
         DEBUG_PRINT("amount written: %zu bytes\n", bytes_written);
         buf_ptr += bytes_written;

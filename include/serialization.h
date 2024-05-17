@@ -126,6 +126,13 @@ const char *io_info_serv(io_info_t *io_info);
 /**
  * @brief Wrapper for poll(2) that uses io_info objects.
  *
+ * The function will return the return value of poll(2) and will set the revents
+ * field of the io_info objects.
+ *
+ * In the event of an error, the function will return a negative value,
+ * corresponding to the inverse of what poll(2) would set errno to. i.e if
+ * poll(2) would set errno to EAGAIN, the function will return -EAGAIN.
+ *
  * @param ios - The array of io_info objects.
  * @param nfds - The number of io_info objects.
  * @param timeout - The timeout in milliseconds.
@@ -143,22 +150,22 @@ int poll_io_info(struct pollio *ios, nfds_t nfds, int timeout);
 io_info_t *io_accept(io_info_t *io_info, int *err);
 
 /**
- * @brief Read a fixed amount of data from a file descriptor.
+ * @brief Read a fixed amount of data from an io_info object.
  *
  * If an error occurs, a non-zero error code will be returned
  * Possible errors:
  *   ENODATA: - the file descriptor has reached the end of the file early
  * See read(2) for additional possible errors.
  *
- * @param fd - the file descriptor
+ * @param io_info - the io_info object
  * @param buff - pointer to store the data
  * @param read_sz - the size of the data to read
  * @return int - 0 on success, non-zero on failure
  */
-int read_exact(int fd, void *buff, size_t read_sz);
+int read_exact(io_info_t *io_info, void *buff, size_t read_sz);
 
 /**
- * @brief Write all data to a file descriptor.
+ * @brief Write all data to an io_info object.
  *
  * The function handles partial writes and will continue to write until all the
  * data is written.
@@ -166,11 +173,11 @@ int read_exact(int fd, void *buff, size_t read_sz);
  * If an error occurs, a non-zero error code will be returned
  * See write(2) for possible errors.
  *
- * @param fd - the file descriptor
+ * @param io_info - the io_info object
  * @param buf - the data to send
  * @param len - the length of the data
  * @return int - 0 on success, non-zero on failure
  */
-int write_all(int fd, const void *buf, size_t len);
+int write_all(io_info_t *io_info, const void *buf, size_t len);
 
 #endif /* SERIALIZATION_H */

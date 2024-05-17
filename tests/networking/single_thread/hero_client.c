@@ -19,6 +19,7 @@
 
 #define HERO_NAME "Tartaglia"
 int server_sock;
+io_info_t *server_io;
 
 static void exit_handler(int sig) { (void)sig; }
 
@@ -54,10 +55,19 @@ int init_suite1(void) {
         }
         return FAILURE;
     }
+    server_io = new_io_info(server_sock, CONNECTED_IO, &err);
+    if (server_io == NULL) {
+        fprintf(stderr, "new_io_info: %s\n", strerror(err));
+        close(server_sock);
+        return FAILURE;
+    }
     return SUCCESS;
 }
 
-int clean_suite1(void) { return close(server_sock); }
+int clean_suite1(void) {
+    free_io_info(server_io);
+    return close(server_sock);
+}
 
 void test_send_hero() {
     struct hero adventurer;
@@ -65,12 +75,12 @@ void test_send_hero() {
     strncpy(adventurer.name, HERO_NAME, strlen(HERO_NAME) + 1);
     adventurer.status = HERO_STATUS;
 
-    CU_ASSERT_EQUAL_FATAL(write_pkt_data(server_sock, &adventurer,
+    CU_ASSERT_EQUAL_FATAL(write_pkt_data(server_io, &adventurer,
                                          hero_size(&adventurer), RQU_STR_HRO),
                           SUCCESS);
 
     int err;
-    struct packet *pkt = recv_pkt_data(server_sock, TIMEOUT, &err);
+    struct packet *pkt = recv_pkt_data(server_io, TIMEOUT, &err);
     if (pkt == NULL) {
         CU_ASSERT_PTR_NOT_NULL_FATAL(pkt); // ensure failure
     }
@@ -84,12 +94,12 @@ void test_send_hero() {
 }
 
 void test_recv_hero() {
-    CU_ASSERT_EQUAL_FATAL(write_pkt_data(server_sock, HERO_NAME,
+    CU_ASSERT_EQUAL_FATAL(write_pkt_data(server_io, HERO_NAME,
                                          strlen(HERO_NAME) + 1, RQU_GET_HRO),
                           SUCCESS);
 
     int err;
-    struct packet *pkt = recv_pkt_data(server_sock, TIMEOUT, &err);
+    struct packet *pkt = recv_pkt_data(server_io, TIMEOUT, &err);
     if (pkt == NULL) {
         CU_ASSERT_PTR_NOT_NULL_FATAL(pkt); // ensure failure
     }

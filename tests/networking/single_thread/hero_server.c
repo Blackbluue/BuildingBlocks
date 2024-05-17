@@ -23,32 +23,34 @@
 
 /* PRIVATE FUNCTIONS */
 
-static int load_hero(const struct packet *pkt, int sock) {
+static int load_hero(const struct packet *pkt, io_info_t *client) {
     DEBUG_PRINT("looking for hero: %s\n", (char *)pkt->data);
-    int fd = open(HERO_FILE, FILE_READ_FLAGS);
-    if (fd < 0) {
+    int err;
+    io_info_t *file =
+        new_file_io_info(HERO_FILE, FILE_READ_FLAGS, NO_FLAGS, &err);
+    if (file == NULL) {
         // log error locally
-        if (errno == ENOENT) { // file does not exist
+        if (err == ENOENT) { // file does not exist
             DEBUG_PRINT("hero file does not exist\n");
-            return write_pkt_data(sock, NULL, 0, SVR_NOT_FOUND);
+            return write_pkt_data(client, NULL, 0, SVR_NOT_FOUND);
         } else { // other error opening file
-            DEBUG_PRINT("error opening hero file: %s\n", strerror(errno));
-            return write_pkt_data(sock, NULL, 0, SVR_FAILURE);
+            DEBUG_PRINT("error opening hero file: %s\n", strerror(err));
+            return write_pkt_data(client, NULL, 0, SVR_FAILURE);
         }
     }
 
     while (true) {
         int err;
-        struct packet *hero_pkt = read_pkt(fd, &err);
+        struct packet *hero_pkt = read_pkt(file, &err);
         if (hero_pkt == NULL) {
-            // log error locally
-            close(fd);
+            // TODO: log error locally
+            free_io_info(file);
             if (err == EAGAIN) {
-                DEBUG_PRINT("ran out of heros\n"); // debug
-                return write_pkt_data(sock, NULL, 0, SVR_NOT_FOUND);
-            } else {                                 // other error opening file
-                DEBUG_PRINT("error reading hero\n"); // debug
-                return write_pkt_data(sock, NULL, 0, SVR_FAILURE);
+                DEBUG_PRINT("ran out of heros\n");
+                return write_pkt_data(client, NULL, 0, SVR_NOT_FOUND);
+            } else { // other error opening file
+                DEBUG_PRINT("error reading hero\n");
+                return write_pkt_data(client, NULL, 0, SVR_FAILURE);
             }
         }
 
@@ -62,12 +64,13 @@ static int load_hero(const struct packet *pkt, int sock) {
             continue;
         }
 
-        close(fd);
+        free_io_info(file);
         DEBUG_PRINT("hero found\n\tname-> %s\n\tlevel-> %hu\n\thealth-> "
                     "%hu\n\tattack-> %hd\n\texp-> %hhu\n\tstatus-> %hhu\n",
                     hero->name, hero->level, hero->health, hero->attack,
                     hero->experience, hero->status);
-        err = write_pkt_data(sock, hero, hero_pkt->hdr->data_len, SVR_SUCCESS);
+        err =
+            write_pkt_data(client, hero, hero_pkt->hdr->data_len, SVR_SUCCESS);
         free_packet(hero_pkt);
         return err;
     }
@@ -81,15 +84,16 @@ static int load_hero(const struct packet *pkt, int sock) {
  */
 static uint32_t save_hero(const struct packet *pkt) {
     DEBUG_PRINT("saving hero to file\n");
-    int fd = open(HERO_FILE, FILE_WRITE_FLAGS, FILE_MODE);
-    if (fd < 0) {
-        // log error locally
+    io_info_t *file =
+        new_file_io_info(HERO_FILE, FILE_WRITE_FLAGS, FILE_MODE, NULL);
+    if (file == NULL) {
+        // TODO: log error locally
         return SVR_FAILURE;
     }
     // should check hero is formatted correctly
     struct hero *hero = (struct hero *)pkt->data;
-    int res = write_pkt_data(fd, hero, pkt->hdr->data_len, NO_FLAGS);
-    close(fd);
+    int res = write_pkt_data(file, hero, pkt->hdr->data_len, NO_FLAGS);
+    free_io_info(file);
     // log error locally
     return res == FAILURE ? SVR_FAILURE : SVR_SUCCESS;
 }
@@ -110,9 +114,8 @@ void allow_graceful_exit(void) {
 int send_response(io_info_t *client) {
     int err;
     bool handle_client = true;
-    int sock = io_info_fd(client, NULL);
     while (handle_client) {
-        struct packet *pkt = recv_pkt_data(sock, TO_INFINITE, &err);
+        struct packet *pkt = recv_pkt_data(client, TO_INFINITE, &err);
         if (pkt == NULL) {
             // an error here always closes client connection
             handle_client = false;
@@ -122,7 +125,7 @@ int send_response(io_info_t *client) {
             case ETIMEDOUT:   // client timed out
             case EINVAL:      // invalid packet
                 // send response to client
-                write_pkt_data(sock, NULL, 0, SVR_INVALID);
+                write_pkt_data(client, NULL, 0, SVR_INVALID);
                 continue;
             case EINTR:        // signal interrupt
                 err = SUCCESS; // no error
@@ -138,13 +141,13 @@ int send_response(io_info_t *client) {
 
         switch (pkt->hdr->data_type) {
         case RQU_GET_HRO:
-            err = load_hero(pkt, sock);
+            err = load_hero(pkt, client);
             break;
         case RQU_STR_HRO:
-            err = write_pkt_data(sock, NULL, 0, save_hero(pkt));
+            err = write_pkt_data(client, NULL, 0, save_hero(pkt));
             break;
         default:
-            err = write_pkt_data(sock, NULL, 0, SVR_INVALID);
+            err = write_pkt_data(client, NULL, 0, SVR_INVALID);
             break;
         }
         free_packet(pkt);

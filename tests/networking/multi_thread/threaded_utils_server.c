@@ -23,28 +23,28 @@ static void exit_handler(int sig) { (void)sig; }
  * @brief Count the number of letters in a string.
  *
  * @param pkt - The packet containing the string to process.
- * @param sock - The socket to send the response to.
+ * @param client - The client information.
  *
  * @return int - 0 on success, -1 on failure.
  */
-static int count_letters(const struct packet *pkt, int sock) {
+static int count_letters(const struct packet *pkt, io_info_t *client) {
     struct counter_packet *req = pkt->data;
     get_highest(req->string, &req->character, &req->count);
-    return write_pkt_data(sock, req, sizeof(*req), SVR_SUCCESS);
+    return write_pkt_data(client, req, sizeof(*req), SVR_SUCCESS);
 }
 
 /**
  * @brief Repeat a character in a string.
  *
  * @param pkt - The packet containing the character and string to process.
- * @param sock - The socket to send the response to.
+ * @param client - The client information.
  *
  * @return int - 0 on success, -1 on failure.
  */
-static int repeat_letters(const struct packet *pkt, int sock) {
+static int repeat_letters(const struct packet *pkt, io_info_t *client) {
     struct counter_packet *req = pkt->data;
     memset(req->string, req->character, req->count);
-    return write_pkt_data(sock, req, sizeof(*req), SVR_SUCCESS);
+    return write_pkt_data(client, req, sizeof(*req), SVR_SUCCESS);
 }
 
 /**
@@ -67,9 +67,8 @@ static int send_response(io_info_t *client) {
 
     int err;
     bool handle_client = true;
-    int sock = io_info_fd(client, NULL);
     while (handle_client) {
-        struct packet *pkt = recv_pkt_data(sock, TO_INFINITE, &err);
+        struct packet *pkt = recv_pkt_data(client, TO_INFINITE, &err);
         if (pkt == NULL) {
             // an error here always closes client connection
             handle_client = false;
@@ -79,7 +78,7 @@ static int send_response(io_info_t *client) {
             case ETIMEDOUT:   // client timed out
             case EINVAL:      // invalid packet
                 // send response to client
-                write_pkt_data(sock, NULL, 0, SVR_INVALID);
+                write_pkt_data(client, NULL, 0, SVR_INVALID);
                 continue;
             case EINTR:        // signal interrupt
                 err = SUCCESS; // no error
@@ -95,13 +94,13 @@ static int send_response(io_info_t *client) {
 
         switch (pkt->hdr->data_type) {
         case RQU_COUNT:
-            err = count_letters(pkt, sock);
+            err = count_letters(pkt, client);
             break;
         case RQU_REPEAT:
-            err = repeat_letters(pkt, sock);
+            err = repeat_letters(pkt, client);
             break;
         default:
-            err = write_pkt_data(sock, NULL, 0, SVR_INVALID);
+            err = write_pkt_data(client, NULL, 0, SVR_INVALID);
             break;
         }
         free_packet(pkt);

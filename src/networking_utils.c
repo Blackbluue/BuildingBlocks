@@ -28,15 +28,15 @@ struct inner_network_attr {
 /* PRIVATE FUNCTION */
 
 /**
- * @brief Read packet header from a socket descriptor.
+ * @brief Read packet header from an io_info object.
  *
- * @param sock - the file descriptor
+ * @param io_info - the io_info object to read from
  * @param hdr - pointer to store the header
  * @return int - 0 on success, non-zero on failure
  */
-static int read_hdr_data(int fd, struct pkt_hdr *hdr) {
+static int read_hdr_data(io_info_t *io_info, struct pkt_hdr *hdr) {
     DEBUG_PRINT("reading header...\n");
-    ssize_t err = read_exact(fd, hdr, sizeof(*hdr));
+    ssize_t err = read_exact(io_info, hdr, sizeof(*hdr));
     if (err != SUCCESS) {
         return err;
     }
@@ -44,7 +44,7 @@ static int read_hdr_data(int fd, struct pkt_hdr *hdr) {
     hdr->header_len = ntohl(hdr->header_len);
     if (hdr->header_len != sizeof(*hdr)) {
         // invalid value in reported header length
-        DEBUG_PRINT("error in reported size: %s\n", strerror(err));
+        DEBUG_PRINT("error in reported header size\n");
         return EINVAL;
     }
     hdr->data_len = ntohl(hdr->data_len);
@@ -141,7 +141,8 @@ void free_packet(struct packet *pkt) {
     }
 }
 
-int write_pkt_data(int fd, void *data, size_t len, uint32_t data_type) {
+int write_pkt_data(io_info_t *io_info, void *data, size_t len,
+                   uint32_t data_type) {
     DEBUG_PRINT("writing packet...\n");
     struct pkt_hdr hdr;
     memset(&hdr, 0, sizeof(hdr));
@@ -149,15 +150,15 @@ int write_pkt_data(int fd, void *data, size_t len, uint32_t data_type) {
     hdr.data_len = htonl(len);
     hdr.data_type = htonl(data_type);
 
-    int err = write_all(fd, &hdr, sizeof(hdr));
+    int err = write_all(io_info, &hdr, sizeof(hdr));
     if (err != SUCCESS) {
         return err;
     }
     DEBUG_PRINT("header successfully written\n");
-    return write_all(fd, data, len);
+    return write_all(io_info, data, len);
 }
 
-struct packet *read_pkt(int fd, int *err) {
+struct packet *read_pkt(io_info_t *io_info, int *err) {
     struct packet *pkt = calloc(1, sizeof(*pkt));
     if (pkt == NULL) {
         set_err(err, errno);
@@ -172,7 +173,7 @@ struct packet *read_pkt(int fd, int *err) {
         return NULL;
     }
 
-    int loc_err = read_hdr_data(fd, pkt->hdr);
+    int loc_err = read_hdr_data(io_info, pkt->hdr);
     if (loc_err != SUCCESS) {
         set_err(err, loc_err);
         free_packet(pkt);
@@ -191,7 +192,7 @@ struct packet *read_pkt(int fd, int *err) {
         return NULL;
     }
     DEBUG_PRINT("reading data...\n");
-    loc_err = read_exact(fd, pkt->data, pkt->hdr->data_len);
+    loc_err = read_exact(io_info, pkt->data, pkt->hdr->data_len);
     if (loc_err != SUCCESS) {
         set_err(err, loc_err);
         free_packet(pkt);
@@ -201,17 +202,17 @@ struct packet *read_pkt(int fd, int *err) {
     return pkt;
 }
 
-struct packet *recv_pkt_data(int sock, int timeout, int *err) {
-    struct pollfd pfd = {.fd = sock, .events = POLLIN};
-    int loc_err = poll(&pfd, 1, timeout);
+struct packet *recv_pkt_data(io_info_t *io_info, int timeout, int *err) {
+    struct pollio pio = {.io_info = io_info, .events = POLLIN};
+    int loc_err = poll_io_info(&pio, 1, timeout);
     if (loc_err <= 0) {
         // 0 on timeout, negative on poll error
-        set_err(err, loc_err == 0 ? ETIMEDOUT : errno);
+        set_err(err, loc_err == 0 ? ETIMEDOUT : -loc_err);
         DEBUG_PRINT("poll error: %s\n", strerror(*err));
         return NULL;
-    } else if (pfd.revents & POLLIN) {
+    } else if (pio.revents & POLLIN) {
         DEBUG_PRINT("receiving packet...\n");
-        return read_pkt(sock, err);
+        return read_pkt(io_info, err);
     } else {
         return NULL; // error in revents, usually means other end closed
     }

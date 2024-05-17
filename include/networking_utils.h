@@ -167,7 +167,7 @@ int network_attr_set_max_connections(networking_attr_t *attr,
 void free_packet(struct packet *pkt);
 
 /**
- * @brief Write packet data to a file descriptor.
+ * @brief Write packet data to an io_info object.
  *
  * The data will be sent in a packet with a header containing the length of the
  * serialized data. recv_pkt_data or read_pkt should be used to read the data
@@ -177,16 +177,17 @@ void free_packet(struct packet *pkt);
  *
  * Possible errors are the same as write(2).
  *
- * @param fd - the file descriptor
+ * @param io_info - the io_info object
  * @param data - the data to write
  * @param len - the length of the data
  * @param data_type - flag for the type of the data
  * @return int - 0 on success, non-zero on failure
  */
-int write_pkt_data(int fd, void *data, size_t len, uint32_t data_type);
+int write_pkt_data(io_info_t *io_info, void *data, size_t len,
+                   uint32_t data_type);
 
 /**
- * @brief Receive packet data from a file descriptor.
+ * @brief Receive packet data from an io_info object.
  *
  * Receives packet data from the given file descriptor and returns a pointer to
  * a packet struct containing the header and data. The other end must use
@@ -198,14 +199,14 @@ int write_pkt_data(int fd, void *data, size_t len, uint32_t data_type);
  *      ENOMEM: Out of memory.
  * See read(2) for more details.
  *
- * @param fd - the file descriptor
+ * @param io_info - the io_info object
  * @param err - the error code
  * @return struct packet* - pointer to the packet on success, NULL on failure
  */
-struct packet *read_pkt(int fd, int *err);
+struct packet *read_pkt(io_info_t *io_info, int *err);
 
 /**
- * @brief Receive packet data from a socket.
+ * @brief Receive packet data from an io_info object.
  *
  * Receives packet data from the given socket and returns a pointer to a packet
  * struct containing the header and data. The other end must use write_pkt_data
@@ -221,11 +222,11 @@ struct packet *read_pkt(int fd, int *err);
  *      ENOMEM: Out of memory.
  * See poll(2), read(2) for more details.
  *
- * @param sock - the socket
+ * @param io_info - the io_info object
  * @param timeout - the timeout in milliseconds
  * @param err - the error code
  * @return struct packet* - pointer to the packet on success, NULL on failure
  */
-struct packet *recv_pkt_data(int sock, int timeout, int *err);
+struct packet *recv_pkt_data(io_info_t *io_info, int timeout, int *err);
 
 #endif /* NETWORKING_UTILS_H */
