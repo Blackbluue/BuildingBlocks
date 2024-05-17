@@ -10,6 +10,7 @@
 // is set by the library to 1 when SSL is available, 0 otherwise
 // TODO: define this in the build system instead
 #define SSL_AVAILABLE
+#define MAX_CONNECTIONS 4096 // maximum number of pending connections
 
 // TODO: err_type syntax is ugly, need to find an alternative
 enum err_type {

@@ -398,9 +398,7 @@ int destroy_server(server_t *server) {
 }
 
 int open_inet_socket(server_t *server, const char *name, const char *port,
-                     const networking_attr_t *attr, int *err_type) {
-    // attributes not used with OpenSSL, but kept in signature for compatibility
-    (void)attr;
+                     int *err_type) {
     if (server == NULL || port == NULL || name == NULL) {
         set_err(err_type, SYS);
         DEBUG_PRINT("server, name, or port is NULL\n");
@@ -425,8 +423,7 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
     return err;
 }
 
-int open_unix_socket(server_t *server, const char *name, const char *path,
-                     const networking_attr_t *attr) {
+int open_unix_socket(server_t *server, const char *name, const char *path) {
     // TODO:convert raw unix socket to OpenSSL BIO object
     if (server == NULL || name == NULL || path == NULL) {
         DEBUG_PRINT("server, name, or path is NULL\n");
@@ -439,20 +436,8 @@ int open_unix_socket(server_t *server, const char *name, const char *path,
         return err;
     }
 
-    if (attr == NULL) {
-        // use default values
-        DEBUG_PRINT("using default attributes\n");
-        networking_attr_t def_attr;
-        attr = &def_attr;
-        init_attr((networking_attr_t *)attr);
-    }
-    int socktype;
-    size_t connections;
-    network_attr_get_socktype(attr, &socktype);
-    network_attr_get_max_connections(attr, &connections);
-
     err = SUCCESS;
-    int sock = socket(AF_UNIX, socktype, 0);
+    int sock = socket(AF_UNIX, SOCK_STREAM, 0);
     if (sock == FAILURE) {
         err = errno;
         goto error;
@@ -468,12 +453,11 @@ int open_unix_socket(server_t *server, const char *name, const char *path,
         goto error;
     }
 
-    if (socktype == SOCK_STREAM || socktype == SOCK_SEQPACKET) {
-        if (listen(sock, connections) == FAILURE) {
-            err = errno;
-            goto error;
-        }
+    if (listen(sock, MAX_CONNECTIONS) == FAILURE) {
+        err = errno;
+        goto error;
     }
+
     srv->accept_io = new_io_info(sock, ACCEPT_IO, &err);
     if (srv->accept_io == NULL) {
         goto error;

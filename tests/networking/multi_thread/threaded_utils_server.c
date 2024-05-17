@@ -125,7 +125,7 @@ void allow_graceful_exit(void) {
 int add_counter(server_t *server, const char *name, const char *port) {
     int err;
     int err_type;
-    err = open_inet_socket(server, name, port, NULL, &err_type);
+    err = open_inet_socket(server, name, port, &err_type);
     if (err != SUCCESS) {
         switch (err_type) {
         case SYS:

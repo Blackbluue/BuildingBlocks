@@ -21,7 +21,6 @@
 
 #define SUCCESS 0
 #define FAILURE -1
-#define MAX_CONNECTIONS 4096
 
 struct io_info {
     int type;
