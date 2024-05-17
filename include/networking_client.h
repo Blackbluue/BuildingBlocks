@@ -7,7 +7,8 @@
 
 /* FUNCTIONS */
 
-int get_server_sock(const char *host, const char *port,
-                    const networking_attr_t *attr, int *err, int *err_type);
+io_info_t *get_server_info(const char *host, const char *port,
+                           const networking_attr_t *attr, int *err,
+                           int *err_type);
 
 #endif /* NETWORKING_CLIENT_H */

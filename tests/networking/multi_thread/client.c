@@ -181,8 +181,8 @@ void *thread_test(void *arg) {
     char *port = arg;
     int err = SUCCESS;
     int err_type;
-    int server_sock = get_server_sock(NULL, port, NULL, &err, &err_type);
-    if (server_sock == FAILURE) {
+    io_info_t *server_io = get_server_info(NULL, port, NULL, &err, &err_type);
+    if (server_io == NULL) {
         switch (err_type) {
         case SYS:
             fprintf(stderr, "open_inet_socket: %s\n", strerror(err));
@@ -202,17 +202,12 @@ void *thread_test(void *arg) {
         }
         return (void *)FAILURE;
     }
-    io_info_t *server_io = new_io_info(server_sock, CONNECTED_IO, &err);
-    if (server_io == NULL) {
-        fprintf(stderr, "new_io_info: %s\n", strerror(err));
-        close(server_sock);
-        return (void *)FAILURE;
-    }
 
     // random seed set from sever socket number
     struct random_data rdata = {0};
     char statebuf[RAND_BUF_SIZE];
-    initstate_r(time(NULL) + server_sock, statebuf, RAND_BUF_SIZE, &rdata);
+    initstate_r(time(NULL) + io_info_fd(server_io, NULL), statebuf,
+                RAND_BUF_SIZE, &rdata);
 
     // run tests
     long thread_err = SUCCESS;
@@ -230,7 +225,7 @@ void *thread_test(void *arg) {
     }
 
     // close the socket
-    close(server_sock);
+    free_io_info(server_io);
     return (void *)thread_err;
 }
 

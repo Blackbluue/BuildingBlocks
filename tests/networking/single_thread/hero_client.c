@@ -18,7 +18,6 @@
 #define TIMEOUT TO_DEFAULT * 5
 
 #define HERO_NAME "Tartaglia"
-int server_sock;
 io_info_t *server_io;
 
 static void exit_handler(int sig) { (void)sig; }
@@ -34,8 +33,8 @@ void allow_graceful_exit(void) {
 int init_suite1(void) {
     int err;
     int err_type;
-    server_sock = get_server_sock(NULL, TCP_PORT, NULL, &err, &err_type);
-    if (server_sock == FAILURE) {
+    server_io = get_server_info("", TCP_PORT, NULL, &err, &err_type);
+    if (server_io == NULL) {
         switch (err_type) {
         case SYS:
             fprintf(stderr, "open_inet_socket: %s\n", strerror(err));
@@ -55,18 +54,12 @@ int init_suite1(void) {
         }
         return FAILURE;
     }
-    server_io = new_io_info(server_sock, CONNECTED_IO, &err);
-    if (server_io == NULL) {
-        fprintf(stderr, "new_io_info: %s\n", strerror(err));
-        close(server_sock);
-        return FAILURE;
-    }
     return SUCCESS;
 }
 
 int clean_suite1(void) {
     free_io_info(server_io);
-    return close(server_sock);
+    return SUCCESS;
 }
 
 void test_send_hero() {
