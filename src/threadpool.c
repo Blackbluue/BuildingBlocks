@@ -1,21 +1,29 @@
+#define _DEFAULT_SOURCE
 #include "threadpool.h"
 #include "buildingblocks.h"
 #include "queue_concurrent.h"
 #include <errno.h>
 #include <pthread.h>
+#include <signal.h>
+#include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* DATA */
 
 #define SUCCESS 0
+#define LOCK_WAIT_TIMEOUT 3
+
+// casting for pthread start routine
+typedef void *(*THRD)(void *);
 
 struct task_t {
     ROUTINE action;
     void *arg;
-    void *arg2;
 };
 
 struct thread {
+    size_t index;
     pthread_t id;
     threadpool_t *pool;
     struct task_t *task;
@@ -23,15 +31,21 @@ struct thread {
     thread_status status;
     int error;
     pthread_cond_t error_cond;
+    task_type type;
+    pthread_cond_t type_cond;
 };
 
 struct threadpool_t {
     struct thread *threads;
     struct thread_info *info;
     pthread_rwlock_t running_lock;
+    pthread_mutex_t pool_lock;
     queue_c_t *queue;
     size_t num_threads;
     size_t max_threads;
+    bool lock_requested;
+    size_t locked_thread;
+    pthread_cond_t lock_cond;
     int shutdown;
     int timed_wait;
     int block_on_add;
@@ -64,6 +78,7 @@ static void free_pool(threadpool_t *pool) {
     for (size_t i = 0; i < pool->max_threads; i++) {
         struct thread *thread = &pool->threads[i];
         pthread_cond_destroy(&thread->error_cond);
+        pthread_cond_destroy(&thread->type_cond);
         pthread_mutex_destroy(&thread->info_lock);
         if (thread->task != NULL) {
             free(thread->task);
@@ -72,9 +87,10 @@ static void free_pool(threadpool_t *pool) {
     free(pool->threads);
     free(pool->info);
     pthread_rwlock_destroy(&pool->running_lock);
+    pthread_mutex_destroy(&pool->pool_lock);
+    pthread_cond_destroy(&pool->lock_cond);
     queue_c_destroy(&pool->queue);
     free(pool);
-    DEBUG_PRINT("\tThreadpool freed\n");
 }
 
 /**
@@ -99,21 +115,24 @@ static threadpool_t *init_thread_info(threadpool_t *pool, int *err) {
         return NULL;
     }
     for (size_t i = 0; i < pool->max_threads; i++) {
-        DEBUG_PRINT("\tInitializing thread %zu\n", i);
+        DEBUG_PRINT("\tInitializing thread info %zu\n", i);
         struct thread *thread = &pool->threads[i];
+        thread->index = i;
         thread->pool = pool;
         thread->task = NULL;
         pthread_mutex_init(&thread->info_lock, NULL);
         thread->status = STOPPED;
         thread->error = SUCCESS;
         pthread_cond_init(&thread->error_cond, NULL);
+        thread->type = UNSPECIFIED;
+        pthread_cond_init(&thread->type_cond, NULL);
 
         struct thread_info *info = &pool->info[i];
         info->index = i;
         info->action = NULL;
         info->arg = NULL;
-        info->arg2 = NULL;
         info->status = STOPPED;
+        info->type = UNSPECIFIED;
         info->error = SUCCESS;
     }
     DEBUG_PRINT("\tThreadpool initialized\n");
@@ -160,6 +179,10 @@ static threadpool_t *init_pool(threadpool_attr_t *attr, int *err) {
 
     // initialize mutexes and condition variables
     pthread_rwlock_init(&pool->running_lock, NULL);
+    pthread_mutex_init(&pool->pool_lock, NULL);
+    pthread_cond_init(&pool->lock_cond, NULL);
+    pool->lock_requested = false;
+    pool->locked_thread = 0;
     pool->num_threads = 0;
     pool->shutdown = NO_SHUTDOWN;
 
@@ -194,12 +217,10 @@ static void wait_on_error(struct thread *self) {
 /**
  * @brief Perform a task for the threadpool.
  *
- * @param arg pointer to threadpool_t
- * @return void* NULL
+ * @param self pointer to thread
  */
-static void *thread_task(void *arg) {
-    DEBUG_PRINT("Thread task: thread %lX\n", pthread_self());
-    struct thread *self = arg;
+static void thread_task(struct thread *self) {
+    DEBUG_PRINT("Starting worker %lX\n", pthread_self());
     threadpool_t *pool = self->pool;
     set_status(self, IDLE);
     for (;;) {
@@ -208,12 +229,27 @@ static void *thread_task(void *arg) {
         while (queue_c_is_empty(pool->queue) && pool->shutdown == NO_SHUTDOWN) {
             int err = queue_c_wait_for_not_empty(pool->queue);
             if (!(err == SUCCESS || err == EAGAIN)) {
-                // EAGAIN returned if threadpool is being gracefully destroyed
+                // EAGAIN returned if queue wait is manually canceled
                 DEBUG_PRINT("\ton thread %lX: Error waiting for work\n",
                             pthread_self());
                 queue_c_unlock(pool->queue);
                 set_status(self, STOPPED);
-                return NULL;
+                return;
+            } else if (err == EAGAIN) {
+                // check if thread lock requested
+                pthread_mutex_lock(&pool->pool_lock);
+                if (pool->lock_requested) {
+                    pthread_mutex_lock(&self->info_lock);
+                    self->status = LOCKED;
+                    self->type = UNSPECIFIED;
+                    pthread_mutex_unlock(&self->info_lock);
+                    pool->lock_requested = false;
+                    pool->locked_thread = self->index;
+                    pthread_cond_signal(&pool->lock_cond);
+                    pthread_mutex_unlock(&pool->pool_lock);
+                    return;
+                }
+                pthread_mutex_unlock(&pool->pool_lock);
             }
         }
 
@@ -225,7 +261,7 @@ static void *thread_task(void *arg) {
                         pthread_self());
             queue_c_unlock(pool->queue);
             set_status(self, DESTROYING);
-            return NULL;
+            return;
         }
 
         DEBUG_PRINT("\ton thread %lX: ..Performing work\n", pthread_self());
@@ -243,7 +279,7 @@ static void *thread_task(void *arg) {
         pthread_mutex_unlock(&self->info_lock);
         DEBUG_PRINT("\ton thread %lX: Work dequeued\n", pthread_self());
         pthread_rwlock_rdlock(&pool->running_lock);
-        int err = self->task->action(self->task->arg, self->task->arg2);
+        int err = self->task->action(self->task->arg);
         pthread_rwlock_unlock(&pool->running_lock);
         pthread_mutex_lock(&self->info_lock);
         self->error = err;
@@ -254,6 +290,157 @@ static void *thread_task(void *arg) {
         pthread_mutex_unlock(&self->info_lock);
         DEBUG_PRINT("\ton thread %lX: Work complete\n", pthread_self());
     }
+}
+
+/**
+ * @brief Perform a dedicated task for the threadpool.
+ *
+ * @param self pointer to thread
+ */
+static void dedicated_task(struct thread *self) {
+    DEBUG_PRINT("Starting dedicated %lX\n", pthread_self());
+    set_status(self, RUNNING);
+
+    DEBUG_PRINT("\ton thread %lX: ..Performing work\n", pthread_self());
+    // perform work
+    int err = self->task->action(self->task->arg);
+    pthread_mutex_lock(&self->info_lock);
+    self->error = err;
+    free(self->task);
+    self->task = NULL;
+    self->type = UNSPECIFIED;
+    DEBUG_PRINT("\ton thread %lX: Work complete\n", pthread_self());
+    // check if threadpool is shutting down
+    if (self->pool->shutdown != NO_SHUTDOWN) {
+        DEBUG_PRINT("\ton thread %lX: Thread shutting down\n", pthread_self());
+        self->status = DESTROYING;
+    } else {
+        // reset status to locked. application can check on the error then
+        self->status = LOCKED;
+    }
+    pthread_mutex_unlock(&self->info_lock);
+}
+
+/**
+ * @brief Task coordinator for the thread.
+ *
+ * The thread will wait for a task type to be assigned to it. Either worker or
+ * dedicated.
+ *
+ * @param self pointer to thread
+ * @return void* NULL
+ */
+static void *task_coordinator(struct thread *self) {
+    DEBUG_PRINT("Starting thread %lX\n", pthread_self());
+
+    threadpool_t *pool = self->pool;
+    for (;;) {
+        pthread_mutex_lock(&self->info_lock);
+        while (self->type == UNSPECIFIED && pool->shutdown == NO_SHUTDOWN) {
+            pthread_cond_wait(&self->type_cond, &self->info_lock);
+        }
+        // check if threadpool is shutting down
+        if (pool->shutdown != NO_SHUTDOWN) {
+            self->status = DESTROYING;
+            pthread_mutex_unlock(&self->info_lock);
+            DEBUG_PRINT("Destroying thread %lX\n", pthread_self());
+            return NULL;
+        }
+
+        task_type type = self->type;
+        pthread_mutex_unlock(&self->info_lock);
+        switch (type) {
+        case WORKER:
+            // perform work from queue
+            thread_task(self);
+            break;
+        case DEDICATED:
+            // perform dedicated task
+            dedicated_task(self);
+            break;
+        default: // error in type, exit thread
+            return NULL;
+        }
+        DEBUG_PRINT("Thread %lX: Checking for destruction\n", pthread_self());
+        pthread_mutex_lock(&self->info_lock);
+        if (self->status == DESTROYING) {
+            pthread_mutex_unlock(&self->info_lock);
+            DEBUG_PRINT("Destroying thread %lX\n", pthread_self());
+            return NULL;
+        }
+        pthread_mutex_unlock(&self->info_lock);
+    }
+}
+
+/**
+ * @brief Lock an idle thread.
+ *
+ * @param pool pointer to threadpool_t
+ * @param thread_idx pointer to thread index
+ * @retval 0 if successful
+ * @retval EAGAIN if no threads available
+ */
+static int lock_idle(threadpool_t *pool, size_t *thread_idx) {
+    int locked = EAGAIN;
+    if (pool != NULL) {
+        pthread_mutex_lock(&pool->pool_lock);
+        pool->lock_requested = true;
+        // wake all threads, ask 1 to lock
+        queue_c_cancel_wait(pool->queue);
+        struct timespec abstime = {time(NULL) + LOCK_WAIT_TIMEOUT, 0};
+        // locked thread will set lock_requested to false
+        while (pool->lock_requested == true) {
+            pthread_cond_timedwait(&pool->lock_cond, &pool->pool_lock,
+                                   &abstime);
+        }
+        // if lock requested is false, thread is locked
+        if (pool->lock_requested == false) {
+            if (thread_idx != NULL) {
+                *thread_idx = pool->locked_thread;
+            }
+            locked = SUCCESS;
+        }
+        pthread_mutex_unlock(&pool->pool_lock);
+    }
+    return locked;
+}
+
+/**
+ * @brief Lock a stopped thread.
+ *
+ * @param pool pointer to threadpool_t
+ * @param thread_idx pointer to thread index
+ * @retval 0 if successful
+ * @retval EAGAIN if no threads available
+ */
+static int lock_stopped(threadpool_t *pool, size_t *thread_idx) {
+    int locked = EAGAIN;
+    if (pool != NULL) {
+        for (size_t i = 0; i < pool->max_threads; i++) {
+            struct thread *thread = &pool->threads[i];
+            pthread_mutex_lock(&thread->info_lock);
+            if (thread->status == STOPPED) {
+                thread->status = LOCKED;
+                int res = pthread_create(&thread->id, NULL,
+                                         (THRD)task_coordinator, thread);
+                if (res == SUCCESS) {
+                    DEBUG_PRINT("\tLocking thread %lX\n", thread->id);
+                    if (thread_idx != NULL) {
+                        *thread_idx = i;
+                    }
+                    pthread_mutex_unlock(&thread->info_lock);
+                    locked = SUCCESS;
+                    break;
+                } else {
+                    DEBUG_PRINT("\tFailed to start/lock thread %zu\n", i);
+                    thread->status = STOPPED;
+                    thread->type = UNSPECIFIED;
+                }
+            }
+            pthread_mutex_unlock(&thread->info_lock);
+        }
+    }
+    return locked;
 }
 
 /**
@@ -274,15 +461,33 @@ static int start_new_thread(threadpool_t *pool) {
         struct thread *thread = &pool->threads[i];
         pthread_mutex_lock(&thread->info_lock);
         switch (thread->status) {
-        case STOPPED:
-            res = pthread_create(&thread->id, NULL, thread_task, thread);
-            pthread_mutex_unlock(&thread->info_lock);
-            if (res == SUCCESS) {
-                pool->num_threads++;
+        case STARTING:
+            if (thread->type == UNSPECIFIED) {
+                // only signal the thread to start if it is not already starting
+                DEBUG_PRINT("\tWake thread %zu with id %lX\n", i, thread->id);
+                thread->type = WORKER;
+                pthread_cond_signal(&thread->type_cond);
+                return SUCCESS;
             }
+            // keep looking
+            break;
+        case STOPPED:
+            thread->status = STARTING;
+            thread->type = WORKER;
+            res = pthread_create(&thread->id, NULL, (THRD)task_coordinator,
+                                 thread);
+            if (res == SUCCESS) {
+                DEBUG_PRINT("\tStart thread %zu with id %lX\n", i, thread->id);
+                pool->num_threads++;
+            } else {
+                thread->status = STOPPED;
+                thread->type = UNSPECIFIED;
+            }
+            pthread_mutex_unlock(&thread->info_lock);
             return res;
         case IDLE:
             // assume this thread will eventually pick up the task
+            DEBUG_PRINT("\tThread %zu is idle, let it take the task\n", i);
             pthread_mutex_unlock(&thread->info_lock);
             return SUCCESS;
         default: // keep looking
@@ -299,10 +504,9 @@ static int start_new_thread(threadpool_t *pool) {
  * @param pool pointer to threadpool_t
  * @param action pointer to function to be performed
  * @param arg pointer to argument for action
- * @param arg2 pointer to second argument for action
  * @return int 0 if successful, otherwise error code
  */
-static int add_task(threadpool_t *pool, ROUTINE action, void *arg, void *arg2) {
+static int add_task(threadpool_t *pool, ROUTINE action, void *arg) {
     struct task_t *task = malloc(sizeof(*task));
     if (task == NULL) {
         queue_c_unlock(pool->queue);
@@ -312,8 +516,6 @@ static int add_task(threadpool_t *pool, ROUTINE action, void *arg, void *arg2) {
     }
     task->action = action;
     task->arg = arg;
-    task->arg2 = arg2;
-    DEBUG_PRINT("\ton thread %lX: \tEnqueueing...\n", pthread_self());
     int res = queue_c_enqueue(pool->queue, task);
     if (res != SUCCESS) {
         queue_c_unlock(pool->queue);
@@ -329,8 +531,8 @@ static int add_task(threadpool_t *pool, ROUTINE action, void *arg, void *arg2) {
     if (pool->thread_creation == THREAD_CREATE_LAZY) {
         res = start_new_thread(pool);
         if (res != SUCCESS) {
-            DEBUG_PRINT("\ton thread %lX: Failed to start new thread\n",
-                        pthread_self());
+            DEBUG_PRINT("\ton thread %lX: Failed to start new thread '%s'\n",
+                        pthread_self(), strerror(res));
             return res;
         }
     }
@@ -356,7 +558,15 @@ static int restart_thread(struct thread *thread) {
         res = SUCCESS;
         break;
     case STOPPED: // thread is not running
-        res = pthread_create(&thread->id, NULL, thread_task, thread);
+        thread->status = STARTING;
+        thread->type = WORKER;
+        res = pthread_create(&thread->id, NULL, (THRD)task_coordinator, thread);
+        if (res == SUCCESS) {
+            DEBUG_PRINT("\tRestarted thread %lX\n", thread->id);
+        } else {
+            thread->status = STOPPED;
+            thread->type = UNSPECIFIED;
+        }
         break;
     default:
         break;
@@ -377,9 +587,10 @@ threadpool_t *threadpool_create(threadpool_attr_t *attr, int *err) {
     // strict creation requires all threads to be created before returning
     if (pool->thread_creation == THREAD_CREATE_STRICT) {
         for (size_t i = 0; i < pool->max_threads; i++) {
-            DEBUG_PRINT("\tCreating thread %zu\n", i);
             struct thread *thread = &pool->threads[i];
-            int res = pthread_create(&thread->id, NULL, thread_task, thread);
+            thread->status = STARTING;
+            int res = pthread_create(&thread->id, NULL, (THRD)task_coordinator,
+                                     thread);
             if (res != SUCCESS) {
                 threadpool_destroy(pool, SHUTDOWN_GRACEFUL);
                 set_err(err, res);
@@ -394,8 +605,7 @@ threadpool_t *threadpool_create(threadpool_attr_t *attr, int *err) {
     return pool;
 }
 
-int threadpool_add_work(threadpool_t *pool, ROUTINE action, void *arg,
-                        void *arg2) {
+int threadpool_add_work(threadpool_t *pool, ROUTINE action, void *arg) {
     DEBUG_PRINT("\ton thread %lX: Adding work to threadpool\n", pthread_self());
     if (pool == NULL || action == NULL) {
         DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
@@ -405,8 +615,7 @@ int threadpool_add_work(threadpool_t *pool, ROUTINE action, void *arg,
     // timeout ignored if TIMED_WAIT is not set
     if (pool->block_on_add == BLOCK_ON_ADD_ENABLED &&
         pool->timed_wait == TIMED_WAIT_ENABLED) {
-        return threadpool_timed_add_work(pool, action, arg, arg2,
-                                         pool->default_wait);
+        return threadpool_timed_add_work(pool, action, arg, pool->default_wait);
     } else if (pool->block_on_add) {
         DEBUG_PRINT("\ton thread %lX: ...Blocking on add\n", pthread_self());
         while (queue_c_is_full(pool->queue)) {
@@ -422,11 +631,11 @@ int threadpool_add_work(threadpool_t *pool, ROUTINE action, void *arg,
     }
 
     DEBUG_PRINT("\ton thread %lX: Adding task to queue\n", pthread_self());
-    return add_task(pool, action, arg, arg2);
+    return add_task(pool, action, arg);
 }
 
 int threadpool_timed_add_work(threadpool_t *pool, ROUTINE action, void *arg,
-                              void *arg2, time_t timeout) {
+                              time_t timeout) {
     DEBUG_PRINT("\ton thread %lX: Adding work to threadpool with timeout\n",
                 pthread_self());
     if (pool == NULL || action == NULL || timeout <= 0) {
@@ -445,31 +654,114 @@ int threadpool_timed_add_work(threadpool_t *pool, ROUTINE action, void *arg,
     }
 
     DEBUG_PRINT("\ton thread %lX: Adding task to queue\n", pthread_self());
-    return add_task(pool, action, arg, arg2);
+    return add_task(pool, action, arg);
 }
 
-int threadpool_thread_status(threadpool_t *pool, size_t thread_id,
+int threadpool_lock_thread(threadpool_t *pool, size_t *thread_idx) {
+    if (pool == NULL) {
+        DEBUG_PRINT("\ton thread %lX: pool is null\n", pthread_self());
+        return EINVAL;
+    }
+    int locked = EAGAIN;
+    // if strict, most threads should be idle
+    // if lazy, most threads should be stopped
+    if (pool->thread_creation == THREAD_CREATE_STRICT) {
+        // prioritize idle threads
+        locked = lock_idle(pool, thread_idx);
+        if (locked == EAGAIN) {
+            // look for stopped threads if none are idle
+            locked = lock_stopped(pool, thread_idx);
+        }
+    } else {
+        // prioritize stopped threads
+        locked = lock_stopped(pool, thread_idx);
+        if (locked == EAGAIN) {
+            // look for idle threads if none are stopped
+            locked = lock_idle(pool, thread_idx);
+        }
+    }
+    DEBUG_PRINT("\ton thread %lX: Locking %s\n", pthread_self(),
+                locked == SUCCESS ? "successful" : "failed");
+    return locked;
+}
+
+int threadpool_unlock_thread(threadpool_t *pool, size_t thread_idx) {
+    if (pool == NULL) {
+        DEBUG_PRINT("\ton thread %lX: pool is null\n", pthread_self());
+        return EINVAL;
+    } else if (thread_idx >= pool->max_threads) {
+        DEBUG_PRINT("\ton thread %lX: %zu is not a valid thread\n",
+                    pthread_self(), thread_idx);
+        return ENOENT;
+    }
+    struct thread *thread = &pool->threads[thread_idx];
+    pthread_mutex_lock(&thread->info_lock);
+    if (thread->status == LOCKED) {
+        thread->status = STARTING;
+        DEBUG_PRINT("\ton thread %lX: Unlocked thread %zu\n", pthread_self(),
+                    thread_idx);
+    }
+    pthread_mutex_unlock(&thread->info_lock);
+    return SUCCESS;
+}
+
+int threadpool_add_dedicated(threadpool_t *pool, ROUTINE action, void *arg,
+                             size_t thread_idx) {
+    if (pool == NULL || action == NULL) {
+        DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
+        return EINVAL;
+    } else if (thread_idx >= pool->max_threads) {
+        DEBUG_PRINT("\ton thread %lX: %zu is not a valid thread\n",
+                    pthread_self(), thread_idx);
+        return ENOENT;
+    }
+
+    int res = EAGAIN;
+    struct thread *thread = &pool->threads[thread_idx];
+    pthread_mutex_lock(&thread->info_lock);
+    if (thread->status == LOCKED) {
+        thread->task = malloc(sizeof(*thread->task));
+        if (thread->task == NULL) {
+            res = ENOMEM;
+            goto cleanup;
+        }
+        thread->task->action = action;
+        thread->task->arg = arg;
+        thread->type = DEDICATED;
+        pthread_cond_signal(&thread->type_cond);
+        res = SUCCESS;
+    }
+
+cleanup:
+    DEBUG_PRINT("\ton thread %lX: Dedicated thread %zu is %s started\n",
+                pthread_self(), thread_idx,
+                res == SUCCESS ? "successfully" : "unsuccessfully");
+    pthread_mutex_unlock(&thread->info_lock);
+    return res;
+}
+
+int threadpool_thread_status(threadpool_t *pool, size_t thread_idx,
                              struct thread_info *info) {
     DEBUG_PRINT("\ton thread %lX: Getting thread status\n", pthread_self());
     if (pool == NULL || info == NULL) {
         DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
         return EINVAL;
-    } else if (thread_id >= pool->max_threads) {
+    } else if (thread_idx >= pool->max_threads) {
         DEBUG_PRINT("\ton thread %lX: %zu is not a valid thread\n",
-                    pthread_self(), thread_id);
+                    pthread_self(), thread_idx);
         return ENOENT;
     }
-    struct thread *thread = &pool->threads[thread_id];
+    struct thread *thread = &pool->threads[thread_idx];
     pthread_mutex_lock(&thread->info_lock);
-    info->index = thread_id;
+    info->index = thread_idx;
     info->action = thread->task->action;
     info->arg = thread->task->arg;
-    info->arg2 = thread->task->arg2;
     info->status = thread->status;
+    info->type = thread->type;
     info->error = thread->error;
     pthread_mutex_unlock(&thread->info_lock);
     DEBUG_PRINT("\ton thread %lX: Thread %zu status: %d\n", pthread_self(),
-                thread_id, info->status);
+                thread_idx, info->status);
     return SUCCESS;
 }
 
@@ -493,19 +785,19 @@ int threadpool_thread_status_all(threadpool_t *pool,
     return SUCCESS;
 }
 
-int threadpool_restart_thread(threadpool_t *pool, size_t thread_id) {
+int threadpool_restart_thread(threadpool_t *pool, size_t thread_idx) {
     DEBUG_PRINT("\ton thread %lX: Restarting thread %zu\n", pthread_self(),
-                thread_id);
+                thread_idx);
     if (pool == NULL) {
         DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
         return EINVAL;
-    } else if (thread_id >= pool->max_threads) {
+    } else if (thread_idx >= pool->max_threads) {
         DEBUG_PRINT("\ton thread %lX: %zu is not a valid thread\n",
-                    pthread_self(), thread_id);
+                    pthread_self(), thread_idx);
         return ENOENT;
     }
 
-    return restart_thread(&pool->threads[thread_id]);
+    return restart_thread(&pool->threads[thread_idx]);
 }
 
 int threadpool_refresh(threadpool_t *pool) {
@@ -516,9 +808,13 @@ int threadpool_refresh(threadpool_t *pool) {
     }
 
     for (size_t i = 0; i < pool->max_threads; i++) {
-        // ignore error on failure to start thread
-        int res = restart_thread(&pool->threads[i]);
-        if (res != SUCCESS && pool->thread_creation == THREAD_CREATE_STRICT) {
+        struct thread *thread = &pool->threads[i];
+        if (pool->thread_creation == THREAD_CREATE_LAZY &&
+            thread->status != BLOCKED) {
+            // only refresh blocked threads when using lazy creation
+            continue;
+        }
+        if (restart_thread(thread) != SUCCESS) {
             DEBUG_PRINT("\ton thread %lX: Failed to refresh thread %zu\n",
                         pthread_self(), i);
             return EAGAIN;
@@ -528,7 +824,6 @@ int threadpool_refresh(threadpool_t *pool) {
 }
 
 int threadpool_wait(threadpool_t *pool) {
-    DEBUG_PRINT("\ton thread %lX: Waiting for threadpool\n", pthread_self());
     if (pool == NULL) {
         DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
         return EINVAL;
@@ -537,10 +832,16 @@ int threadpool_wait(threadpool_t *pool) {
         return threadpool_timed_wait(pool, pool->default_wait);
     }
 
-    DEBUG_PRINT("\ton thread %lX: ...Waiting for queue to be empty\n",
-                pthread_self());
+    DEBUG_PRINT("\ton thread %lX: ...Waiting for threadpool\n", pthread_self());
+    // this loop is skipped if the queue is empty upon first check,
+    // meaning the queue is never locked. bug?
     while (!queue_c_is_empty(pool->queue)) {
-        queue_c_wait_for_empty(pool->queue);
+        int res = queue_c_wait_for_empty(pool->queue);
+        if (res != SUCCESS) {
+            DEBUG_PRINT("\ton thread %lX: stop waiting on queue: %s\n",
+                        pthread_self(), strerror(res));
+            return res;
+        }
     }
 
     // cant acquire the write lock until all readers are done
@@ -567,9 +868,11 @@ int threadpool_timed_wait(threadpool_t *pool, time_t timeout) {
         "\ton thread %lX: ...Waiting for queue to be empty with timeout\n",
         pthread_self());
     while (!queue_c_is_empty(pool->queue)) {
-        if (queue_c_timed_wait_for_empty(pool->queue, timeout) == ETIMEDOUT) {
-            DEBUG_PRINT("\ton thread %lX: Timed out\n", pthread_self());
-            return ETIMEDOUT;
+        int res = queue_c_timed_wait_for_empty(pool->queue, timeout);
+        if (res != SUCCESS) {
+            DEBUG_PRINT("\ton thread %lX: stop waiting on queue: %s\n",
+                        pthread_self(), strerror(res));
+            return res;
         }
     }
 
@@ -588,22 +891,95 @@ int threadpool_timed_wait(threadpool_t *pool, time_t timeout) {
     return SUCCESS;
 }
 
+int threadpool_cancel_wait(threadpool_t *pool) {
+    if (pool == NULL) {
+        DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
+        return EINVAL;
+    }
+    DEBUG_PRINT("\ton thread %lX: Cancelling wait on threadpool\n",
+                pthread_self());
+    queue_c_cancel_wait(pool->queue);
+    return SUCCESS;
+}
+
+int threadpool_signal_all(threadpool_t *pool, int sig) {
+    if (pool == NULL) {
+        DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
+        return EINVAL;
+    } else if (sigaction(sig, NULL, NULL) == EINVAL) {
+        DEBUG_PRINT("\ton thread %lX: Invalid signal\n", pthread_self());
+        return EINVAL;
+    }
+
+    DEBUG_PRINT("\ton thread %lX: Signaling threadpool: '%s'\n", pthread_self(),
+                strsignal(sig));
+    for (size_t i = 0; i < pool->max_threads; i++) {
+        struct thread *thread = &pool->threads[i];
+        pthread_mutex_lock(&thread->info_lock);
+        if (thread->status == RUNNING) {
+            pthread_kill(thread->id, sig);
+        }
+        pthread_mutex_unlock(&thread->info_lock);
+    }
+    return SUCCESS;
+}
+
+int threadpool_signal(threadpool_t *pool, size_t thread_idx, int sig) {
+    if (pool == NULL) {
+        DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
+        return EINVAL;
+    } else if (thread_idx >= pool->max_threads) {
+        DEBUG_PRINT("\ton thread %lX: %zu is not a valid thread\n",
+                    pthread_self(), thread_idx);
+        return ENOENT;
+    } else if (sigaction(sig, NULL, NULL) == EINVAL) {
+        DEBUG_PRINT("\ton thread %lX: Invalid signal\n", pthread_self());
+        return EINVAL;
+    }
+
+    DEBUG_PRINT("\ton thread %lX: Signaling thread %zu: '%s'\n", pthread_self(),
+                thread_idx, strsignal(sig));
+    struct thread *thread = &pool->threads[thread_idx];
+    pthread_mutex_lock(&thread->info_lock);
+    if (thread->status == RUNNING) {
+        pthread_kill(thread->id, sig);
+    }
+    pthread_mutex_unlock(&thread->info_lock);
+    return SUCCESS;
+}
+
 int threadpool_destroy(threadpool_t *pool, int flag) {
-    DEBUG_PRINT("\ton thread %lX: Destroying threadpool\n", pthread_self());
     if (pool == NULL ||
         (flag != SHUTDOWN_GRACEFUL && flag != SHUTDOWN_FORCEFUL)) {
         DEBUG_PRINT("\ton thread %lX: Invalid arguments\n", pthread_self());
         return EINVAL;
     }
+    DEBUG_PRINT("\ton thread %lX: Destroying threadpool\n", pthread_self());
     if (flag == SHUTDOWN_GRACEFUL) {
         threadpool_wait(pool);
     }
-    // wake up all threads
+    // wake up all threads, then allow them to end on their own
     pool->shutdown = flag;
-    DEBUG_PRINT("\ton thread %lX: Waking threads\n", pthread_self());
     queue_c_cancel_wait(pool->queue);
     for (size_t i = 0; i < pool->max_threads; i++) {
         struct thread *thread = &pool->threads[i];
+        pthread_mutex_lock(&thread->info_lock);
+        switch (thread->status) {
+        case STOPPED:
+            // skip threads that are not running
+            continue;
+        case STARTING:
+        case LOCKED:
+            // wake up starting/locked threads
+            DEBUG_PRINT("\ton thread %lX: Unblocking thread %zu with id %lX\n",
+                        pthread_self(), i, thread->id);
+            pthread_cond_signal(&thread->type_cond);
+            break;
+        default:
+            break;
+        }
+        pthread_mutex_unlock(&thread->info_lock);
+
         if (flag == SHUTDOWN_FORCEFUL) {
             // will be ignored if thread is already cancelled
             DEBUG_PRINT("\ton thread %lX: Cancelling thread %zu with id %lX\n",

@@ -379,6 +379,10 @@ int hash_table_iterate(hash_table_t *table, ACT_TABLE_F action,
         .addl_data = addl_data,
     };
     for (size_t i = 0; i < table->capacity; i++) {
+        if (table->buckets[i] == NULL) {
+            // skip empty buckets
+            continue;
+        }
         err =
             list_foreach_call(table->buckets[i], action_wrapper, &action_data);
         if (err != CONTINUE) {

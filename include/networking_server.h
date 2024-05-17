@@ -2,8 +2,14 @@
 #define NETWORKING_SERVER_H
 
 #include "networking_utils.h"
+#include <signal.h>
 
 /* DATA */
+
+// Used internally to control the server. Applications should not use this.
+#define CONTROL_SIGNAL_1 SIGRTMIN + 1
+// Used internally to control the server. Applications should not use this.
+#define CONTROL_SIGNAL_2 SIGRTMIN + 2
 
 typedef struct server server_t;
 
@@ -14,13 +20,28 @@ typedef struct server server_t;
  *
  * Creates the server object, which can be used to run multiple services.
  *
+ * The maximum number of allowed services is determined by the underlying
+ * threadpool @link{threadpool.h}.
+ *
+ * The server will monitor signals sent to the process. Do not alter the signal
+ * mask of the process while the server is running, as this may cause the server
+ * to behave unexpectedly. The mask should be altered before the server is
+ * created. They will be restored when the server is destroyed.
+ *
+ * @note A current limitation of the server is that it will block any signals
+ * that are sent to the process. The appropriate functions will still exit with
+ * EINTR, but signal handlers will not be called.This is a limitation of the
+ * server and may be addressed in future versions.
+ *
  * Possible errors:
+ * - EINVAL: max_services is 0 or greater than the maximum number of threads.
  * - ENOMEM: Insufficient memory is available.
  *
- * @param err - The error code.
+ * @param max_services - The maximum number of services the server can run.
+ * @param err - Where to store any errors.
  * @return server_t* - the server on success, NULL on failure.
  */
-server_t *init_server(int *err);
+server_t *init_server(size_t max_services, int *err);
 
 /**
  * @brief Destroy a server.
@@ -40,6 +61,7 @@ int destroy_server(server_t *server);
  *
  * Errors are separated into different types. The error type will be stored in
  * optional err_type argument, while the error itself will always be returned.
+ *
  * Possible errors:
  * - SOCK: socket error
  *      See socket(2)for more details.
@@ -48,13 +70,11 @@ int destroy_server(server_t *server);
  * - SYS: system error
  *      EINVAL: server, name, or port is NULL
  *      ENOMEM: Insufficient memory is available.
+ *      EEXIST: The socket with the given name already exists
  * - BIND: bind error
  *      See bind(2)for more details.
  * - LISTEN: listen error
  *      See listen(2)for more details.
- *
- * @note Until multiple services are supported, the name will be ignored and
- * calling this function multiple times will overwrite the previous service.
  *
  * @param server - The server to store the socket.
  * @param name - The identifier of the service.
@@ -76,10 +96,8 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
  * Possible errors:
  * - EINVAL: server, name, or path is NULL
  * - ENOMEM: Insufficient memory is available.
+ * - EEXIST: The socket with the given name already exists
  * See socket(2), bind(2) and listen(2) for more error details.
- *
- * @note Until multiple services are supported, the name will be ignored and
- * calling this function multiple times will overwrite the previous service.
  *
  * @param server - the server to store the socket.
  * @param name - the identifier of the service.
@@ -129,5 +147,21 @@ int register_service(server_t *server, const char *name, service_f service,
  * @return int - 0 on success, non-zero on failure.
  */
 int run_service(server_t *server, const char *name);
+
+/**
+ * @brief Run the server.
+ *
+ * Runs the server, accepting incoming connections and running the designated
+ * services. The function will block while running the server; it will return
+ * when it encounters a network error or when all services terminate.
+ *
+ * Possible errors:
+ * - EINVAL: server is NULL.
+ * See accept(2) and the service function for more error details.
+ *
+ * @param server - The server to run.
+ * @return int - 0 on success, non-zero on failure.
+ */
+int run_server(server_t *server);
 
 #endif /* NETWORKING_SERVER_H */

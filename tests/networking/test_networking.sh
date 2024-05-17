@@ -13,10 +13,11 @@ kill -0 ${server_pid} 2> /dev/null
 running=$?
 if [[ ${running} -ne 0 ]]; then
     echo "Failed to start server"
+    exit ${running}
 fi
 
 # Start the client
-${client}
+valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ${client}
 result=$?
 
 # Kill the server

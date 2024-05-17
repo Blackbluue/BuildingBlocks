@@ -124,6 +124,9 @@ threadpool_t *setup_test(void) {
     CU_ASSERT_EQUAL_FATAL(
         threadpool_attr_set_timed_wait(&attr, TIMED_WAIT_ENABLED), SUCCESS);
     CU_ASSERT_EQUAL_FATAL(threadpool_attr_set_timeout(&attr, TIMEOUT), SUCCESS);
+    CU_ASSERT_EQUAL_FATAL(
+        threadpool_attr_set_thread_creation(&attr, THREAD_CREATE_LAZY),
+        SUCCESS);
 
     fprintf(stderr, "\tsetup_test\n");
     threadpool_t *pool = threadpool_create(&attr, NULL);
@@ -148,8 +151,7 @@ void teardown_test(threadpool_t **pool) {
     fprintf(stderr, "\tteardown_test done\n");
 }
 
-int dummy_task(void *arg, void *arg2) {
-    (void)arg2;
+int dummy_task(void *arg) {
     fprintf(stderr, "\ton thread %lX: dummy_task\n", pthread_self());
     sleep(TIMEOUT);
     fprintf(stderr, "\ton thread %lX: work starting\n", pthread_self());
@@ -175,8 +177,7 @@ int start_tasks(threadpool_t *pool, int *done) {
     int tasks = 0;
     int work_added;
     do {
-        work_added =
-            threadpool_timed_add_work(pool, dummy_task, done, NULL, TIMEOUT);
+        work_added = threadpool_timed_add_work(pool, dummy_task, done, TIMEOUT);
         switch (work_added) {
         case SUCCESS:
             tasks++;
@@ -230,8 +231,8 @@ void test_threadpool_run_tasks() {
 
     // Confirm that threadpool_add_work() returns EINVAL when pool or action are
     // NULL
-    CU_ASSERT_EQUAL(threadpool_add_work(pool, NULL, NULL, NULL), EINVAL);
-    CU_ASSERT_EQUAL(threadpool_add_work(NULL, dummy_task, NULL, NULL), EINVAL);
+    CU_ASSERT_EQUAL(threadpool_add_work(pool, NULL, NULL), EINVAL);
+    CU_ASSERT_EQUAL(threadpool_add_work(NULL, dummy_task, NULL), EINVAL);
     // Add QUEUE_SIZE tasks to the threadpool. Confirm that
     // threadpool_add_work() returns EAGAIN when the queue is full
     int done = 0;
@@ -252,6 +253,7 @@ void test_threadpool_run_tasks() {
     // finish
     CU_ASSERT_EQUAL(threadpool_timed_wait(pool, TIMEOUT * tasks), SUCCESS);
     // Confirm that all tasks were completed
+    fprintf(stderr, "\ttasks: %d\tdone: %d\n", tasks, done);
     CU_ASSERT_EQUAL(done, tasks);
 
     teardown_test(&pool);
@@ -285,6 +287,7 @@ void test_threadpool_shutdown() {
     tasks = start_tasks(pool, &done);
     pthread_mutex_unlock(&lock);
     teardown_test(&pool);
+    fprintf(stderr, "\ttasks: %d\tdone: %d\n", tasks, done);
     CU_ASSERT_EQUAL(done, tasks);
     fprintf(stderr, "test_threadpool_shutdown done\n\n");
 }
