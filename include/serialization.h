@@ -81,6 +81,20 @@ io_info_t *new_file_io_info(const char *filename, int flags, mode_t mode,
 io_info_t *new_accept_io_info(const char *port, int *err, int *err_type);
 
 /**
+ * @brief Create a new io_info object for connecting to remote hosts.
+ *
+ * Any underlying socket will be closed when the io_info object is freed.
+ *
+ * @param host - The remote host to connect to.
+ * @param port - The remote port to connect on.
+ * @param err - Where to store the error code.
+ * @param err_type - Where to store the error type.
+ * @return io_info_t* - The io_info object.
+ */
+io_info_t *new_connect_io_info(const char *host, const char *port, int *err,
+                               int *err_type);
+
+/**
  * @brief Free an io_info object.
  *
  * @param io_info - The io_info object to free.

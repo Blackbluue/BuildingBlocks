@@ -192,6 +192,62 @@ cleanup:
     return io_info;
 }
 
+io_info_t *new_connect_io_info(const char *host, const char *port, int *err,
+                               int *err_type) {
+    io_info_t *io_info = malloc(sizeof(*io_info));
+    if (io_info == NULL) {
+        set_err(err_type, SYS);
+        set_err(err, ENOMEM);
+        return NULL;
+    }
+    struct addrinfo hints = {
+        .ai_family = AF_UNSPEC,
+        .ai_socktype = SOCK_STREAM,
+        .ai_flags = AI_V4MAPPED,
+        .ai_protocol = 0,
+    };
+
+    int sock = FAILURE;
+    struct addrinfo *result;
+    int loc_err = getaddrinfo(host, port, &hints, &result);
+    if (loc_err != SUCCESS) {
+        if (loc_err == EAI_SYSTEM) {
+            set_err(err, errno);
+            set_err(err_type, SYS);
+        } else {
+            set_err(err, loc_err);
+            set_err(err_type, GAI);
+        }
+        goto error;
+    }
+
+    for (struct addrinfo *res_ptr = result; res_ptr != NULL;
+         res_ptr = res_ptr->ai_next) {
+        sock = socket(res_ptr->ai_family, res_ptr->ai_socktype,
+                      res_ptr->ai_protocol);
+        if (sock == FAILURE) {
+            set_err(err, errno);
+            set_err(err_type, SOCK);
+            continue;
+        }
+
+        if (connect(sock, res_ptr->ai_addr, res_ptr->ai_addrlen) != FAILURE) {
+            goto cleanup;
+        }
+
+        set_err(err, errno);
+        set_err(err_type, CONN);
+    }
+    // only get here if no address worked
+error:
+    close(sock); // ignore EBADF error if sock is not set
+    free(io_info);
+    io_info = NULL;
+cleanup: // if jumped directly here, function succeeded
+    freeaddrinfo(result);
+    return io_info;
+}
+
 void free_io_info(io_info_t *io_info) {
     if (io_info != NULL) {
         if (io_info->close_on_free) {

@@ -169,6 +169,52 @@ io_info_t *new_accept_io_info(const char *port, int *err, int *err_type) {
     return io_info;
 }
 
+io_info_t *new_connect_io_info(const char *host, const char *port, int *err,
+                               int *err_type) {
+    io_info_t *io_info = malloc(sizeof(*io_info));
+    if (io_info == NULL) {
+        set_err(err_type, SYS);
+        set_err(err, ENOMEM);
+        return NULL;
+    }
+
+    if ((io_info->bio = BIO_new(BIO_s_connect())) == NULL) {
+        set_err(err_type, SYS);
+        set_err(err, FAILURE); // TODO: don't know what to use for error
+        DEBUG_PRINT("BIO_new_connect failed\n");
+        DEBUG_PRINT_SSL();
+        free(io_info);
+        return NULL;
+    }
+    BIO_set_conn_hostname(io_info->bio, host);
+    BIO_set_conn_port(io_info->bio, port);
+    BIO_set_nbio(io_info->bio, true);
+
+    while (BIO_do_connect(io_info->bio) <= SUCCESS) {
+        if (BIO_should_retry(io_info->bio)) {
+            DEBUG_PRINT(
+                "BIO_do_connect would block to server <-> host: %s port: %s\n",
+                host, port);
+            continue;
+        } else {
+            set_err(err_type, SYS);
+            set_err(err, FAILURE); // TODO: don't know what to use for error
+            DEBUG_PRINT("BIO_do_connect failed\n");
+            DEBUG_PRINT_SSL();
+        }
+        free_io_info(io_info);
+        return NULL;
+    }
+
+    io_info->host = BIO_get_conn_hostname(io_info->bio);
+    io_info->serv = BIO_get_conn_port(io_info->bio);
+    (void)BIO_set_close(io_info->bio, BIO_CLOSE);
+    BIO_get_fd(io_info->bio, &io_info->fd);
+    io_info->type = CONNECTED_IO;
+
+    return io_info;
+}
+
 void free_io_info(io_info_t *io_info) {
     if (io_info != NULL) {
         BIO_free(io_info->bio);
