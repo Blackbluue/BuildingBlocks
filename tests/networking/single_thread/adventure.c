@@ -1,25 +1,12 @@
 #define _POSIX_C_SOURCE 200112L
-#include "hero.h"
-#include "networking_server.h"
+#include "hero_server.h"
 #include <errno.h>
 #include <netdb.h>
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define SUCCESS 0
-
-static void exit_handler(int sig) { (void)sig; }
-
-void allow_graceful_exit(void) {
-    struct sigaction action;
-    action.sa_handler = exit_handler;
-    action.sa_flags = 0;
-    sigemptyset(&action.sa_mask);
-    sigaction(SIGINT, &action, NULL);
-    sigaction(SIGTERM, &action, NULL);
-}
 
 int main(void) {
     int err;

@@ -52,9 +52,6 @@ struct packet {
     void *data;          // packet data
 };
 
-typedef int (*service_f)(struct packet *pkt, struct sockaddr *addr,
-                         socklen_t addrlen, int client_sock);
-
 /* FUNCTIONS */
 
 /**

@@ -1,11 +1,13 @@
 #define _POSIX_C_SOURCE 200809L
 #include "networking_server.h"
+#include "array_list.h"
 #include "buildingblocks.h"
 #include "hash_table.h"
 #include "threadpool.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
+#include <poll.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -18,6 +20,12 @@
 
 #define SUCCESS 0
 #define FAILURE -1
+#define INFINITE_POLL -1
+
+struct lists {
+    arr_list_t *poll_list;
+    arr_list_t *srvs_list;
+};
 
 struct service_info {
     char *name;
@@ -27,11 +35,15 @@ struct service_info {
     server_t *server;
 };
 
+struct session {
+    struct client_info client;
+    struct service_info srv;
+};
+
 struct server {
     hash_table_t *services;
     threadpool_t *pool;
     pthread_t main;
-    pthread_rwlock_t running_lock;
     size_t monitor;
     sigset_t oldset;
 };
@@ -59,42 +71,39 @@ static void free_service(struct service_info *srv) {
  * @return server_t* - The server object on success, NULL on failure.
  */
 static server_t *init_resources(size_t max_services, int *err) {
-    if (max_services == 0 || max_services > MAX_THREADS - 1) {
-        // minus 1 to account for the signal monitor thread
+    if (max_services == 0) {
         set_err(err, EINVAL);
-        DEBUG_PRINT("init_resources: max_services is invalid '%zu\n",
-                    max_services);
+        DEBUG_PRINT("max_services is invalid '%zu\n", max_services);
         return NULL;
     }
     server_t *server = malloc(sizeof(*server));
     if (server == NULL) {
         set_err(err, errno);
-        DEBUG_PRINT("init_server: malloc failed\n");
+        DEBUG_PRINT("malloc failed\n");
         return NULL;
     }
     server->services =
         hash_table_init(max_services, (FREE_F)free_service, (CMP_F)strcmp, err);
     if (server->services == NULL) {
         free(server);
-        DEBUG_PRINT("init_server: hash_table_init failed\n");
+        DEBUG_PRINT("hash_table_init failed\n");
         return NULL;
     }
 
     // create a threadpool with the maximum number of threads, created lazily
+    // threads will be created for each session/request as needed
     threadpool_attr_t attr;
     threadpool_attr_init(&attr);
-    // plus 1 to account for the signal monitor thread
-    threadpool_attr_set_thread_count(&attr, max_services + 1);
+    threadpool_attr_set_thread_count(&attr, MAX_THREADS);
     threadpool_attr_set_thread_creation(&attr, THREAD_CREATE_LAZY);
     server->pool = threadpool_create(&attr, err);
     threadpool_attr_destroy(&attr);
     if (server->pool == NULL) {
         hash_table_destroy(&server->services);
         free(server);
-        DEBUG_PRINT("init_server: threadpool_create failed\n");
+        DEBUG_PRINT("threadpool_create failed\n");
         return NULL;
     }
-    pthread_rwlock_init(&server->running_lock, NULL);
     return server;
 }
 
@@ -190,100 +199,126 @@ static int create_socket(struct addrinfo *result, int connections, int *sock,
 }
 
 /**
- * @brief Run a single service.
+ * @brief Handle a request from the client.
  *
- * @param srv - The service to run.
+ * @param session - The session object.
  * @return int - 0 on success, non-zero on failure.
  */
-static int run_single(struct service_info *srv) {
-    if (srv == NULL) {
-        // hash table lookup failed
-        DEBUG_PRINT("\ton thread %lX: service not found\n", pthread_self());
-        return ENOENT;
+static int handle_request(struct session *session) {
+    if (session == NULL) {
+        return EINVAL;
     }
-    DEBUG_PRINT("\ton thread %lX: running service %s\n", pthread_self(),
-                srv->name);
 
-    pthread_rwlock_rdlock(&srv->server->running_lock);
-    int err = SUCCESS;
-    bool keep_running = true;
-    while (keep_running) {
-        struct sockaddr_storage addr;
-        socklen_t addrlen = sizeof(addr);
-        DEBUG_PRINT("\ton thread %lX: waiting for client\n", pthread_self());
-        int client_sock = accept(srv->sock, (struct sockaddr *)&addr, &addrlen);
-        if (client_sock == FAILURE) {
-            err = errno;
-            DEBUG_PRINT("\ton thread %lX: accept error: %s\n", pthread_self(),
-                        strerror(errno));
-            break;
-        }
-        fcntl(client_sock, F_SETFL, O_NONBLOCK);
-        DEBUG_PRINT("\ton thread %lX: client accepted\n", pthread_self());
+    DEBUG_PRINT("\ton thread %lX: begin client session\n\n", pthread_self());
+    session->srv.service(&session->client);
+    DEBUG_PRINT("\ton thread %lX: session complete\n\n", pthread_self());
 
-        bool handle_client = true;
-        while (handle_client) {
-            struct packet *pkt = recv_pkt_data(client_sock, TO_INFINITE, &err);
-            if (pkt == NULL) {
-                handle_client = false; // drop the client
-                switch (err) {
-                case EWOULDBLOCK:  // no data available
-                case ENODATA:      // client disconnected
-                case ETIMEDOUT:    // client timed out
-                case EINVAL:       // invalid packet
-                    err = 0;       // clear error
-                    continue;      // don't close the server
-                case EINTR:        // signal interrupt
-                    err = SUCCESS; // no error
-                    // fall through
-                default:                  // other errors
-                    keep_running = false; // close the server
-                    continue;
-                }
-            }
-            DEBUG_PRINT("\ton thread %lX: packet successfully received\n",
-                        pthread_self());
-
-            err = srv->service(pkt, (struct sockaddr *)&addr, addrlen,
-                               client_sock);
-            if (err != SUCCESS) {
-                keep_running = false;
-                handle_client = false;
-            }
-            DEBUG_PRINT("\ton thread %lX: packet successfully processed\n\n",
-                        pthread_self());
-            free_packet(pkt);
-        }
-        DEBUG_PRINT("\ton thread %lX: closing client\n\n\n", pthread_self());
-        close(client_sock);
-    }
-    pthread_rwlock_unlock(&srv->server->running_lock);
-    return err;
+    close(session->client.client_sock);
+    free(session);
+    return SUCCESS;
 }
 
 /**
- * @brief Run each service in the server.
+ * @brief Accept a new request from the client.
  *
- * @param name - The name of the service.
- * @param srv - The service to run.
- * @param pool - The threadpool to run the service in.
+ * @param pool - The threadpool object.
+ * @param srv - The service object.
+ * @param sock - The socket to accept the client from.
  * @return int - 0 on success, non-zero on failure.
  */
-static int run_each(const char *name, struct service_info **srv,
-                    threadpool_t *pool) {
-    if (name == NULL || srv == NULL || *srv == NULL || pool == NULL) {
-        DEBUG_PRINT("run_each: service %s has invalid arguments\n", name);
-        return EINVAL;
-    } else if ((*srv)->service == NULL) {
-        // skip services without a service function
-        DEBUG_PRINT("run_each: service %s has no service function\n", name);
-        return SUCCESS;
+static int accept_request(threadpool_t *pool, struct service_info *srv,
+                          int sock) {
+    int err;
+    // the session object will be freed by the handle_request function
+    struct session *sess = calloc(1, sizeof(*sess));
+    if (sess == NULL) {
+        err = errno;
+        DEBUG_PRINT("\tsession malloc error\n");
+        return err;
     }
-    DEBUG_PRINT("adding service %s to pool\n", name);
-    int err = threadpool_add_work(pool, (ROUTINE)run_single, *srv);
-    if (err != SUCCESS) {
-        DEBUG_PRINT("run_each: error adding work for service %s\n", name);
+    sess->srv = *srv;
+    struct client_info client = {0};
+    DEBUG_PRINT("\taccepting client\n");
+    client.client_sock =
+        accept(sock, (struct sockaddr *)&client.addr, &client.addrlen);
+    if (client.client_sock == FAILURE) {
+        err = errno;
+        free(sess);
+        DEBUG_PRINT("\taccept error: %s\n", strerror(errno));
+        return err;
     }
+    memcpy(&sess->client, &client, sizeof(client));
+    DEBUG_PRINT("\tclient accepted\n");
+
+    // run the service in a separate thread if the flag is set
+    if (srv->flags & THREADED_SESSIONS) {
+        return threadpool_add_work(pool, (ROUTINE)handle_request, sess);
+    } else {
+        return handle_request(sess);
+    }
+}
+
+/**
+ * @brief Add the service to the poll and services lists.
+ *
+ * Must be added to both lists at the same time so that their indices match.
+ *
+ * @param unused - The key of the service, unused.
+ * @param srv - The service to add.
+ * @param lists - The poll/service lists to add the service to.
+ * @return int - 0 on success, non-zero on failure.
+ */
+static int add_polls(const char *unused, struct service_info **srv,
+                     struct lists *lists) {
+    (void)unused;
+    ssize_t size;
+    arr_list_query(lists->poll_list, QUERY_SIZE, &size);
+    struct pollfd pfd = {
+        .fd = (*srv)->sock,
+        .events = POLLIN,
+    };
+    int err = arr_list_insert(lists->poll_list, &pfd, size);
+    if (err) {
+        return err;
+    }
+    return arr_list_insert(lists->srvs_list, *srv, size);
+}
+
+/**
+ * @brief Build the poll list.
+ *
+ * The arrays pointed to by pfds and services_cpy must be NULL upon entry to
+ * this function. They will be allocated and must be freed by the caller. Must
+ * be added to both lists at the same time so that their indices match.
+ *
+ * @param services - The services to build the poll list from.
+ * @param pfds - The poll list to be created.
+ * @param services_cpy - The services list to be created.
+ * @param size - The size of the poll list.
+ * @return int - 0 on success, non-zero on failure.
+ */
+static int build_pfds(hash_table_t *services, struct pollfd **pfds,
+                      struct service_info **services_cpy, size_t size) {
+    struct lists lists;
+    int err;
+    // wrapped array lists are just to easily append to the end of the array
+    lists.poll_list =
+        arr_list_wrap(NULL, NULL, size, sizeof(**pfds), (void **)pfds, &err);
+    if (lists.poll_list == NULL) {
+        // err != SUCCESS
+        return err;
+    }
+    lists.srvs_list = arr_list_wrap(NULL, NULL, size, sizeof(**services_cpy),
+                                    (void **)services_cpy, &err);
+    if (lists.srvs_list == NULL) {
+        arr_list_delete(lists.poll_list);
+        return err;
+    }
+
+    err = hash_table_iterate(services, (ACT_TABLE_F)add_polls, &lists);
+    // always delete the wrappers; they are no longer needed
+    arr_list_delete(lists.srvs_list);
+    arr_list_delete(lists.poll_list);
     return err;
 }
 
@@ -413,18 +448,11 @@ server_t *init_server(size_t max_services, int *err) {
 int destroy_server(server_t *server) {
     if (server != NULL) {
         DEBUG_PRINT("destroy_server\n");
-        // cant acquire the write lock until all readers are done
-        pthread_rwlock_wrlock(&server->running_lock);
-        // all services completed once lock acquired
-
         // signal the monitor thread to stop
         threadpool_signal(server->pool, server->monitor, CONTROL_SIGNAL_1);
         threadpool_destroy(server->pool, SHUTDOWN_GRACEFUL);
 
         hash_table_destroy(&server->services);
-
-        pthread_rwlock_unlock(&server->running_lock);
-        pthread_rwlock_destroy(&server->running_lock);
 
         pthread_sigmask(SIG_SETMASK, &server->oldset, NULL);
         set_control_handler(SIG_DFL);
@@ -576,8 +604,19 @@ int run_service(server_t *server, const char *name) {
         DEBUG_PRINT("server or name is NULL\n");
         return EINVAL;
     }
-    // run_single will handle the missing service error
-    return run_single(hash_table_lookup(server->services, name));
+    struct service_info *srv = hash_table_lookup(server->services, name);
+    if (srv == NULL) {
+        DEBUG_PRINT("\tservice not found\n");
+        return ENOENT;
+    }
+    DEBUG_PRINT("\trunning service %s\n", srv->name);
+
+    while (true) {
+        int err = accept_request(server->pool, srv, srv->sock);
+        if (err != SUCCESS) {
+            return err;
+        }
+    }
 }
 
 int run_server(server_t *server) {
@@ -586,14 +625,47 @@ int run_server(server_t *server) {
         return EINVAL;
     }
 
-    DEBUG_PRINT("starting services\n");
-    int err = hash_table_iterate(server->services, (ACT_TABLE_F)run_each,
-                                 server->pool);
-    if (err != SUCCESS) {
-        DEBUG_PRINT("error running services\n");
+    DEBUG_PRINT("running all services\n");
+    ssize_t size;
+    hash_table_query(server->services, QUERY_SIZE, &size);
+    struct pollfd *pfds = NULL;
+    struct service_info *services_cpy = NULL;
+    int err = build_pfds(server->services, &pfds, &services_cpy, size);
+    if (pfds == NULL || services_cpy == NULL) {
+        DEBUG_PRINT("error building poll list: %s\n", strerror(err));
         return err;
     }
-    DEBUG_PRINT("waiting for services to finish\n");
-    err = threadpool_wait(server->pool);
-    return err == EAGAIN ? EINTR : err;
+
+    bool keep_running = true;
+    while (keep_running) {
+        int ready = poll(pfds, size, INFINITE_POLL);
+        if (ready == FAILURE) {
+            err = errno;
+            DEBUG_PRINT("\tpoll error: %s\n", strerror(errno));
+            break;
+        }
+
+        for (ssize_t i = 0; i < size; i++) {
+            struct pollfd *pfd = &pfds[i];
+            if (pfds[i].revents & POLLIN) {
+                err = accept_request(server->pool, &services_cpy[i], pfd->fd);
+                if (err != SUCCESS) {
+                    keep_running = false;
+                    break;
+                }
+            } else if (pfd->revents & POLLERR || pfd->revents & POLL_HUP ||
+                       pfd->revents & POLLNVAL) {
+                // error specific to this service socket.
+                // unsure of which error code to return, may change later
+                err = EAGAIN;
+                keep_running = false;
+                DEBUG_PRINT("\tserver socket error\n");
+                break;
+            }
+        }
+    }
+
+    free(pfds);
+    free(services_cpy);
+    return err;
 }
