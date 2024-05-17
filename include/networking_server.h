@@ -1,7 +1,7 @@
 #ifndef NETWORKING_SERVER_H
 #define NETWORKING_SERVER_H
 
-#include "networking_utils.h"
+#include "serialization.h"
 #include <signal.h>
 
 /* DATA */

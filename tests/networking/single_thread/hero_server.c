@@ -115,7 +115,7 @@ int send_response(io_info_t *client) {
     int err;
     bool handle_client = true;
     while (handle_client) {
-        struct packet *pkt = recv_pkt_data(client, TO_INFINITE, &err);
+        struct packet *pkt = recv_pkt_data(client, TIMEOUT_INFINITE, &err);
         if (pkt == NULL) {
             // an error here always closes client connection
             handle_client = false;

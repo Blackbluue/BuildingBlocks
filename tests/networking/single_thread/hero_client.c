@@ -1,6 +1,6 @@
 #define _POSIX_C_SOURCE 200112L
 #include "hero.h"
-#include "networking_client.h"
+#include "serialization.h"
 #include <CUnit/Basic.h>
 #include <CUnit/CUnit.h>
 #include <arpa/inet.h>
@@ -15,7 +15,7 @@
 #define SUCCESS 0
 #define FAILURE -1
 #define HERO_STATUS POISONED | BURNED | PARALYZED | BLINDED
-#define TIMEOUT TO_DEFAULT * 5
+#define TIMEOUT TIMEOUT_DEFAULT * 5
 
 #define HERO_NAME "Tartaglia"
 io_info_t *server_io;
