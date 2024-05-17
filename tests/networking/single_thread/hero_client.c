@@ -33,7 +33,7 @@ void allow_graceful_exit(void) {
 int init_suite1(void) {
     int err;
     int err_type;
-    server_io = get_server_info("", TCP_PORT, &err, &err_type);
+    server_io = new_connect_io_info("", TCP_PORT, &err, &err_type);
     if (server_io == NULL) {
         switch (err_type) {
         case SYS:

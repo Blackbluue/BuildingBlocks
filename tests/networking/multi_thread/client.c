@@ -181,7 +181,7 @@ void *thread_test(void *arg) {
     char *port = arg;
     int err = SUCCESS;
     int err_type;
-    io_info_t *server_io = get_server_info(NULL, port, &err, &err_type);
+    io_info_t *server_io = new_connect_io_info(NULL, port, &err, &err_type);
     if (server_io == NULL) {
         switch (err_type) {
         case SYS:
