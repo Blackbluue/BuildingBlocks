@@ -27,6 +27,6 @@ void allow_graceful_exit(void);
  * @param client - The client information.
  * @return int - 0 on success, non-zero on failure.
  */
-int send_response(struct client_info *client);
+int send_response(io_info_t *client);
 
 #endif /* HERO_SERVER_H */

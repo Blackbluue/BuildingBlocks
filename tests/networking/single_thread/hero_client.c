@@ -1,6 +1,6 @@
 #define _POSIX_C_SOURCE 200112L
 #include "hero.h"
-#include "networking_client.h"
+#include "serialization.h"
 #include <CUnit/Basic.h>
 #include <CUnit/CUnit.h>
 #include <arpa/inet.h>
@@ -15,10 +15,10 @@
 #define SUCCESS 0
 #define FAILURE -1
 #define HERO_STATUS POISONED | BURNED | PARALYZED | BLINDED
-#define TIMEOUT TO_DEFAULT * 5
+#define TIMEOUT TIMEOUT_DEFAULT * 5
 
 #define HERO_NAME "Tartaglia"
-int server_sock;
+io_info_t *server_io;
 
 static void exit_handler(int sig) { (void)sig; }
 
@@ -33,8 +33,8 @@ void allow_graceful_exit(void) {
 int init_suite1(void) {
     int err;
     int err_type;
-    server_sock = get_server_sock(NULL, TCP_PORT, NULL, &err, &err_type);
-    if (server_sock == FAILURE) {
+    server_io = new_connect_io_info("", TCP_PORT, &err, &err_type);
+    if (server_io == NULL) {
         switch (err_type) {
         case SYS:
             fprintf(stderr, "open_inet_socket: %s\n", strerror(err));
@@ -57,7 +57,10 @@ int init_suite1(void) {
     return SUCCESS;
 }
 
-int clean_suite1(void) { return close(server_sock); }
+int clean_suite1(void) {
+    free_io_info(server_io);
+    return SUCCESS;
+}
 
 void test_send_hero() {
     struct hero adventurer;
@@ -65,12 +68,12 @@ void test_send_hero() {
     strncpy(adventurer.name, HERO_NAME, strlen(HERO_NAME) + 1);
     adventurer.status = HERO_STATUS;
 
-    CU_ASSERT_EQUAL_FATAL(write_pkt_data(server_sock, &adventurer,
+    CU_ASSERT_EQUAL_FATAL(write_pkt_data(server_io, &adventurer,
                                          hero_size(&adventurer), RQU_STR_HRO),
                           SUCCESS);
 
     int err;
-    struct packet *pkt = recv_pkt_data(server_sock, TIMEOUT, &err);
+    struct packet *pkt = recv_pkt_data(server_io, TIMEOUT, &err);
     if (pkt == NULL) {
         CU_ASSERT_PTR_NOT_NULL_FATAL(pkt); // ensure failure
     }
@@ -84,12 +87,12 @@ void test_send_hero() {
 }
 
 void test_recv_hero() {
-    CU_ASSERT_EQUAL_FATAL(write_pkt_data(server_sock, HERO_NAME,
+    CU_ASSERT_EQUAL_FATAL(write_pkt_data(server_io, HERO_NAME,
                                          strlen(HERO_NAME) + 1, RQU_GET_HRO),
                           SUCCESS);
 
     int err;
-    struct packet *pkt = recv_pkt_data(server_sock, TIMEOUT, &err);
+    struct packet *pkt = recv_pkt_data(server_io, TIMEOUT, &err);
     if (pkt == NULL) {
         CU_ASSERT_PTR_NOT_NULL_FATAL(pkt); // ensure failure
     }

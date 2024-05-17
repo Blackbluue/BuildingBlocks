@@ -1,5 +1,5 @@
 #define _DEFAULT_SOURCE
-#include "networking_client.h"
+#include "serialization.h"
 #include "threaded_utils.h"
 #include <CUnit/Basic.h>
 #include <CUnit/CUnit.h>
@@ -11,7 +11,7 @@
 
 #define SUCCESS 0
 #define FAILURE -1
-#define TIMEOUT TO_DEFAULT * 5
+#define TIMEOUT TIMEOUT_DEFAULT * 5
 #define TEST_COUNT 5
 #define PORT_STR_LEN 6
 #define ALPHABET_LEN 26
@@ -44,7 +44,7 @@ int init_suite1(void) { return SUCCESS; }
 
 int clean_suite1(void) { return SUCCESS; }
 
-long test_ltr_count(int server_sock, struct random_data *rdata) {
+long test_ltr_count(io_info_t *server_io, struct random_data *rdata) {
     // send a message to the server
     uint16_t len = rand_str_len(rdata);
     char *string = calloc(len + 1, sizeof(*string));
@@ -66,7 +66,7 @@ long test_ltr_count(int server_sock, struct random_data *rdata) {
     snprintf(request.string, sizeof(request.string) - 1, "%s", string);
 
     long thread_err =
-        write_pkt_data(server_sock, &request, sizeof(request), RQU_COUNT);
+        write_pkt_data(server_io, &request, sizeof(request), RQU_COUNT);
     if (thread_err != SUCCESS) {
         fprintf(stderr, "test_ltr_count->write_pkt_data: %s\n",
                 strerror(thread_err));
@@ -76,7 +76,7 @@ long test_ltr_count(int server_sock, struct random_data *rdata) {
 
     // get a response from the server
     int err;
-    struct packet *pkt = recv_pkt_data(server_sock, TIMEOUT, &err);
+    struct packet *pkt = recv_pkt_data(server_io, TIMEOUT, &err);
     if (pkt == NULL) {
         fprintf(stderr, "test_ltr_count->recv_pkt_data: %s\n", strerror(err));
         thread_err = err;
@@ -113,7 +113,7 @@ cleanup:
     return thread_err;
 }
 
-long test_repeat(int server_sock, struct random_data *rdata) {
+long test_repeat(io_info_t *server_io, struct random_data *rdata) {
     // send a message to the server
     uint16_t count = rand_str_len(rdata);
     char letter = rand_letter(rdata);
@@ -131,7 +131,7 @@ long test_repeat(int server_sock, struct random_data *rdata) {
     };
 
     long thread_err =
-        write_pkt_data(server_sock, &request, sizeof(request), RQU_REPEAT);
+        write_pkt_data(server_io, &request, sizeof(request), RQU_REPEAT);
     if (thread_err != SUCCESS) {
         fprintf(stderr, "test_repeat->write_pkt_data: %s\n",
                 strerror(thread_err));
@@ -141,7 +141,7 @@ long test_repeat(int server_sock, struct random_data *rdata) {
 
     // get a response from the server
     int err;
-    struct packet *pkt = recv_pkt_data(server_sock, TIMEOUT, &err);
+    struct packet *pkt = recv_pkt_data(server_io, TIMEOUT, &err);
     if (pkt == NULL) {
         fprintf(stderr, "test_repeat->recv_pkt_data: %s\n", strerror(err));
         thread_err = err;
@@ -181,8 +181,8 @@ void *thread_test(void *arg) {
     char *port = arg;
     int err = SUCCESS;
     int err_type;
-    int server_sock = get_server_sock(NULL, port, NULL, &err, &err_type);
-    if (server_sock == FAILURE) {
+    io_info_t *server_io = new_connect_io_info(NULL, port, &err, &err_type);
+    if (server_io == NULL) {
         switch (err_type) {
         case SYS:
             fprintf(stderr, "open_inet_socket: %s\n", strerror(err));
@@ -206,17 +206,18 @@ void *thread_test(void *arg) {
     // random seed set from sever socket number
     struct random_data rdata = {0};
     char statebuf[RAND_BUF_SIZE];
-    initstate_r(time(NULL) + server_sock, statebuf, RAND_BUF_SIZE, &rdata);
+    initstate_r(time(NULL) + io_info_fd(server_io, NULL), statebuf,
+                RAND_BUF_SIZE, &rdata);
 
     // run tests
     long thread_err = SUCCESS;
     for (int i = 0; i < TEST_COUNT; i++) {
-        if ((thread_err = test_repeat(server_sock, &rdata)) != SUCCESS) {
+        if ((thread_err = test_repeat(server_io, &rdata)) != SUCCESS) {
             fprintf(stderr, "repeat test %d failed on port %s\n", i, port);
             break;
         }
         fprintf(stderr, "repeat test %d passed on port %s\n", i, port);
-        if ((thread_err = test_ltr_count(server_sock, &rdata)) != SUCCESS) {
+        if ((thread_err = test_ltr_count(server_io, &rdata)) != SUCCESS) {
             fprintf(stderr, "count test %d failed on port %s\n", i, port);
             break;
         }
@@ -224,7 +225,7 @@ void *thread_test(void *arg) {
     }
 
     // close the socket
-    close(server_sock);
+    free_io_info(server_io);
     return (void *)thread_err;
 }
 

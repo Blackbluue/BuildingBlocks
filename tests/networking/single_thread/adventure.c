@@ -17,7 +17,7 @@ int main(void) {
     }
 
     int err_type;
-    err = open_inet_socket(server, "adventure", TCP_PORT, NULL, &err_type);
+    err = open_inet_socket(server, "adventure", TCP_PORT, &err_type);
     if (err != SUCCESS) {
         switch (err_type) {
         case SYS:
