@@ -11,13 +11,6 @@
 
 /* DATA */
 
-// disable SSL
-// TODO: define this in the build system instead
-#ifdef SSL_AVAILABLE
-#undef SSL_AVAILABLE
-#endif
-#define SSL_AVAILABLE 0
-
 #define SUCCESS 0
 #define FAILURE -1
 

@@ -93,10 +93,12 @@ target_link_libraries(weighted_graph buildingblocks queue_p queue linked_list ha
 set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/weighted_graph.c)
 
 if(OpenSSL_FOUND)
+    add_compile_definitions(SSL_AVAILABLE=1)
     add_library(serialization OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/serialization_ssl.c)
     target_link_libraries(serialization buildingblocks OpenSSL::SSL)
     set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/serialization_ssl.c)
 else()
+    add_compile_definitions(SSL_AVAILABLE=0)
     add_library(serialization OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/serialization.c)
     target_link_libraries(serialization buildingblocks)
     set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/serialization.c)

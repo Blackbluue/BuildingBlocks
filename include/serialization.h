@@ -8,8 +8,9 @@
 /* DATA */
 
 // is set by the library to 1 when SSL is available, 0 otherwise
-// TODO: define this in the build system instead
+#ifndef SSL_AVAILABLE
 #define SSL_AVAILABLE 0
+#endif
 
 #define MAX_CONNECTIONS 4096 // maximum number of pending connections
 #define TIMEOUT_DEFAULT 1000 // default timeout for recv_all_data
