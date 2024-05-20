@@ -50,7 +50,7 @@ int clean_suite1(void) {
 void test_send_message() {
     CU_ASSERT_EQUAL_FATAL(io_info_add_ssl(server_io), SUCCESS);
 
-    const char *msg = "hello world!";
+    char *msg = "hello world!";
     CU_ASSERT_EQUAL_FATAL(
         write_pkt_data(server_io, msg, strlen(msg) + 1, RQU_MSG), SUCCESS);
 

@@ -489,8 +489,10 @@ int register_service(server_t *server, const char *name, service_f service,
         if (!SSL_AVAILABLE) {
             DEBUG_PRINT("SSL not available\n");
             return ENOTSUP;
-        } else if (io_info_add_ssl(srv->accept_io) != SUCCESS) {
-            DEBUG_PRINT("Failed to add SSL\n");
+        }
+        int err = io_info_add_ssl(srv->accept_io);
+        if (err != SUCCESS) {
+            DEBUG_PRINT("Failed to add SSL: %s\n", strerror(err));
             return EAGAIN;
         }
     }

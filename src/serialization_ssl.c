@@ -22,6 +22,7 @@ struct io_info {
     int type;
     int fd;
     BIO *bio;
+    SSL_CTX *ctx;
     const char *host;
     const char *serv;
 };
@@ -32,6 +33,34 @@ static void DEBUG_PRINT_SSL(void) {
 #ifdef DEBUG
     ERR_print_errors_fp(stderr);
 #endif
+}
+
+int add_server_ssl(io_info_t *io_info) {
+    io_info->ctx = SSL_CTX_new(TLS_server_method());
+    SSL_CTX_set_min_proto_version(io_info->ctx, TLS1_2_VERSION);
+    BIO *ssl_bio = BIO_new_ssl(io_info->ctx, false);
+    if (ssl_bio == NULL) {
+        DEBUG_PRINT("BIO_new_ssl failed for server\n");
+        DEBUG_PRINT_SSL();
+        SSL_CTX_free(io_info->ctx);
+        return FAILURE; // TODO: don't know what to use for error
+    }
+    BIO_set_accept_bios(io_info->bio, ssl_bio);
+    return SUCCESS;
+}
+
+int add_client_ssl(io_info_t *io_info) {
+    io_info->ctx = SSL_CTX_new(TLS_client_method());
+    SSL_CTX_set_min_proto_version(io_info->ctx, TLS1_2_VERSION);
+    BIO *ssl_bio = BIO_new_ssl(io_info->ctx, true);
+    if (ssl_bio == NULL) {
+        DEBUG_PRINT("BIO_new_ssl failed for client\n");
+        DEBUG_PRINT_SSL();
+        SSL_CTX_free(io_info->ctx);
+        return FAILURE; // TODO: don't know what to use for error
+    }
+    io_info->bio = BIO_push(io_info->bio, ssl_bio);
+    return SUCCESS;
 }
 
 /**
@@ -157,7 +186,7 @@ io_info_t *new_file_io_info(const char *filename, int flags, mode_t mode,
 }
 
 io_info_t *new_accept_io_info(const char *port, int *err, int *err_type) {
-    io_info_t *io_info = malloc(sizeof(*io_info));
+    io_info_t *io_info = calloc(1, sizeof(*io_info));
     if (io_info == NULL) {
         set_err(err_type, SYS);
         set_err(err, ENOMEM);
@@ -193,7 +222,7 @@ io_info_t *new_accept_io_info(const char *port, int *err, int *err_type) {
 
 io_info_t *new_connect_io_info(const char *host, const char *port, int *err,
                                int *err_type) {
-    io_info_t *io_info = malloc(sizeof(*io_info));
+    io_info_t *io_info = calloc(1, sizeof(*io_info));
     if (io_info == NULL) {
         set_err(err_type, SYS);
         set_err(err, ENOMEM);
@@ -240,6 +269,7 @@ io_info_t *new_connect_io_info(const char *host, const char *port, int *err,
 void free_io_info(io_info_t *io_info) {
     if (io_info != NULL) {
         BIO_free(io_info->bio);
+        SSL_CTX_free(io_info->ctx);
         free(io_info);
     }
 }
@@ -256,6 +286,15 @@ const char *io_info_serv(io_info_t *io_info) { return io_info->serv; }
 int io_info_add_ssl(io_info_t *io_info) {
     if (io_info == NULL) {
         return EINVAL;
+    }
+
+    switch (io_info->type) {
+    case FILE_IO:
+        return ENOTSUP;
+    case ACCEPT_IO:
+        return add_server_ssl(io_info);
+    case CONNECTED_IO:
+        return add_client_ssl(io_info);
     }
 
     return SUCCESS;
