@@ -9,7 +9,7 @@
 
 // is set by the library to 1 when SSL is available, 0 otherwise
 // TODO: define this in the build system instead
-#define SSL_AVAILABLE
+#define SSL_AVAILABLE 0
 
 #define MAX_CONNECTIONS 4096 // maximum number of pending connections
 #define TIMEOUT_DEFAULT 1000 // default timeout for recv_all_data
@@ -164,6 +164,20 @@ const char *io_info_host(io_info_t *io_info);
  * @return const char* - The service.
  */
 const char *io_info_serv(io_info_t *io_info);
+
+/**
+ * @brief Add SSL to an io_info object.
+ *
+ * Enables SSL on the io_info object. Not supported for file i/o objects.
+ *
+ * Possible errors:
+ * - ENOTSUP: SSL is not available, or the io_info object is a file i/o object.
+ * - EINVAL: The io_info object is NULL.
+ *
+ * @param io_info - The io_info object.
+ * @return int - 0 on success, non-zero on failure.
+ */
+int io_info_add_ssl(io_info_t *io_info);
 
 /**
  * @brief Wrapper for poll(2) that uses io_info objects.

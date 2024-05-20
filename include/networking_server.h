@@ -13,6 +13,7 @@
 
 enum service_flags {
     THREADED_SESSIONS = 1 << 0, // Run each client session in a separate thread
+    ENABLE_SSL = 1 << 1,        // Enable SSL for the service
 };
 
 typedef struct server server_t;
@@ -118,10 +119,14 @@ int open_unix_socket(server_t *server, const char *name, const char *path);
  * The flags parameter is a bitmask of the service flags.
  * Possible flags:
  * - THREADED_SESSIONS: Run each client session in a separate thread.
+ * - ENABLE_SSL: Enable SSL for the service.
+ * Unknown flags are ignored.
  *
  * Possible errors:
  * - EINVAL: server, name, or service is NULL
  * - ENOENT: The socket with the given name does not exist
+ * - ENOTSUP: One of the given flags are not supported
+ * - EAGAIN: Failed to enable SSL (if ENABLE_SSL is set)
  *
  * @param server - the server to register the service with.
  * @param name - the name of the service.

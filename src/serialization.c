@@ -294,6 +294,8 @@ const char *io_info_host(io_info_t *io_info) { return io_info->host; }
 
 const char *io_info_serv(io_info_t *io_info) { return io_info->serv; }
 
+int io_info_add_ssl(io_info_t *io_info) { return ENOTSUP; }
+
 int poll_io_info(struct pollio *ios, nfds_t nfds, int timeout) {
     struct pollfd *fds = malloc(nfds * sizeof(*fds));
     if (fds == NULL) {
