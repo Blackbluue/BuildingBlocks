@@ -39,6 +39,7 @@ static void DEBUG_PRINT_SSL(void) {
 int add_server_ssl(io_info_t *io_info) {
     io_info->ctx = SSL_CTX_new(TLS_server_method());
     SSL_CTX_set_min_proto_version(io_info->ctx, TLS1_2_VERSION);
+    SSL_CTX_set_mode(io_info->ctx, SSL_MODE_AUTO_RETRY);
     BIO *ssl_bio = BIO_new_ssl(io_info->ctx, false);
     if (ssl_bio == NULL) {
         DEBUG_PRINT("BIO_new_ssl failed for server\n");
@@ -53,6 +54,7 @@ int add_server_ssl(io_info_t *io_info) {
 int add_client_ssl(io_info_t *io_info) {
     io_info->ctx = SSL_CTX_new(TLS_client_method());
     SSL_CTX_set_min_proto_version(io_info->ctx, TLS1_2_VERSION);
+    SSL_CTX_set_mode(io_info->ctx, SSL_MODE_AUTO_RETRY);
     BIO *ssl_bio = BIO_new_ssl(io_info->ctx, true);
     if (ssl_bio == NULL) {
         DEBUG_PRINT("BIO_new_ssl failed for client\n");
