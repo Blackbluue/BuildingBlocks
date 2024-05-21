@@ -355,7 +355,7 @@ io_info_t *io_accept(io_info_t *io_info, int *err) {
     (void)BIO_set_close(new_info->bio, BIO_CLOSE);
     if (io_info->ctx != NULL) {
         if (BIO_do_handshake(new_info->bio) != SSL_SUCCESS) {
-            set_err(err, FAILURE); // TODO: don't know what to use for error
+            set_err(err, EAGAIN);
             DEBUG_PRINT("Failed to complete SSL handshake for server\n");
             DEBUG_PRINT_SSL();
             free_io_info(new_info);

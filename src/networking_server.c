@@ -515,7 +515,11 @@ int run_service(server_t *server, const char *name) {
 
     while (true) {
         int err = accept_request(server->pool, srv);
-        if (err != SUCCESS) {
+        if (err == EAGAIN) {
+            // drop connection and continue
+            DEBUG_PRINT("\tdropping connection\n");
+            continue;
+        } else if (err != SUCCESS) {
             return err;
         }
     }
