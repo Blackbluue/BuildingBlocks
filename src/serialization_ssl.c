@@ -17,6 +17,7 @@
 
 #define SUCCESS 0
 #define FAILURE -1
+#define SSL_SUCCESS 1
 
 struct io_info {
     int type;
@@ -59,7 +60,17 @@ int add_client_ssl(io_info_t *io_info) {
         SSL_CTX_free(io_info->ctx);
         return FAILURE; // TODO: don't know what to use for error
     }
-    io_info->bio = BIO_push(io_info->bio, ssl_bio);
+    io_info->bio = BIO_push(ssl_bio, io_info->bio);
+    if (BIO_do_handshake(io_info->bio) != SSL_SUCCESS) {
+        DEBUG_PRINT("Failed to complete SSL handshake for client\n");
+        DEBUG_PRINT_SSL();
+        // remove the faulty SSL layer
+        io_info->bio = BIO_pop(io_info->bio);
+        BIO_free(ssl_bio);
+        SSL_CTX_free(io_info->ctx);
+        io_info->ctx = NULL;
+        return FAILURE; // TODO: don't know what to use for error
+    }
     return SUCCESS;
 }
 
@@ -342,6 +353,15 @@ io_info_t *io_accept(io_info_t *io_info, int *err) {
     new_info->bio = BIO_pop(io_info->bio);
     BIO_set_nbio_accept(new_info->bio, true);
     (void)BIO_set_close(new_info->bio, BIO_CLOSE);
+    if (io_info->ctx != NULL) {
+        if (BIO_do_handshake(new_info->bio) != SSL_SUCCESS) {
+            set_err(err, FAILURE); // TODO: don't know what to use for error
+            DEBUG_PRINT("Failed to complete SSL handshake for server\n");
+            DEBUG_PRINT_SSL();
+            free_io_info(new_info);
+            return NULL;
+        }
+    }
     BIO_get_fd(new_info->bio, &new_info->fd);
     new_info->host = BIO_get_conn_hostname(new_info->bio);
     new_info->serv = BIO_get_conn_port(new_info->bio);
