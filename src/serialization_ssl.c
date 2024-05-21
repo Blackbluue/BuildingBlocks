@@ -325,7 +325,7 @@ cleanup:
 }
 
 io_info_t *io_accept(io_info_t *io_info, int *err) {
-    io_info_t *new_info = malloc(sizeof(*new_info));
+    io_info_t *new_info = calloc(1, sizeof(*new_info));
     if (new_info == NULL) {
         set_err(err, ENOMEM);
         return NULL;
