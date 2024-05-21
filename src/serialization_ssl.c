@@ -268,7 +268,7 @@ io_info_t *new_connect_io_info(const char *host, const char *port, int *err,
 
 void free_io_info(io_info_t *io_info) {
     if (io_info != NULL) {
-        BIO_free(io_info->bio);
+        BIO_free_all(io_info->bio);
         SSL_CTX_free(io_info->ctx);
         free(io_info);
     }
