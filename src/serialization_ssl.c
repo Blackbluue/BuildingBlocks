@@ -470,8 +470,9 @@ struct packet *recv_pkt_data(io_info_t *io_info, int timeout, int *err) {
     int loc_err = poll_io_info(&pio, 1, timeout);
     if (loc_err <= 0) {
         // 0 on timeout, negative on poll error
-        set_err(err, loc_err == 0 ? ETIMEDOUT : -loc_err);
-        DEBUG_PRINT("poll error: %s\n", strerror(*err));
+        loc_err = loc_err == 0 ? ETIMEDOUT : -loc_err;
+        set_err(err, loc_err);
+        DEBUG_PRINT("poll error: %s\n", strerror(loc_err));
         return NULL;
     } else if (pio.revents & POLLIN) {
         DEBUG_PRINT("receiving packet...\n");
