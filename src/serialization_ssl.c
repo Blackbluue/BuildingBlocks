@@ -23,9 +23,14 @@ struct io_info {
     int type;
     int fd;
     BIO *bio;
-    SSL_CTX *ctx;
+    bool ssl_enabled;
     const char *host;
     const char *serv;
+};
+
+struct ssl_loader {
+    SSL_CTX *client_ctx;
+    SSL_CTX *server_ctx;
 };
 
 /* PRIVATE FUNCTIONS*/
@@ -36,30 +41,72 @@ static void DEBUG_PRINT_SSL(void) {
 #endif
 }
 
-int add_server_ssl(io_info_t *io_info) {
-    io_info->ctx = SSL_CTX_new(TLS_server_method());
-    SSL_CTX_set_min_proto_version(io_info->ctx, TLS1_2_VERSION);
-    SSL_CTX_set_mode(io_info->ctx, SSL_MODE_AUTO_RETRY);
-    BIO *ssl_bio = BIO_new_ssl(io_info->ctx, false);
+static SSL_CTX *get_server_ctx(ssl_loader_t *loader) {
+    if (loader->server_ctx == NULL) {
+        loader->server_ctx = SSL_CTX_new(TLS_server_method());
+        SSL_CTX_set_min_proto_version(loader->server_ctx, TLS1_2_VERSION);
+        SSL_CTX_set_mode(loader->server_ctx, SSL_MODE_AUTO_RETRY);
+        if (!SSL_CTX_use_certificate_chain_file(loader->server_ctx,
+                                                "PLACEHOLDER.pem") ||
+            !SSL_CTX_use_PrivateKey_file(loader->server_ctx, "PLACEHOLDER.pem",
+                                         SSL_FILETYPE_PEM) ||
+            !SSL_CTX_check_private_key(loader->server_ctx)) {
+            DEBUG_PRINT("Error setting up SSL_CTX\n");
+            DEBUG_PRINT_SSL();
+            SSL_CTX_free(loader->server_ctx);
+            loader->server_ctx = NULL;
+            return NULL;
+        }
+    }
+    return loader->server_ctx;
+}
+
+static SSL_CTX *get_client_ctx(ssl_loader_t *loader) {
+    if (loader->client_ctx == NULL) {
+        loader->client_ctx = SSL_CTX_new(TLS_client_method());
+        SSL_CTX_set_min_proto_version(loader->client_ctx, TLS1_2_VERSION);
+        SSL_CTX_set_mode(loader->client_ctx, SSL_MODE_AUTO_RETRY);
+        SSL_CTX_set_verify(loader->client_ctx, SSL_VERIFY_PEER, NULL);
+        if (!SSL_CTX_load_verify_locations(loader->client_ctx,
+                                           "ca_PLACEHOLDER.pem", NULL)) {
+            DEBUG_PRINT("Error loading CA file\n");
+            DEBUG_PRINT_SSL();
+            SSL_CTX_free(loader->client_ctx);
+            loader->client_ctx = NULL;
+            return NULL;
+        }
+    }
+    return loader->client_ctx;
+}
+
+int add_server_ssl(io_info_t *io_info, ssl_loader_t *loader) {
+    SSL_CTX *ctx = get_server_ctx(loader);
+    if (ctx == NULL) {
+        return FAILURE; // TODO: don't know what to use for error
+    }
+
+    BIO *ssl_bio = BIO_new_ssl(ctx, false);
     if (ssl_bio == NULL) {
         DEBUG_PRINT("BIO_new_ssl failed for server\n");
         DEBUG_PRINT_SSL();
-        SSL_CTX_free(io_info->ctx);
         return FAILURE; // TODO: don't know what to use for error
     }
     BIO_set_accept_bios(io_info->bio, ssl_bio);
+
+    io_info->ssl_enabled = true;
     return SUCCESS;
 }
 
-int add_client_ssl(io_info_t *io_info) {
-    io_info->ctx = SSL_CTX_new(TLS_client_method());
-    SSL_CTX_set_min_proto_version(io_info->ctx, TLS1_2_VERSION);
-    SSL_CTX_set_mode(io_info->ctx, SSL_MODE_AUTO_RETRY);
-    BIO *ssl_bio = BIO_new_ssl(io_info->ctx, true);
+int add_client_ssl(io_info_t *io_info, ssl_loader_t *loader) {
+    SSL_CTX *ctx = get_client_ctx(loader);
+    if (ctx == NULL) {
+        return FAILURE; // TODO: don't know what to use for error
+    }
+
+    BIO *ssl_bio = BIO_new_ssl(ctx, true);
     if (ssl_bio == NULL) {
         DEBUG_PRINT("BIO_new_ssl failed for client\n");
         DEBUG_PRINT_SSL();
-        SSL_CTX_free(io_info->ctx);
         return FAILURE; // TODO: don't know what to use for error
     }
     io_info->bio = BIO_push(ssl_bio, io_info->bio);
@@ -69,10 +116,10 @@ int add_client_ssl(io_info_t *io_info) {
         // remove the faulty SSL layer
         io_info->bio = BIO_pop(io_info->bio);
         BIO_free(ssl_bio);
-        SSL_CTX_free(io_info->ctx);
-        io_info->ctx = NULL;
         return FAILURE; // TODO: don't know what to use for error
     }
+
+    io_info->ssl_enabled = true;
     return SUCCESS;
 }
 
@@ -279,11 +326,27 @@ io_info_t *new_connect_io_info(const char *host, const char *port, int *err,
     return io_info;
 }
 
+ssl_loader_t *new_ssl_loader(int *err) {
+    ssl_loader_t *loader = calloc(1, sizeof(*loader));
+    if (loader == NULL) {
+        set_err(err, ENOMEM);
+        return NULL;
+    }
+    return loader;
+}
+
 void free_io_info(io_info_t *io_info) {
     if (io_info != NULL) {
         BIO_free_all(io_info->bio);
-        SSL_CTX_free(io_info->ctx);
         free(io_info);
+    }
+}
+
+void free_ssl_loader(ssl_loader_t *loader) {
+    if (loader != NULL) {
+        SSL_CTX_free(loader->client_ctx);
+        SSL_CTX_free(loader->server_ctx);
+        free(loader);
     }
 }
 
@@ -296,21 +359,19 @@ const char *io_info_host(io_info_t *io_info) { return io_info->host; }
 
 const char *io_info_serv(io_info_t *io_info) { return io_info->serv; }
 
-int io_info_add_ssl(io_info_t *io_info) {
-    if (io_info == NULL) {
+int io_info_add_ssl(io_info_t *io_info, ssl_loader_t *loader) {
+    if (io_info == NULL || loader == NULL) {
         return EINVAL;
     }
 
     switch (io_info->type) {
-    case FILE_IO:
-        return ENOTSUP;
     case ACCEPT_IO:
-        return add_server_ssl(io_info);
+        return add_server_ssl(io_info, loader);
     case CONNECTED_IO:
-        return add_client_ssl(io_info);
+        return add_client_ssl(io_info, loader);
+    default:
+        return ENOTSUP;
     }
-
-    return SUCCESS;
 }
 
 int poll_io_info(struct pollio *ios, nfds_t nfds, int timeout) {
@@ -355,7 +416,7 @@ io_info_t *io_accept(io_info_t *io_info, int *err) {
     new_info->bio = BIO_pop(io_info->bio);
     BIO_set_nbio_accept(new_info->bio, true);
     (void)BIO_set_close(new_info->bio, BIO_CLOSE);
-    if (io_info->ctx != NULL) {
+    if (io_info->ssl_enabled) {
         if (BIO_do_handshake(new_info->bio) != SSL_SUCCESS) {
             set_err(err, EAGAIN);
             DEBUG_PRINT("Failed to complete SSL handshake for server\n");

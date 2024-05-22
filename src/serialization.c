@@ -269,6 +269,11 @@ cleanup: // if jumped directly here, function succeeded
     return io_info;
 }
 
+ssl_loader_t *new_ssl_loader(int *err) {
+    set_err(err, ENOTSUP);
+    return NULL;
+}
+
 void free_io_info(io_info_t *io_info) {
     if (io_info != NULL) {
         if (io_info->close_on_free) {
@@ -277,6 +282,8 @@ void free_io_info(io_info_t *io_info) {
         free(io_info);
     }
 }
+
+void free_ssl_loader(ssl_loader_t *loader) { (void)loader; }
 
 int io_info_fd(io_info_t *io_info, int *type) {
     set_err(type, io_info->type);
@@ -287,7 +294,9 @@ const char *io_info_host(io_info_t *io_info) { return io_info->host; }
 
 const char *io_info_serv(io_info_t *io_info) { return io_info->serv; }
 
-int io_info_add_ssl(io_info_t *io_info) { return ENOTSUP; }
+int io_info_add_ssl(io_info_t *io_info, ssl_loader_t *loader) {
+    return ENOTSUP;
+}
 
 int poll_io_info(struct pollio *ios, nfds_t nfds, int timeout) {
     struct pollfd *fds = malloc(nfds * sizeof(*fds));

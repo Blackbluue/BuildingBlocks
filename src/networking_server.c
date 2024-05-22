@@ -46,6 +46,7 @@ struct server {
     pthread_t main;
     size_t monitor;
     sigset_t oldset;
+    ssl_loader_t *ssl_loader;
 };
 
 /* PRIVATE FUNCTIONS */
@@ -102,6 +103,7 @@ static server_t *init_resources(size_t max_services, int *err) {
         DEBUG_PRINT("threadpool_create failed\n");
         return NULL;
     }
+    server->ssl_loader = NULL;
     return server;
 }
 
@@ -392,6 +394,7 @@ int destroy_server(server_t *server) {
 
         pthread_sigmask(SIG_SETMASK, &server->oldset, NULL);
         set_control_handler(SIG_DFL);
+        free_ssl_loader(server->ssl_loader);
         free(server);
     }
     return SUCCESS;
@@ -490,7 +493,15 @@ int register_service(server_t *server, const char *name, service_f service,
             DEBUG_PRINT("SSL not available\n");
             return ENOTSUP;
         }
-        int err = io_info_add_ssl(srv->accept_io);
+        if (server->ssl_loader == NULL) {
+            int err;
+            server->ssl_loader = new_ssl_loader(&err);
+            if (server->ssl_loader == NULL) {
+                DEBUG_PRINT("Failed to initialize SSL loader\n");
+                return err;
+            }
+        }
+        int err = io_info_add_ssl(srv->accept_io, server->ssl_loader);
         if (err != SUCCESS) {
             DEBUG_PRINT("Failed to add SSL: %s\n", strerror(err));
             return EAGAIN;

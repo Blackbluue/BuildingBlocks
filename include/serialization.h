@@ -33,6 +33,7 @@ enum io_info_type {
 };
 
 typedef struct io_info io_info_t;
+typedef struct ssl_loader ssl_loader_t;
 
 struct pollio {
     io_info_t *io_info; // i/o info
@@ -124,11 +125,30 @@ io_info_t *new_connect_io_info(const char *host, const char *port, int *err,
                                int *err_type);
 
 /**
+ * @brief Create a new SSL loader.
+ *
+ * The SSL loader will store any stateful SSL information needed for use with
+ * the io_info objects, allowing multiple objects to use the same
+ * configurations.
+ *
+ * @param err - Where to store the error code.
+ * @return ssl_loader_t* - The SSL loader.
+ */
+ssl_loader_t *new_ssl_loader(int *err);
+
+/**
  * @brief Free an io_info object.
  *
  * @param io_info - The io_info object to free.
  */
 void free_io_info(io_info_t *io_info);
+
+/**
+ * @brief Free an SSL loader.
+ *
+ * @param loader - The SSL loader to free.
+ */
+void free_ssl_loader(ssl_loader_t *loader);
 
 /**
  * @brief Get the file descriptor from an io_info object.
@@ -176,9 +196,10 @@ const char *io_info_serv(io_info_t *io_info);
  * - EINVAL: The io_info object is NULL.
  *
  * @param io_info - The io_info object.
+ * @param loader - The SSL loader.
  * @return int - 0 on success, non-zero on failure.
  */
-int io_info_add_ssl(io_info_t *io_info);
+int io_info_add_ssl(io_info_t *io_info, ssl_loader_t *loader);
 
 /**
  * @brief Wrapper for poll(2) that uses io_info objects.

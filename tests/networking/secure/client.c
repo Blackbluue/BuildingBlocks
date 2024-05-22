@@ -10,6 +10,7 @@
 #define TIMEOUT TIMEOUT_DEFAULT * 5
 
 io_info_t *server_io;
+ssl_loader_t *loader = NULL;
 
 int init_suite1(void) {
     if (!SSL_AVAILABLE) {
@@ -44,11 +45,13 @@ int init_suite1(void) {
 
 int clean_suite1(void) {
     free_io_info(server_io);
+    free_ssl_loader(loader);
     return SUCCESS;
 }
 
 void test_send_message() {
-    CU_ASSERT_EQUAL_FATAL(io_info_add_ssl(server_io), SUCCESS);
+    CU_ASSERT_PTR_NOT_NULL_FATAL(loader = new_ssl_loader(NULL));
+    CU_ASSERT_EQUAL_FATAL(io_info_add_ssl(server_io, loader), SUCCESS);
 
     char *msg = "hello world!";
     CU_ASSERT_EQUAL_FATAL(
