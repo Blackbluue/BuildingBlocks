@@ -41,6 +41,14 @@ static void DEBUG_PRINT_SSL(void) {
 #endif
 }
 
+/**
+ * @brief Get the SSL_CTX object for a server.
+ *
+ * The context is only created once; if it already exists, it is returned.
+ *
+ * @param loader - the ssl_loader object to get the SSL_CTX from
+ * @return SSL_CTX* - the SSL_CTX object for a server
+ */
 static SSL_CTX *get_server_ctx(ssl_loader_t *loader) {
     if (loader->server_ctx == NULL) {
         loader->server_ctx = SSL_CTX_new(TLS_server_method());
@@ -61,6 +69,14 @@ static SSL_CTX *get_server_ctx(ssl_loader_t *loader) {
     return loader->server_ctx;
 }
 
+/**
+ * @brief Get the SSL_CTX object for a client.
+ *
+ * The context is only created once; if it already exists, it is returned.
+ *
+ * @param loader - the ssl_loader object to get the SSL_CTX from
+ * @return SSL_CTX* - the SSL_CTX object for a client
+ */
 static SSL_CTX *get_client_ctx(ssl_loader_t *loader) {
     if (loader->client_ctx == NULL) {
         loader->client_ctx = SSL_CTX_new(TLS_client_method());
@@ -79,7 +95,14 @@ static SSL_CTX *get_client_ctx(ssl_loader_t *loader) {
     return loader->client_ctx;
 }
 
-int add_server_ssl(io_info_t *io_info, ssl_loader_t *loader) {
+/**
+ * @brief Add SSL layer to a server io_info object.
+ *
+ * @param io_info - the io_info object to add the SSL layer to
+ * @param loader - the ssl_loader object to use for the SSL layer
+ * @return int - 0 on success, non-zero on failure
+ */
+static int add_server_ssl(io_info_t *io_info, ssl_loader_t *loader) {
     SSL_CTX *ctx = get_server_ctx(loader);
     if (ctx == NULL) {
         return FAILURE; // TODO: don't know what to use for error
@@ -97,7 +120,14 @@ int add_server_ssl(io_info_t *io_info, ssl_loader_t *loader) {
     return SUCCESS;
 }
 
-int add_client_ssl(io_info_t *io_info, ssl_loader_t *loader) {
+/**
+ * @brief Add SSL layer to a client io_info object.
+ *
+ * @param io_info - the io_info object to add SSL to
+ * @param loader - the ssl_loader object to get the SSL_CTX from
+ * @return int - 0 on success, non-zero on failure
+ */
+static int add_client_ssl(io_info_t *io_info, ssl_loader_t *loader) {
     SSL_CTX *ctx = get_client_ctx(loader);
     if (ctx == NULL) {
         return FAILURE; // TODO: don't know what to use for error
