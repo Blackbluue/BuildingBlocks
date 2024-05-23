@@ -148,14 +148,25 @@ static int add_client_ssl(io_info_t *io_info, ssl_loader_t *loader) {
     SSL_set1_host(ssl, io_info->host);
 
     io_info->bio = BIO_push(ssl_bio, io_info->bio);
-    if (BIO_do_handshake(io_info->bio) != SSL_SUCCESS) {
-        DEBUG_PRINT("Failed to complete SSL handshake for client\n");
-        DEBUG_PRINT_SSL();
-        // remove the faulty SSL layer
-        io_info->bio = BIO_pop(io_info->bio);
-        BIO_free(ssl_bio);
-        return FAILURE; // TODO: don't know what to use for error
-    }
+    int err;
+    do {
+        err = SSL_connect(ssl);
+        if (err != SSL_SUCCESS) {
+            switch (SSL_get_error(ssl, err)) {
+            case SSL_ERROR_WANT_READ:
+                continue;
+            case SSL_ERROR_WANT_WRITE:
+                continue;
+            default:
+                DEBUG_PRINT("Failed to complete SSL handshake for client\n");
+                DEBUG_PRINT_SSL();
+                // remove the faulty SSL layer
+                io_info->bio = BIO_pop(io_info->bio);
+                BIO_free(ssl_bio);
+                return FAILURE; // TODO: don't know what to use for error
+            }
+        }
+    } while (err != SSL_SUCCESS);
 
     io_info->ssl_enabled = true;
     return SUCCESS;
@@ -341,9 +352,8 @@ io_info_t *new_connect_io_info(const char *host, const char *port, int *err,
 
     while (BIO_do_connect(io_info->bio) <= SUCCESS) {
         if (BIO_should_retry(io_info->bio)) {
-            DEBUG_PRINT(
-                "BIO_do_connect would block to server <-> host: %s port: %s\n",
-                host, port);
+            DEBUG_PRINT("connect would block to server <-> host: %s port: %s\n",
+                        host, port);
             continue;
         } else {
             set_err(err_type, SYS);
@@ -455,7 +465,9 @@ io_info_t *io_accept(io_info_t *io_info, int *err) {
     BIO_set_nbio_accept(new_info->bio, true);
     (void)BIO_set_close(new_info->bio, BIO_CLOSE);
     if (io_info->ssl_enabled) {
-        if (BIO_do_handshake(new_info->bio) != SSL_SUCCESS) {
+        SSL *ssl = NULL;
+        BIO_get_ssl(new_info->bio, &ssl);
+        if (SSL_accept(ssl) != SSL_SUCCESS) {
             set_err(err, EAGAIN);
             DEBUG_PRINT("Failed to complete SSL handshake for server\n");
             DEBUG_PRINT_SSL();
