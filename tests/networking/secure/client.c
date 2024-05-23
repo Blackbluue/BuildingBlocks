@@ -62,6 +62,9 @@ void test_send_message() {
     CU_ASSERT_EQUAL(pkt->hdr->data_type, SVR_SUCCESS);
     CU_ASSERT_EQUAL(pkt->hdr->data_len, strlen(msg) + 1);
     CU_ASSERT_STRING_EQUAL(pkt->data, msg);
+    char *returned_msg = pkt->data;
+    printf("Returned message: %s\n", returned_msg);
+
     free_packet(pkt);
 }
 

@@ -3,6 +3,7 @@
 #include "buildingblocks.h"
 #include <errno.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <unistd.h>
 #ifdef DEBUG
 #include <pthread.h>
@@ -16,6 +17,8 @@
 /* PRIVATE FUNCTIONS */
 
 static int echo_message(const struct packet *pkt, io_info_t *client) {
+    char *msg = pkt->data;
+    printf("Received message: %s\n", msg);
     return write_pkt_data(client, pkt->data, pkt->hdr->data_len, SVR_SUCCESS);
 }
 
