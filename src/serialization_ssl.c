@@ -142,6 +142,11 @@ static int add_client_ssl(io_info_t *io_info, ssl_loader_t *loader) {
         DEBUG_PRINT_SSL();
         return FAILURE; // TODO: don't know what to use for error
     }
+    SSL *ssl;
+    BIO_get_ssl(ssl_bio, &ssl);
+    SSL_set_tlsext_host_name(ssl, io_info->host);
+    SSL_set1_host(ssl, io_info->host);
+
     io_info->bio = BIO_push(ssl_bio, io_info->bio);
     if (BIO_do_handshake(io_info->bio) != SSL_SUCCESS) {
         DEBUG_PRINT("Failed to complete SSL handshake for client\n");
