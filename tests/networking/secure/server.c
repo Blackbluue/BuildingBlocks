@@ -51,9 +51,9 @@ int main(void) {
     err = run_service(server, service_name);
     if (err != SUCCESS && err != EINTR) {
         fprintf(stderr, "run_service: %s\n", strerror(err));
-        destroy_server(server);
-        return EXIT_FAILURE;
+        err = EXIT_FAILURE;
     }
     puts("Closing server...");
     destroy_server(server);
+    return err;
 }
