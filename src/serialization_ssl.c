@@ -19,6 +19,9 @@
 #define FAILURE -1
 #define SSL_SUCCESS 1
 
+#define SSL_LOCATION "/usr/local/ssl/"
+#define SSL_BUILD_PATH(file_name) SSL_LOCATION file_name
+
 struct io_info {
     int type;
     int fd;
@@ -55,8 +58,9 @@ static SSL_CTX *get_server_ctx(ssl_loader_t *loader) {
         SSL_CTX_set_min_proto_version(loader->server_ctx, TLS1_2_VERSION);
         SSL_CTX_set_mode(loader->server_ctx, SSL_MODE_AUTO_RETRY);
         if (!SSL_CTX_use_certificate_chain_file(loader->server_ctx,
-                                                "PLACEHOLDER.pem") ||
-            !SSL_CTX_use_PrivateKey_file(loader->server_ctx, "PLACEHOLDER.pem",
+                                                SSL_BUILD_PATH("cert.pem")) ||
+            !SSL_CTX_use_PrivateKey_file(loader->server_ctx,
+                                         SSL_BUILD_PATH("key.pem"),
                                          SSL_FILETYPE_PEM) ||
             !SSL_CTX_check_private_key(loader->server_ctx)) {
             DEBUG_PRINT("Error setting up SSL_CTX\n");
@@ -83,9 +87,8 @@ static SSL_CTX *get_client_ctx(ssl_loader_t *loader) {
         SSL_CTX_set_min_proto_version(loader->client_ctx, TLS1_2_VERSION);
         SSL_CTX_set_mode(loader->client_ctx, SSL_MODE_AUTO_RETRY);
         SSL_CTX_set_verify(loader->client_ctx, SSL_VERIFY_PEER, NULL);
-        if (!SSL_CTX_load_verify_locations(loader->client_ctx,
-                                           "ca_PLACEHOLDER.pem", NULL)) {
-            DEBUG_PRINT("Error loading CA file\n");
+        if (!SSL_CTX_set_default_verify_paths(loader->client_ctx)) {
+            DEBUG_PRINT("Failed to set default trusted certificate store\n");
             DEBUG_PRINT_SSL();
             SSL_CTX_free(loader->client_ctx);
             loader->client_ctx = NULL;
