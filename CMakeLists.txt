@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.28)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     message("DEBUGGING VERSION")
@@ -136,6 +136,8 @@ endif()
 if(BUILD_TESTING)
     enable_testing()
     set(CTEST_RERUN_FAILED ON)
+    find_package(Pytest REQUIRED)
+
     add_executable(test_array_list ${CMAKE_CURRENT_SOURCE_DIR}/tests/array_list_tests.c)
     target_link_libraries(test_array_list buildingblocks array_list cunit)
     add_test(NAME TestArrayList COMMAND test_array_list)
@@ -201,4 +203,6 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME TestNetworking COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/test_networking.sh ${CMAKE_CURRENT_BINARY_DIR}/test_net_adventure ${CMAKE_CURRENT_BINARY_DIR}/test_net_hero)
     add_test(NAME TestThreadedNetworking COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/test_networking.sh ${CMAKE_CURRENT_BINARY_DIR}/threaded_server ${CMAKE_CURRENT_BINARY_DIR}/client)
+
+    pytest_discover_tests(TestPythonClient TRIM_FROM_NAME "^test_")
 endif()
