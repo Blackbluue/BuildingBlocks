@@ -166,7 +166,7 @@ io_info_t *new_file_io_info(const char *filename, int flags, mode_t mode,
 }
 
 io_info_t *new_accept_io_info(const char *port, int *err, int *err_type) {
-    io_info_t *io_info = malloc(sizeof(*io_info));
+    io_info_t *io_info = calloc(1, sizeof(*io_info));
     if (io_info == NULL) {
         set_err(err_type, SYS);
         set_err(err, ENOMEM);
@@ -215,7 +215,7 @@ cleanup:
 
 io_info_t *new_connect_io_info(const char *host, const char *port, int *err,
                                int *err_type) {
-    io_info_t *io_info = malloc(sizeof(*io_info));
+    io_info_t *io_info = calloc(1, sizeof(*io_info));
     if (io_info == NULL) {
         set_err(err_type, SYS);
         set_err(err, ENOMEM);
@@ -229,7 +229,7 @@ io_info_t *new_connect_io_info(const char *host, const char *port, int *err,
     };
 
     int sock = FAILURE;
-    struct addrinfo *result;
+    struct addrinfo *result = NULL;
     int loc_err = getaddrinfo(host, port, &hints, &result);
     if (loc_err != SUCCESS) {
         if (loc_err == EAI_SYSTEM) {
@@ -253,6 +253,7 @@ io_info_t *new_connect_io_info(const char *host, const char *port, int *err,
         }
 
         if (connect(sock, res_ptr->ai_addr, res_ptr->ai_addrlen) != FAILURE) {
+            io_info->fd = sock;
             goto cleanup;
         }
 
@@ -295,6 +296,8 @@ const char *io_info_host(io_info_t *io_info) { return io_info->host; }
 const char *io_info_serv(io_info_t *io_info) { return io_info->serv; }
 
 int io_info_add_ssl(io_info_t *io_info, ssl_loader_t *loader) {
+    (void)io_info;
+    (void)loader;
     return ENOTSUP;
 }
 
