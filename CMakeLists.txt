@@ -18,7 +18,7 @@ endif()
 
 project(
     BuildingBlocks
-    VERSION 0.3.2
+    VERSION 0.3.3
     LANGUAGES "C"
     DESCRIPTION "A collection of data structures and algorithms"
 )
