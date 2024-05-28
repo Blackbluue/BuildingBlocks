@@ -346,7 +346,7 @@ io_info_t *new_connect_io_info(const char *host, const char *port, int *err,
         free(io_info);
         return NULL;
     }
-    BIO_set_conn_hostname(io_info->bio, host);
+    BIO_set_conn_hostname(io_info->bio, host == NULL ? "" : host);
     BIO_set_conn_port(io_info->bio, port);
     BIO_set_nbio(io_info->bio, true);
 
