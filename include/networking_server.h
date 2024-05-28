@@ -1,7 +1,7 @@
 #ifndef NETWORKING_SERVER_H
 #define NETWORKING_SERVER_H
 
-#include "networking_utils.h"
+#include "serialization.h"
 #include <signal.h>
 
 /* DATA */
@@ -13,24 +13,12 @@
 
 enum service_flags {
     THREADED_SESSIONS = 1 << 0, // Run each client session in a separate thread
-};
-
-/**
- * @brief Client information.
- *
- * @param client_sock - the client socket
- * @param addr - the client address
- * @param addrlen - the length of the address
- */
-struct client_info {
-    int client_sock;              // client socket
-    struct sockaddr_storage addr; // client address
-    socklen_t addrlen;            // length of the address
+    ENABLE_SSL = 1 << 1,        // Enable SSL for the service
 };
 
 typedef struct server server_t;
 
-typedef int (*service_f)(struct client_info *client);
+typedef int (*service_f)(io_info_t *client);
 
 /* FUNCTIONS */
 
@@ -73,10 +61,9 @@ int destroy_server(server_t *server);
 /**
  * @brief Open an Inet server socket.
  *
- * Creates an Inet socket with the given attributes and stores it in the server
- * with the given name. The socket will be bound to all interfaces. If the
- * socket type is SOCK_STREAM or SOCK_SEQPACKET, the socket will be set to
- * listen for incoming connections.
+ * Creates an Inet socket and stores it in the server with the given name. The
+ * socket will be bound to all interfaces and set to listen for incoming
+ * connections.
  *
  * Errors are separated into different types. The error type will be stored in
  * optional err_type argument, while the error itself will always be returned.
@@ -98,19 +85,17 @@ int destroy_server(server_t *server);
  * @param server - The server to store the socket.
  * @param name - The identifier of the service.
  * @param port - The port number.
- * @param attr - The attributes for the server.
  * @param err_type - The error code type.
  * @return int - 0 on success, non-zero on failure.
  */
 int open_inet_socket(server_t *server, const char *name, const char *port,
-                     const networking_attr_t *attr, int *err_type);
+                     int *err_type);
 
 /**
  * @brief Open a Unix domain server socket.
  *
- * Creates a Unix domain server socket with the given attributes. The socket
- * will be bound to all interfaces. If the socket type is SOCK_STREAM or
- * SOCK_SEQPACKET, the socket will be set to listen for incoming connections.
+ * Creates a Unix domain server socket. The socket will be bound to all
+ * interfaces and set to listen for incoming connections.
  *
  * Possible errors:
  * - EINVAL: server, name, or path is NULL
@@ -121,11 +106,9 @@ int open_inet_socket(server_t *server, const char *name, const char *port,
  * @param server - the server to store the socket.
  * @param name - the identifier of the service.
  * @param path - the unix domain path.
- * @param attr - the attributes for the server.
  * @return int - 0 on success, non-zero on failure.
  */
-int open_unix_socket(server_t *server, const char *name, const char *path,
-                     const networking_attr_t *attr);
+int open_unix_socket(server_t *server, const char *name, const char *path);
 
 /**
  * @brief Register a service with the server.
@@ -136,10 +119,14 @@ int open_unix_socket(server_t *server, const char *name, const char *path,
  * The flags parameter is a bitmask of the service flags.
  * Possible flags:
  * - THREADED_SESSIONS: Run each client session in a separate thread.
+ * - ENABLE_SSL: Enable SSL for the service.
+ * Unknown flags are ignored.
  *
  * Possible errors:
  * - EINVAL: server, name, or service is NULL
  * - ENOENT: The socket with the given name does not exist
+ * - ENOTSUP: One of the given flags are not supported
+ * - EAGAIN: Failed to enable SSL (if ENABLE_SSL is set)
  *
  * @param server - the server to register the service with.
  * @param name - the name of the service.

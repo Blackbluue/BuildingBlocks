@@ -1,17 +1,10 @@
-#ifndef HERO_SERVER_H
-#define HERO_SERVER_H
+#ifndef SECURE_UTILS_SERVER_H
+#define SECURE_UTILS_SERVER_H
 
-#include "hero.h"
 #include "networking_server.h"
+#include "secure_utils.h"
 
 /* FUNCTIONS */
-
-/**
- * @brief Allow the server to exit gracefully.
- *
- * Sets up signal handling to allow the server to exit gracefully.
- */
-void allow_graceful_exit(void);
 
 /**
  * @brief Handle a client session.
@@ -29,4 +22,4 @@ void allow_graceful_exit(void);
  */
 int send_response(io_info_t *client);
 
-#endif /* HERO_SERVER_H */
+#endif /* SECURE_UTILS_SERVER_H */

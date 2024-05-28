@@ -18,7 +18,7 @@ endif()
 
 project(
     BuildingBlocks
-    VERSION 0.3.1
+    VERSION 0.3.2
     LANGUAGES "C"
     DESCRIPTION "A collection of data structures and algorithms"
 )
@@ -27,6 +27,17 @@ project(
 set(CMAKE_C_COMPILER gcc)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
+
+set(SSL_DIR /usr/local/ssl)
+set(OPENSSL_ROOT_DIR ${SSL_DIR}/lib64)
+include(FindOpenSSL)
+find_package(OpenSSL)
+if(OpenSSL_FOUND)
+    include_directories(${SSL_DIR}/include)
+else()
+    message("OpenSSL not found")
+endif()
+
 
 set(SOURCES "")
 
@@ -81,20 +92,20 @@ add_library(weighted_graph OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/weighted_graph
 target_link_libraries(weighted_graph buildingblocks queue_p queue linked_list hash_table)
 set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/weighted_graph.c)
 
-add_library(serialization OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/serialization.c)
-target_link_libraries(serialization buildingblocks)
-set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/serialization.c)
-
-add_library(networking_utils OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_utils.c)
-target_link_libraries(networking_utils buildingblocks)
-set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_utils.c)
-
-add_library(networking_client OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_client.c)
-target_link_libraries(networking_client buildingblocks networking_utils)
-set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_client.c)
+if(OpenSSL_FOUND)
+    add_compile_definitions(SSL_AVAILABLE=1)
+    add_library(serialization OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/serialization_ssl.c)
+    target_link_libraries(serialization buildingblocks OpenSSL::SSL)
+    set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/serialization_ssl.c)
+else()
+    add_compile_definitions(SSL_AVAILABLE=0)
+    add_library(serialization OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/serialization.c)
+    target_link_libraries(serialization buildingblocks)
+    set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/serialization.c)
+endif()
 
 add_library(networking_server OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_server.c)
-target_link_libraries(networking_server buildingblocks networking_utils linked_list array_list hash_table threadpool)
+target_link_libraries(networking_server buildingblocks linked_list array_list hash_table threadpool)
 set(SOURCES ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/src/networking_server.c)
 
 ### INSTALL TARGETS ###
@@ -158,16 +169,34 @@ if(BUILD_TESTING)
     add_library(hero OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/single_thread/hero.c)
     add_library(hero_server OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/single_thread/hero_server.c)
     add_executable(test_net_adventure ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/single_thread/adventure.c)
-    target_link_libraries(test_net_adventure buildingblocks serialization networking_utils networking_server hero hero_server queue_concurrent queue linked_list array_list hash_table threadpool_attributes threadpool)
     add_executable(test_net_hero ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/single_thread/hero_client.c)
-    target_link_libraries(test_net_hero buildingblocks serialization networking_utils networking_client hero cunit)
-    add_test(NAME TestNetworking COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/test_networking.sh ${CMAKE_CURRENT_BINARY_DIR}/test_net_adventure ${CMAKE_CURRENT_BINARY_DIR}/test_net_hero)
 
     add_library(threaded_utils OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/multi_thread/threaded_utils.c)
     add_library(threaded_utils_server OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/multi_thread/threaded_utils_server.c)
     add_executable(threaded_server ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/multi_thread/server.c)
-    target_link_libraries(threaded_server buildingblocks serialization networking_utils networking_server threaded_utils threaded_utils_server queue_concurrent queue linked_list array_list hash_table threadpool_attributes threadpool Threads::Threads)
     add_executable(client ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/multi_thread/client.c)
-    target_link_libraries(client buildingblocks serialization networking_utils networking_client threaded_utils cunit Threads::Threads)
+
+    if(OpenSSL_FOUND)
+        target_link_libraries(test_net_adventure buildingblocks serialization networking_server hero hero_server queue_concurrent queue linked_list array_list hash_table threadpool_attributes threadpool OpenSSL::SSL)
+        target_link_libraries(test_net_hero buildingblocks serialization hero cunit OpenSSL::SSL)
+
+        target_link_libraries(threaded_server buildingblocks serialization networking_server threaded_utils threaded_utils_server queue_concurrent queue linked_list array_list hash_table threadpool_attributes threadpool Threads::Threads OpenSSL::SSL)
+        target_link_libraries(client buildingblocks serialization threaded_utils cunit Threads::Threads OpenSSL::SSL)
+
+        add_library(secure_utils OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/secure/secure_utils.c)
+        add_library(secure_utils_server OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/secure/secure_utils_server.c)
+        add_executable(secure_server ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/secure/server.c)
+        add_executable(secure_client ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/secure/client.c)
+        target_link_libraries(secure_server buildingblocks serialization networking_server secure_utils secure_utils_server queue_concurrent queue linked_list array_list hash_table threadpool_attributes threadpool OpenSSL::SSL)
+        target_link_libraries(secure_client buildingblocks serialization secure_utils cunit OpenSSL::SSL)
+        add_test(NAME TestSSL COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/test_networking.sh ${CMAKE_CURRENT_BINARY_DIR}/secure_server ${CMAKE_CURRENT_BINARY_DIR}/secure_client)
+    else()
+        target_link_libraries(test_net_adventure buildingblocks serialization networking_server hero hero_server queue_concurrent queue linked_list array_list hash_table threadpool_attributes threadpool)
+        target_link_libraries(test_net_hero buildingblocks serialization hero cunit)
+
+        target_link_libraries(threaded_server buildingblocks serialization networking_server threaded_utils threaded_utils_server queue_concurrent queue linked_list array_list hash_table threadpool_attributes threadpool Threads::Threads)
+        target_link_libraries(client buildingblocks serialization threaded_utils cunit Threads::Threads)
+    endif()
+    add_test(NAME TestNetworking COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/test_networking.sh ${CMAKE_CURRENT_BINARY_DIR}/test_net_adventure ${CMAKE_CURRENT_BINARY_DIR}/test_net_hero)
     add_test(NAME TestThreadedNetworking COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/networking/test_networking.sh ${CMAKE_CURRENT_BINARY_DIR}/threaded_server ${CMAKE_CURRENT_BINARY_DIR}/client)
 endif()

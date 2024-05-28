@@ -1,5 +1,5 @@
 #define _POSIX_C_SOURCE 200112L
-#include "hero_server.h"
+#include "secure_utils_server.h"
 #include <errno.h>
 #include <netdb.h>
 #include <stdio.h>
@@ -17,7 +17,8 @@ int main(void) {
     }
 
     int err_type;
-    err = open_inet_socket(server, "adventure", TCP_PORT, &err_type);
+    char *service_name = "SSL echo server";
+    err = open_inet_socket(server, service_name, TCP_PORT, &err_type);
     if (err != SUCCESS) {
         switch (err_type) {
         case SYS:
@@ -39,7 +40,7 @@ int main(void) {
         destroy_server(server);
         return EXIT_FAILURE;
     }
-    err = register_service(server, "adventure", send_response, NO_FLAGS);
+    err = register_service(server, service_name, send_response, ENABLE_SSL);
     if (err) {
         fprintf(stderr, "register_server: %s\n", strerror(err));
         destroy_server(server);
@@ -47,12 +48,12 @@ int main(void) {
     }
 
     allow_graceful_exit();
-    err = run_service(server, "adventure");
+    err = run_service(server, service_name);
     if (err != SUCCESS && err != EINTR) {
         fprintf(stderr, "run_service: %s\n", strerror(err));
-        destroy_server(server);
-        return EXIT_FAILURE;
+        err = EXIT_FAILURE;
     }
     puts("Closing server...");
     destroy_server(server);
+    return err;
 }
