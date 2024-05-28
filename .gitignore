@@ -19,8 +19,7 @@
 # Libraries
 *.lib
 *.a
-*.la
-*.lo
+*.l[ao]
 
 # Shared objects (inc. Windows DLLs)
 *.dll
@@ -38,11 +37,14 @@
 build/*
 !build/.gitkeep
 
+#Python files
+*.py[cod]
+__pycache__/
+
 # Debug files
 *.dSYM/
 *.su
-*.idb
-*.pdb
+*.[ip]db
 
 # Kernel Module Compile Results
 *.mod*
