@@ -25,11 +25,13 @@ project(
 
 
 set(CMAKE_C_COMPILER gcc)
+
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
 set(SSL_DIR /usr/local/ssl)
 set(OPENSSL_ROOT_DIR ${SSL_DIR}/lib64)
+set(OPENSSL_INCLUDE_DIR ${SSL_DIR}/include)
 include(FindOpenSSL)
 find_package(OpenSSL)
 if(OpenSSL_FOUND)
