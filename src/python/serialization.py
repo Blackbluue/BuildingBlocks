@@ -1,11 +1,14 @@
 """Contain class for I/O operations."""
 import socket
 import sys
+from struct import Struct, pack
 from typing import Union
 
 
 class IO_Info:
     """Contain class for I/O operations."""
+
+    _header_packer = Struct("!3I")
 
     def __init__(
         self, host: Union[bytes, str, None], port: Union[bytes, str, int, None]
@@ -20,7 +23,6 @@ class IO_Info:
             OSError: If the socket could not be opened and connected to.
         """
         self._connect_sock(host, port)
-        self._header = Struct("!3I")
 
     def __del__(self) -> None:
         if self._sock is not None:
@@ -61,3 +63,12 @@ class IO_Info:
             print("Could not open or connect to socket", file=sys.stderr)
             if err:
                 raise err
+
+    def write_pkt_data(self, data: bytes, len: int, data_type: int) -> None:
+        if self._sock is None:
+            raise OSError("socket is not open")
+
+        self._sock.sendall(
+            self._header_packer.pack(self._header_packer.size, len, data_type)
+        )
+        self._sock.sendall(pack(f"{len}s", data))
