@@ -130,3 +130,15 @@ class IO_Info:
             raise OSError("socket is not open")
         Packet(len, data_type, data).write_pkt_data(self._sock)
 
+    def recv_pkt_data(self) -> Packet:
+        """Receive packet data from the socket.
+
+        Raises:
+            OSError: If the socket is not open.
+
+        Returns:
+            Packet: The packet received from the socket.
+        """
+        if self._sock is None:
+            raise OSError("socket is not open")
+        return Packet.recv_pkt_data(self._sock)
