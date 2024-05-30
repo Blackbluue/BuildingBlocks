@@ -55,6 +55,9 @@ class Packet(NamedTuple):
         )
         sock.sendall(pack(f"{self.data_len}s", self.data))
 
+    def __str__(self) -> str:
+        return f"Packet of {self.data_len} bytes with type {self.data_type}"
+
 
 class IO_Info:
     """Contain class for I/O operations."""
