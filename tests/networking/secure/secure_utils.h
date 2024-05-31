@@ -3,7 +3,7 @@
 
 /* DATA */
 
-#define TCP_PORT "53467" // default port for TCP
+#define TCP_PORT "53466" // default port for TCP
 
 enum {
     SVR_SUCCESS = 99, // server response flag: success
