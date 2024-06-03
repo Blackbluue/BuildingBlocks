@@ -2,12 +2,11 @@
 from __future__ import annotations
 
 import socket
-import sys
 from struct import Struct, pack
 from typing import TYPE_CHECKING, NamedTuple
 
 if TYPE_CHECKING:
-    from typing import Union
+    from typing import Optional, Union
 
 
 # header length, data length, data type as unsigned 32-bit int in network byte order
@@ -59,13 +58,13 @@ class Packet(NamedTuple):
         return f"Packet of {self.data_len} bytes with type {self.data_type}"
 
 
-class IO_Info:
+class IOInfo:
     """Contain class for I/O operations."""
 
     _header_packer = Struct("!3I")
 
     def __init__(self, host: Union[str, None], port: int) -> None:
-        """Create a new instance of IO_Info.
+        """Create a new instance of IOInfo.
 
         Args:
             host (bytes | str | None): The host to connect to. Use None for localhost.
@@ -75,7 +74,9 @@ class IO_Info:
             OSError: If the socket could not be opened and connected to.
         """
         try:
-            self._sock = socket.create_connection((host, port))
+            self._sock: Optional[socket.socket] = socket.create_connection(
+                (host, port)
+            )
         except OSError as exc:
             self._sock = None
             raise OSError("Could not open or connect to socket") from exc
@@ -85,12 +86,12 @@ class IO_Info:
             self._sock.close()
             self._sock = None
 
-    def write_pkt_data(self, data: bytes, len: int, data_type: int) -> None:
+    def write_pkt_data(self, data: bytes, length: int, data_type: int) -> None:
         """Write packet data to the socket.
 
         Args:
             data (bytes): The data to write.
-            len (int): The length of the data.
+            length (int): The length of the data.
             data_type (int): The user-defined data type flag.
 
         Raises:
@@ -98,7 +99,7 @@ class IO_Info:
         """
         if self._sock is None:
             raise OSError("socket is not open")
-        Packet(len, data_type, data).write_pkt_data(self._sock)
+        Packet(length, data_type, data).write_pkt_data(self._sock)
 
     def recv_pkt_data(self) -> Packet:
         """Receive packet data from the socket.

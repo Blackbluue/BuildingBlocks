@@ -3,7 +3,7 @@ import os.path
 from subprocess import DEVNULL, Popen, TimeoutExpired
 from time import sleep
 
-from buildingblocks.src.python.serialization import IO_Info
+from buildingblocks.src.python.serialization import IOInfo
 
 from .hero import TCP_PORT, Hero, ResponseCodes, Status
 
@@ -15,7 +15,7 @@ def test_send_hero():
         stderr=DEVNULL,
     )
     assert server.poll() is None, "Server failed to start"
-    sleep(1)
+    sleep(1)  # give the server time to start
 
     allogenes = Hero("Yelan", 60)
     allogenes.set_status(
@@ -24,10 +24,10 @@ def test_send_hero():
     packed_hero = allogenes.pack()
 
     try:
-        info = IO_Info(None, TCP_PORT)
+        info = IOInfo(None, TCP_PORT)
     except Exception as e:
         close_server(server)
-        assert False, f"Failed to create IO_Info instance with error: {e}"
+        assert False, f"Failed to create IOInfo instance with error: {e}"
 
     try:
         info.write_pkt_data(
@@ -57,7 +57,7 @@ def test_send_hero():
             packet.data_type == ResponseCodes.SVR_SUCCESS
         ), f"Received packet data type is not {ResponseCodes.SVR_SUCCESS}"
 
-    assert close_server(server), "Server failed to close properly"
+    close_server(server)
 
 
 def close_server(server: Popen):

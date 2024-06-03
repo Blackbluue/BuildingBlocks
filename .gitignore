@@ -40,6 +40,7 @@ build/*
 #Python files
 *.py[cod]
 __pycache__/
+.mypy_cache/
 
 # Debug files
 *.dSYM/
